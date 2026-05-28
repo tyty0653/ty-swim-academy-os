@@ -49,7 +49,7 @@ begin
   delete from public.students where student_code like 'DEMO-%';
   delete from public.customers where customer_code like 'DEMO-%';
   delete from public.coach_rates where coach_id in (select id from public.coaches where coach_code like 'DEMO%') or notes like 'DEMO_SEED%';
-  delete from public.coaches where coach_code = 'DEMO';
+  delete from public.coaches where coach_code like 'DEMO%';
 
   insert into public.profiles (id, full_name, email, role, active)
   values
@@ -140,7 +140,27 @@ begin
     ('DEMO-LES-0001', v_class_id, v_package_id, v_coach_id, v_venue_id, v_schedule_id, 'fixed_weekly', current_date, '17:00', '18:00', 60, 'scheduled', true, true, v_admin_profile_id, v_admin_profile_id, 'DEMO_SEED scheduled fixed weekly lesson'),
     ('DEMO-LES-0002', v_class_id, v_package_id, v_coach_id, v_venue_id, null, 'flexible', current_date + 3, '10:00', '11:00', 60, 'scheduled', true, true, v_admin_profile_id, v_admin_profile_id, 'DEMO_SEED flexible lesson appointment'),
     ('DEMO-LES-0003', v_class_id, v_package_id, v_coach_id, v_venue_id, null, 'flexible', current_date - 1, '10:00', '11:00', 60, 'completed_pending_review', true, true, v_coach_profile_id, v_coach_profile_id, 'DEMO_SEED pending review lesson submitted by coach')
-  on conflict (lesson_code) do nothing;
+  on conflict (lesson_code) do update set
+    class_id = excluded.class_id,
+    package_id = excluded.package_id,
+    coach_id = excluded.coach_id,
+    venue_id = excluded.venue_id,
+    recurring_schedule_id = excluded.recurring_schedule_id,
+    scheduling_mode = excluded.scheduling_mode,
+    scheduled_date = excluded.scheduled_date,
+    start_time = excluded.start_time,
+    end_time = excluded.end_time,
+    duration_minutes = excluded.duration_minutes,
+    status = excluded.status,
+    count_package_lesson = excluded.count_package_lesson,
+    coach_payable = excluded.coach_payable,
+    approved_package_applied = false,
+    admin_reviewed_at = null,
+    admin_reviewed_by = null,
+    created_by = excluded.created_by,
+    updated_by = excluded.updated_by,
+    coach_notes = excluded.coach_notes,
+    admin_notes = null;
 
   insert into public.lesson_participants (lesson_id, student_id, attendance, progress_note, next_focus)
   select l.id, s.id, 'present', 'DEMO_SEED progress note', 'DEMO_SEED next focus'
@@ -153,4 +173,14 @@ begin
   insert into public.consents (customer_id, internal_photo_allowed, marketing_photo_status, platforms_allowed, consent_date, notes)
   values (v_customer_id, true, 'ask_first', array['internal'], current_date, 'DEMO_SEED fake consent row')
   on conflict do nothing;
+
+  if not exists (
+    select 1 from public.lessons
+    where lesson_code = 'DEMO-LES-0003'
+      and status = 'completed_pending_review'
+      and package_id = v_package_id
+      and coach_id = v_coach_id
+  ) then
+    raise exception 'Demo seed failed to create DEMO-LES-0003 as completed_pending_review';
+  end if;
 end $$;

@@ -9,6 +9,7 @@ Date: 2026-05-28
 - [x] Standalone Vite routes returned HTTP 200 for `/`, `/login`, and `/dashboard`.
 - [x] Added `npm run smoke:routes` for repeatable local route checks.
 - [x] Added `npm run qa:check` for live Supabase Admin/Coach RLS and workflow checks when test credentials are available.
+- [x] Live QA and System Check use bucket-specific reachability checks instead of unreliable `listBuckets()` output.
 - [x] Missing Supabase env variables keep the app from crashing and show the setup screen.
 
 ## Schema And Frontend Consistency
@@ -20,6 +21,7 @@ Date: 2026-05-28
 - [x] Added `supabase/demo-seed.sql` with safe fake data and replaceable Auth user ID placeholders.
 - [x] Demo seed can be rerun to reset only `DEMO-*` / `DEMO_SEED` data.
 - [x] Demo seed includes fixed weekly schedule, fixed scheduled lesson, flexible scheduled lesson, and one pending-review lesson.
+- [x] Demo seed now force-resets `DEMO-LES-0003` to `completed_pending_review` and raises an error if that row is not created.
 
 ## Auth And Roles
 

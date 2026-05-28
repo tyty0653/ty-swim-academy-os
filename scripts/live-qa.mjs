@@ -37,6 +37,10 @@ function warn(check, detail) {
   result('WARN', check, detail);
 }
 
+function info(check, detail) {
+  result('INFO', check, detail);
+}
+
 function fail(check, detail) {
   result('FAIL', check, detail);
 }
@@ -83,6 +87,11 @@ async function signedUrl(supabase, bucket, path) {
   return data?.signedUrl;
 }
 
+async function checkBucketReachable(supabase, bucket) {
+  const { error } = await supabase.storage.from(bucket).list('', { limit: 1 });
+  return { bucket, ok: !error, detail: error?.message || 'Reachable' };
+}
+
 async function main() {
   if (!supabaseUrl || !supabaseAnonKey) {
     warn('Live QA skipped', 'Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local.');
@@ -110,21 +119,26 @@ async function main() {
     else pass(`Admin can read ${table}`);
   }
 
-  const { data: buckets, error: bucketError } = await admin.supabase.storage.listBuckets();
-  const bucketNames = buckets?.map((bucket) => bucket.name) || [];
-  if (!bucketError && ['lesson-photos', 'payment-proofs', 'expense-receipts'].every((name) => bucketNames.includes(name))) {
-    pass('Required private buckets visible to Admin', bucketNames.join(', '));
+  const bucketChecks = await Promise.all(['lesson-photos', 'payment-proofs', 'expense-receipts'].map((bucket) => checkBucketReachable(admin.supabase, bucket)));
+  if (bucketChecks.every((item) => item.ok)) {
+    pass('Required private buckets reachable to Admin', bucketChecks.map((item) => item.bucket).join(', '));
   } else {
-    fail('Required private buckets visible to Admin', bucketError?.message || `Found: ${bucketNames.join(', ') || 'none'}`);
+    fail('Required private buckets reachable to Admin', bucketChecks.map((item) => `${item.bucket}: ${item.detail}`).join(' | '));
   }
 
-  const { data: demoPackage } = await admin.supabase.from('packages').select('*').eq('package_code', 'DEMO-PKG-0001').maybeSingle();
-  const { data: demoPendingLesson } = await admin.supabase.from('lessons').select('*').eq('lesson_code', 'DEMO-LES-0003').maybeSingle();
-  const { data: demoScheduledLesson } = await admin.supabase.from('lessons').select('*').eq('lesson_code', 'DEMO-LES-0001').maybeSingle();
-  if (demoPackage && demoPendingLesson && demoScheduledLesson) pass('Demo package and lessons exist', 'DEMO-PKG-0001, DEMO-LES-0001, DEMO-LES-0003');
-  else warn('Demo package and lessons exist', 'Run supabase/demo-seed.sql after replacing Auth user IDs.');
+  const { data: demoPackage, error: demoPackageError } = await admin.supabase.from('packages').select('*').eq('package_code', 'DEMO-PKG-0001').maybeSingle();
+  const { data: demoLessons, error: demoLessonsError } = await admin.supabase.from('lessons').select('*').like('lesson_code', 'DEMO-LES-%').order('lesson_code');
+  const demoPendingLesson = (demoLessons || []).find((lesson) => lesson.lesson_code === 'DEMO-LES-0003');
+  const demoScheduledLesson = (demoLessons || []).find((lesson) => lesson.lesson_code === 'DEMO-LES-0001');
+  const missingDemo = [
+    demoPackage ? '' : 'DEMO-PKG-0001',
+    demoScheduledLesson ? '' : 'DEMO-LES-0001',
+    demoPendingLesson ? '' : 'DEMO-LES-0003',
+  ].filter(Boolean);
+  if (!demoPackageError && !demoLessonsError && missingDemo.length === 0) pass('Demo package and lessons exist', 'DEMO-PKG-0001, DEMO-LES-0001, DEMO-LES-0003');
+  else warn('Demo package and lessons exist', `${demoPackageError?.message || demoLessonsError?.message || `Missing: ${missingDemo.join(', ')}`}. Rerun the latest supabase/demo-seed.sql after replacing Auth user IDs.`);
   if (demoPendingLesson?.status === 'completed_pending_review') pass('Pending review demo lesson exists', demoPendingLesson.lesson_code);
-  else warn('Pending review demo lesson exists', `Expected DEMO-LES-0003 completed_pending_review, got ${demoPendingLesson?.status || 'missing'}.`);
+  else warn('Pending review demo lesson exists', `Expected DEMO-LES-0003 completed_pending_review, got ${demoPendingLesson?.status || 'missing'}. Visible demo lessons: ${(demoLessons || []).map((lesson) => `${lesson.lesson_code}:${lesson.status}`).join(', ') || 'none'}. Rerun the latest demo-seed.sql.`);
 
   const coach = await signIn('Coach', coachEmail, coachPassword);
   const { data: coachProfile, error: coachProfileError } = await coach.supabase.from('profiles').select('*').eq('id', coach.user.id).maybeSingle();
@@ -155,7 +169,7 @@ async function main() {
   else fail('Coach payroll scope', 'At least one payroll item belongs to a different coach.');
 
   if (!runMutations) {
-    warn('Mutation QA skipped', 'Set QA_RUN_MUTATIONS=true after running demo-seed.sql to test approve, payroll, expense, and storage flows.');
+    info('Mutation QA skipped', 'Set QA_RUN_MUTATIONS=true after running demo-seed.sql to test approve, payroll, expense, and storage flows.');
     return;
   }
 
@@ -263,6 +277,6 @@ try {
 const hasFail = results.some((item) => item.status === 'FAIL');
 const hasWarn = results.some((item) => item.status === 'WARN');
 console.log('');
-console.log(`Live QA summary: ${results.filter((item) => item.status === 'PASS').length} pass, ${results.filter((item) => item.status === 'WARN').length} warning, ${results.filter((item) => item.status === 'FAIL').length} fail.`);
+console.log(`Live QA summary: ${results.filter((item) => item.status === 'PASS').length} pass, ${results.filter((item) => item.status === 'WARN').length} warning, ${results.filter((item) => item.status === 'FAIL').length} fail, ${results.filter((item) => item.status === 'INFO').length} info.`);
 if (hasFail) process.exit(1);
 if (hasWarn) process.exit(0);

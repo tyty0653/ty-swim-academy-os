@@ -30,6 +30,7 @@ const allTableNames = [
 
 const coachTableNames = allTableNames.filter((name) => !['package_financials', 'expenses', 'import_batches', 'audit_logs'].includes(name));
 const initialData = Object.fromEntries(allTableNames.map((name) => [name, []]));
+const requiredStorageBuckets = ['lesson-photos', 'payment-proofs', 'expense-receipts'];
 
 function getPathInfo() {
   const rawPath = window.location.pathname.replace(/\/$/, '') || '/dashboard';
@@ -745,13 +746,20 @@ function moreToolDescription(key) {
 }
 
 function SystemCheckPage({ session, profile, data }) {
-  const [bucketState, setBucketState] = useState({ loading: true, names: [], error: '' });
+  const [bucketState, setBucketState] = useState({ loading: true, checks: [], error: '' });
   useEffect(() => {
     let cancelled = false;
     async function run() {
-      const { data: buckets, error } = await supabase.storage.listBuckets();
+      if (profile?.role !== 'admin') {
+        setBucketState({ loading: false, checks: [], error: '' });
+        return;
+      }
+      const checks = await Promise.all(requiredStorageBuckets.map(async (name) => {
+        const { error } = await supabase.storage.from(name).list('', { limit: 1 });
+        return { name, ok: !error, detail: error?.message || 'Reachable' };
+      }));
       if (cancelled) return;
-      setBucketState({ loading: false, names: buckets?.map((bucket) => bucket.name) || [], error: error?.message || '' });
+      setBucketState({ loading: false, checks, error: '' });
     }
     run();
     return () => {
@@ -759,8 +767,6 @@ function SystemCheckPage({ session, profile, data }) {
     };
   }, []);
 
-  const bucketNames = bucketState.names;
-  const requiredBuckets = ['lesson-photos', 'payment-proofs', 'expense-receipts'];
   const requiredTables = ['profiles', 'coaches', 'customers', 'students', 'venues', 'classes', 'packages', 'lessons', 'payroll_items'];
   const isAdmin = profile?.role === 'admin';
   const isCoach = profile?.role === 'coach';
@@ -784,7 +790,7 @@ function SystemCheckPage({ session, profile, data }) {
     checkRow('Current role detected', ['admin', 'coach'].includes(profile?.role) ? 'pass' : 'fail', `Role: ${profile?.role || 'missing'}`, 'Set profile role to admin or coach.'),
     checkRow('Admin / Coach role logic', ['admin', 'coach'].includes(profile?.role) ? 'pass' : 'fail', `You are viewing ${profile?.role || 'unknown'} checks.`, 'Use Admin login for Admin checks and Coach login for Coach restriction checks.'),
     checkRow('Core tables accessible', requiredTables.every((name) => Array.isArray(data[name])) ? 'pass' : 'fail', 'Core operational tables should load as lists.', 'Run supabase/schema.sql in the test Supabase project.'),
-    checkRow('Required storage buckets exist', !bucketState.loading && requiredBuckets.every((name) => bucketNames.includes(name)) ? 'pass' : 'warning', bucketState.loading ? 'Checking buckets...' : bucketState.error || `Found: ${bucketNames.join(', ') || 'none'}`, 'Confirm private buckets exist: lesson-photos, payment-proofs, expense-receipts.'),
+    checkRow('Required storage buckets reachable', isAdmin ? (!bucketState.loading && bucketState.checks.every((item) => item.ok) ? 'pass' : 'fail') : 'warning', isAdmin ? (bucketState.loading ? 'Checking buckets...' : bucketState.checks.map((item) => `${item.name}: ${item.detail}`).join(' | ')) : 'Bucket reachability is checked from Admin because payment proofs and expense receipts are Admin-only.', 'If Admin sees a bucket failure, rerun supabase/schema.sql and confirm the private buckets exist: lesson-photos, payment-proofs, expense-receipts.'),
     checkRow('Demo data present', demoDataPresent ? 'pass' : 'warning', demoDataPresent ? 'DEMO customer, students, class, package, and lessons found.' : 'Demo rows not found yet.', 'Run supabase/demo-seed.sql after replacing the Admin and Coach Auth user IDs.'),
     checkRow('Pending review lesson exists', pendingReviewLesson ? 'pass' : 'warning', pendingReviewLesson ? 'A lesson is waiting for Admin review.' : 'No completed_pending_review lesson is visible.', 'Run demo-seed.sql or submit a lesson as Coach.'),
     checkRow('Coach profile exists', coachProfileExists ? 'pass' : 'warning', `${data.coaches.length} coach record(s), ${data.coaches.filter((coach) => coach.profile_id).length} linked to login profile.`, 'Create a coach row and link profile_id to the Coach Auth user.'),

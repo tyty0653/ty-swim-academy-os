@@ -23,6 +23,15 @@ Before running `demo-seed.sql`, replace:
 
 You can rerun `demo-seed.sql` anytime to reset demo data. It deletes only `DEMO-*` rows and `DEMO_SEED` records.
 
+After a successful seed, these records should exist:
+
+- `DEMO-PKG-0001`
+- `DEMO-LES-0001` with status `scheduled`
+- `DEMO-LES-0002` with status `scheduled`
+- `DEMO-LES-0003` with status `completed_pending_review`
+
+If `npm run qa:check` says demo lessons are missing, rerun the latest `supabase/demo-seed.sql`. The seed now raises an error if it cannot create `DEMO-LES-0003` as pending review.
+
 ## 2. Local Env
 
 Create `.env.local`:
@@ -77,7 +86,7 @@ Admin:
 - Admin login works.
 - Admin profile exists and is active.
 - Required tables are readable.
-- Private storage buckets exist.
+- Private storage buckets are reachable by Admin using bucket-specific checks.
 - Demo package and lessons exist.
 - Pending review demo lesson exists.
 - Payment, expense, and payroll data are accessible to Admin.
@@ -102,6 +111,22 @@ Coach:
 - Coach can upload and signed-preview a lesson photo only for an assigned unapproved lesson.
 - Coach cannot upload payment proofs.
 - Coach cannot upload expense receipts.
+
+The script does not use `listBuckets()` as the source of truth, because Supabase may not reliably expose bucket listing through an anon/authenticated frontend client. Instead:
+
+- Read-only QA checks Admin reachability with `storage.from(bucket).list(...)`.
+- Mutation QA checks real upload, signed preview, and delete behavior.
+- Bucket privacy is still controlled by `supabase/schema.sql`, which creates all three buckets with `public = false`.
+
+If the bucket reachability check fails:
+
+1. Rerun `supabase/schema.sql`.
+2. In Supabase Dashboard, open Storage and confirm these private buckets exist:
+   - `lesson-photos`
+   - `payment-proofs`
+   - `expense-receipts`
+3. Confirm the storage policies from `schema.sql` exist.
+4. Rerun `npm run qa:check`.
 
 ## 5. System Check
 

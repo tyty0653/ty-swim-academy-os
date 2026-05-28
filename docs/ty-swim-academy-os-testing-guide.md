@@ -36,6 +36,8 @@ The demo seed uses fake data only and deletes previous `DEMO-*` rows before inse
 
 To reset demo data later, run the same `supabase/demo-seed.sql` again. The reset section only removes demo rows with `DEMO-*` codes or `DEMO_SEED` notes, so future real records are not touched.
 
+After seeding, `DEMO-LES-0003` should exist with status `completed_pending_review`. If it does not, rerun the latest `demo-seed.sql`; the seed raises an error if that pending review lesson cannot be created.
+
 ## 3. Local Env
 
 Create `.env.local`:
@@ -79,6 +81,7 @@ Check:
 - `/more`: System Check, import, cleanup, reports, settings, and advanced tools are available.
 - `/system-check`: all setup checks are pass or understandable warnings.
 - `/system-check`: confirms env, session, profile, role, tables, buckets, demo data, coach profile link, sensitive coach restrictions, counts, and next action.
+- Bucket checks use bucket-specific reachability, not `listBuckets()`, because `listBuckets()` can be unreliable from an anon/authenticated frontend client.
 
 Flow:
 
