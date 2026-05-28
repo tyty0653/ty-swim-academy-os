@@ -32,6 +32,8 @@ Expected:
 
 The demo seed uses fake data only and deletes previous `DEMO-*` rows before inserting fresh demo data.
 
+To reset demo data later, run the same `supabase/demo-seed.sql` again. The reset section only removes demo rows with `DEMO-*` codes or `DEMO_SEED` notes, so future real records are not touched.
+
 ## 3. Local Env
 
 Create `.env.local`:
@@ -49,7 +51,19 @@ npm run dev
 
 Open `/login`.
 
-## 4. Admin Test Script
+## 4. Login Troubleshooting
+
+If login does not work, use these messages:
+
+- Supabase setup required: `.env.local` is missing `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY`.
+- Login failed: email or password is wrong, or the Auth user does not exist.
+- Login succeeded, but your staff profile is missing or inactive: the Auth user exists, but `profiles.id` does not match the Auth user ID, or the profile is inactive.
+- Your staff role is not valid: set `profiles.role` to `admin` or `coach`.
+- TY Swim Academy OS could not finish loading: check internet connection, Supabase URL/key, and whether `schema.sql` has been applied.
+
+The sign-in button should always stop loading after success, failure, or timeout.
+
+## 5. Admin Test Script
 
 Sign in as Admin.
 
@@ -62,6 +76,7 @@ Check:
 - `/money`: payments, payroll, expenses, and export summary are grouped.
 - `/more`: System Check, import, cleanup, reports, settings, and advanced tools are available.
 - `/system-check`: all setup checks are pass or understandable warnings.
+- `/system-check`: confirms env, session, profile, role, tables, buckets, demo data, coach profile link, sensitive coach restrictions, counts, and next action.
 
 Flow:
 
@@ -73,7 +88,7 @@ Flow:
 6. Mark payroll paid.
 7. Mark paid again must not create duplicate coach salary expense.
 
-## 5. Coach Test Script
+## 6. Coach Test Script
 
 Sign in as Coach.
 
@@ -87,7 +102,7 @@ Check:
 - Coach sees own payroll only.
 - Coach does not see payment amount, customer price, expenses, profit, or other coach payroll.
 
-## 6. Storage Checks
+## 7. Storage Checks
 
 In Supabase Storage:
 
@@ -104,7 +119,20 @@ As Admin:
 
 - Confirm Admin can manage lesson photos, payment proofs, and expense receipts.
 
-## 7. Do Not Deploy Yet
+## 8. Vercel Later
+
+Do not deploy until local/test Supabase QA is stable. When ready, use only these frontend env variables:
+
+```bash
+VITE_SUPABASE_URL=your-production-project-url
+VITE_SUPABASE_ANON_KEY=your-production-anon-key
+```
+
+Never add a Supabase `service_role` key to Vercel frontend env variables.
+
+Recommended future URL: `os.tyswimacademy.com`.
+
+## 9. Do Not Deploy Yet
 
 Keep this in local/test Supabase QA until:
 

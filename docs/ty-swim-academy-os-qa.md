@@ -17,10 +17,14 @@ Date: 2026-05-28
 - [x] Admin data loading still includes operational, finance, payroll, import, and audit tables.
 - [x] CSV import field mapping supports English headers and Chinese simplified/traditional headers.
 - [x] Added `supabase/demo-seed.sql` with safe fake data and replaceable Auth user ID placeholders.
+- [x] Demo seed can be rerun to reset only `DEMO-*` / `DEMO_SEED` data.
+- [x] Demo seed includes fixed weekly schedule, fixed scheduled lesson, flexible scheduled lesson, and one pending-review lesson.
 
 ## Auth And Roles
 
 - [x] Login uses Supabase email/password auth.
+- [x] Login now has timeout/error handling so the button cannot spin forever.
+- [x] Missing profile, invalid role, inactive profile, wrong password, and missing env variables show clear setup messages.
 - [x] Admin route access remains unrestricted by UI and RLS.
 - [x] Coach main navigation is limited to Today, My Schedule, My Students, and My Pay.
 - [x] Coach direct access to Admin-only sections returns the No Access screen.
@@ -67,10 +71,12 @@ Date: 2026-05-28
 - [x] Coach data loading excludes payment/expense/audit/import tables.
 - [x] Coach-facing screens do not show customer charged price, company income, payments, expenses, profit, or other coaches' payroll.
 - [x] Added Admin-only `/system-check` page under More.
+- [x] System Check shows env, session, profile, role, table, storage, demo data, coach profile, sensitive-module, payroll-scope, service-role, and data-count checks.
 
 ## UX QA
 
 - [x] Admin Today page is a control centre with quick actions instead of a finance-heavy dashboard.
+- [x] Admin Today now includes cancelled lesson and missing required photo attention cards.
 - [x] Students page now starts with a guided setup flow and hides advanced tables until needed.
 - [x] Schedule page clearly separates Fixed Weekly and Flexible / Coach-arranged modes.
 - [x] Review page groups Pending, Rescheduled, Cancelled, Needs Edit, and Missing Photos.

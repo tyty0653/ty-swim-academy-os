@@ -51,6 +51,54 @@ function makeId(prefix) {
   return `${prefix}-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)}`;
 }
 
+function withTimeout(promise, label, ms = 12000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      window.setTimeout(() => reject(new Error(`${label} took too long. Please check your internet connection and Supabase settings.`)), ms);
+    }),
+  ]);
+}
+
+async function loadProfileForUser(userId) {
+  return withTimeout(
+    supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle(),
+    'Staff profile check'
+  );
+}
+
+function getProfileIssue(profileRow, profileError) {
+  if (profileError) {
+    return {
+      title: 'Could not load your staff profile',
+      body: profileError.message || 'Supabase returned an error while loading your profile.',
+    };
+  }
+  if (!profileRow) {
+    return {
+      title: 'Login succeeded, but your staff profile is missing or inactive.',
+      body: 'Please contact Admin. Your Auth user exists, but there is no matching row in the profiles table.',
+    };
+  }
+  if (!['admin', 'coach'].includes(profileRow.role)) {
+    return {
+      title: 'Your staff role is not valid',
+      body: `The profile role is "${profileRow.role || 'empty'}". It must be either admin or coach.`,
+    };
+  }
+  if (!profileRow.active) {
+    return {
+      title: 'Your staff account is inactive',
+      body: 'Please contact Admin to reactivate this OS account.',
+    };
+  }
+  return null;
+}
+
 export default function OsApp() {
   const [pathInfo, setPathInfo] = useState(getPathInfo);
   useEffect(() => {
@@ -74,13 +122,28 @@ function LoginPage() {
     event.preventDefault();
     setLoading(true);
     setMessage('');
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) {
-      setMessage(error.message);
-      return;
+    try {
+      const { data: authData, error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        'Login'
+      );
+      if (error) {
+        setMessage('Login failed. Please check your email and password.');
+        return;
+      }
+      const { data: profileRow, error: profileError } = await loadProfileForUser(authData.user.id);
+      const issue = getProfileIssue(profileRow, profileError);
+      if (issue) {
+        await supabase.auth.signOut();
+        setMessage(`${issue.title} ${issue.body}`);
+        return;
+      }
+      go('/dashboard');
+    } catch (error) {
+      setMessage(error.message || 'Login failed. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    go('/dashboard');
   };
 
   return (
@@ -91,10 +154,10 @@ function LoginPage() {
         <form className="mt-6 grid gap-4" onSubmit={submit}>
           <Field label="Email"><Input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
           <Field label="Password"><Input type="password" required value={password} onChange={(event) => setPassword(event.target.value)} /></Field>
-          {message ? <p className="rounded-lg bg-rose-50 p-3 text-sm font-medium text-rose-700">{message}</p> : null}
+          {message ? <p className="rounded-lg bg-rose-50 p-3 text-sm font-medium leading-6 text-rose-700">{message}</p> : null}
           <Button disabled={loading}>{loading ? 'Signing in...' : 'Sign in'}</Button>
         </form>
-        <button className="mt-5 inline-flex text-sm font-semibold text-sky-700" type="button" onClick={() => go('/dashboard')}>Back to dashboard</button>
+        <p className="mt-5 text-sm leading-6 text-slate-500">If login succeeds but the profile is missing, ask Admin to create or activate your staff profile in Supabase.</p>
       </div>
     </div>
   );
@@ -105,6 +168,7 @@ function ProtectedOs({ pathInfo }) {
   const [profile, setProfile] = useState(null);
   const [data, setData] = useState(initialData);
   const [loading, setLoading] = useState(true);
+  const [accessIssue, setAccessIssue] = useState(null);
   const [toasts, setToasts] = useState([]);
 
   const toast = (message) => {
@@ -115,28 +179,43 @@ function ProtectedOs({ pathInfo }) {
 
   async function reload() {
     setLoading(true);
-    const { data: auth } = await supabase.auth.getSession();
-    if (!auth.session) {
+    setAccessIssue(null);
+    try {
+      const { data: auth } = await withTimeout(supabase.auth.getSession(), 'Session check');
+      if (!auth.session) {
+        setLoading(false);
+        go('/login');
+        return;
+      }
+      setSession(auth.session);
+      const { data: profileRow, error: profileError } = await loadProfileForUser(auth.session.user.id);
+      const issue = getProfileIssue(profileRow, profileError);
+      if (issue) {
+        setProfile(profileRow || null);
+        setAccessIssue(issue);
+        setLoading(false);
+        return;
+      }
+      setProfile(profileRow);
+      const tablesToLoad = profileRow.role === 'admin' ? allTableNames : coachTableNames;
+      const tableResults = await withTimeout(
+        Promise.all(tablesToLoad.map((name) => supabase.from(name).select('*').limit(1000))),
+        'Loading OS data',
+        18000
+      );
+      const next = { ...initialData };
+      tableResults.forEach((result, index) => {
+        if (!result.error) next[tablesToLoad[index]] = result.data || [];
+      });
+      setData(next);
+    } catch (error) {
+      setAccessIssue({
+        title: 'TY Swim Academy OS could not finish loading',
+        body: error.message || 'Please check your Supabase connection and try again.',
+      });
+    } finally {
       setLoading(false);
-      go('/login');
-      return;
     }
-    setSession(auth.session);
-    const { data: profileRow, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', auth.session.user.id)
-      .maybeSingle();
-    if (profileError) toast(profileError.message);
-    setProfile(profileRow);
-    const tablesToLoad = profileRow?.role === 'admin' ? allTableNames : coachTableNames;
-    const tableResults = await Promise.all(tablesToLoad.map((name) => supabase.from(name).select('*').limit(1000)));
-    const next = { ...initialData };
-    tableResults.forEach((result, index) => {
-      if (!result.error) next[tablesToLoad[index]] = result.data || [];
-    });
-    setData(next);
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -148,28 +227,33 @@ function ProtectedOs({ pathInfo }) {
   }, []);
 
   if (loading) return <div className="grid min-h-screen place-items-center bg-slate-50 text-slate-600">Loading TY Swim Academy OS...</div>;
+  if (accessIssue) return <StaffAccessIssue issue={accessIssue} />;
   if (!session || !profile) return <LoginPage />;
-  if (!profile.active) return <LockedProfile />;
 
   return (
-    <OsShell profile={profile} pathInfo={pathInfo} data={data} reload={reload} toast={toast}>
+    <OsShell session={session} profile={profile} pathInfo={pathInfo} data={data} reload={reload} toast={toast}>
       <Toasts toasts={toasts} />
     </OsShell>
   );
 }
 
-function LockedProfile() {
+function StaffAccessIssue({ issue }) {
   return (
     <div className="grid min-h-screen place-items-center bg-slate-50 px-4">
       <div className="max-w-md rounded-xl border border-slate-200 bg-white p-6 text-slate-700 shadow-sm">
-        <h1 className="text-xl font-semibold text-slate-950">Account inactive</h1>
-        <p className="mt-2 text-sm leading-6">This OS account exists but is not active. Ask an Admin to activate it in Supabase.</p>
+        <p className="text-sm font-semibold text-sky-700">TY Swim Academy OS</p>
+        <h1 className="mt-2 text-xl font-semibold text-slate-950">{issue.title}</h1>
+        <p className="mt-2 text-sm leading-6">{issue.body}</p>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <Button onClick={async () => { await supabase.auth.signOut(); go('/login'); }}>Back to login</Button>
+          <Button variant="ghost" onClick={() => window.location.reload()}>Try again</Button>
+        </div>
       </div>
     </div>
   );
 }
 
-function OsShell({ profile, pathInfo, data, reload, toast, children }) {
+function OsShell({ session, profile, pathInfo, data, reload, toast, children }) {
   const isAdmin = profile.role === 'admin';
   const nav = isAdmin ? adminNav : coachNav;
 
@@ -209,7 +293,7 @@ function OsShell({ profile, pathInfo, data, reload, toast, children }) {
           </div>
         </header>
         <main className="mx-auto max-w-7xl p-4 lg:p-6">
-          <RoutePage profile={profile} pathInfo={pathInfo} data={data} reload={reload} toast={toast} />
+          <RoutePage session={session} profile={profile} pathInfo={pathInfo} data={data} reload={reload} toast={toast} />
         </main>
       </div>
     </div>
@@ -330,6 +414,11 @@ function AdminDashboard({ data }) {
   const weekLessons = data.lessons.filter((lesson) => lesson.scheduled_date >= now).slice(0, 12);
   const pending = data.lessons.filter((lesson) => ['completed_pending_review', 'cancelled_pending_review', 'needs_edit'].includes(lesson.status));
   const reschedules = data.lesson_change_logs.filter((log) => !log.admin_seen);
+  const cancelled = data.lessons.filter((lesson) => lesson.status === 'cancelled_pending_review');
+  const missingPhotos = data.lessons.filter((lesson) => {
+    const cls = data.classes.find((item) => item.id === lesson.class_id);
+    return cls?.photo_required && !data.lesson_photos.some((photo) => photo.lesson_id === lesson.id);
+  });
   const oneRemaining = data.packages.filter((pkg) => Number(pkg.remaining_lessons) === 1);
   const zeroRemaining = data.packages.filter((pkg) => Number(pkg.remaining_lessons) === 0);
   const expiring = data.packages.filter((pkg) => {
@@ -340,9 +429,11 @@ function AdminDashboard({ data }) {
   const replacement = data.lessons.filter((lesson) => lesson.need_replacement);
   const cleanup = cleanupRows(data).length;
   const controlCards = [
-    ['Today’s lessons', lessonsToday.length, 'Lessons happening today.', '/schedule', 'sky'],
+    ["Today's lessons", lessonsToday.length, 'Lessons happening today.', '/schedule', 'sky'],
     ['Pending review', pending.length, 'Coach submissions waiting for Admin.', '/review', 'amber'],
     ['Coach reschedule alerts', reschedules.length, 'Date/time changes to acknowledge.', '/review', 'rose'],
+    ['Cancelled lessons', cancelled.length, 'Cancelled records waiting for review.', '/review', 'amber'],
+    ['Missing photos', missingPhotos.length, 'Required lesson photos not uploaded yet.', '/review', 'rose'],
     ['1 lesson remaining', oneRemaining.length, 'Renewal reminders.', '/students', 'amber'],
     ['Expiring soon', expiring.length, 'Packages expiring within 7 days.', '/students', 'rose'],
     ['Replacement needed', replacement.length, 'Lessons marked for replacement.', '/schedule', 'slate'],
@@ -352,7 +443,7 @@ function AdminDashboard({ data }) {
   return (
     <div className="grid gap-5">
       <OnboardingChecklist data={data} />
-      <Section title="Today Control Centre" action={<div className="flex flex-wrap gap-2"><Button onClick={() => go('/students')}>Add Customer</Button><Button variant="soft" onClick={() => go('/students')}>Add Class</Button><Button variant="soft" onClick={() => go('/students')}>Add Package</Button><Button variant="ghost" onClick={() => go('/schedule')}>Schedule Lesson</Button><Button variant="ghost" onClick={() => go('/review')}>Review Lessons</Button></div>}>
+      <Section title="Today Control Centre" action={<div className="flex flex-wrap gap-2"><Button onClick={() => go('/students')}>Add Family</Button><Button variant="soft" onClick={() => go('/students')}>Add Student</Button><Button variant="soft" onClick={() => go('/students')}>Add Class</Button><Button variant="soft" onClick={() => go('/students')}>Add Package</Button><Button variant="ghost" onClick={() => go('/schedule')}>Schedule Lesson</Button><Button variant="ghost" onClick={() => go('/review')}>Review Lessons</Button><Button variant="ghost" onClick={() => go('/system-check')}>Open System Check</Button></div>}>
         <p className="mb-4 text-sm leading-6 text-slate-500">Start here each day. These cards show what needs attention before lessons and payments become a problem.</p>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {controlCards.map(([title, value, note, href, tone]) => (
@@ -650,7 +741,7 @@ function moreToolDescription(key) {
   }[key] || 'Open tool';
 }
 
-function SystemCheckPage({ profile, data }) {
+function SystemCheckPage({ session, profile, data }) {
   const [bucketState, setBucketState] = useState({ loading: true, names: [], error: '' });
   useEffect(() => {
     let cancelled = false;
@@ -668,19 +759,30 @@ function SystemCheckPage({ profile, data }) {
   const bucketNames = bucketState.names;
   const requiredBuckets = ['lesson-photos', 'payment-proofs', 'expense-receipts'];
   const requiredTables = ['profiles', 'coaches', 'customers', 'students', 'venues', 'classes', 'packages', 'lessons', 'payroll_items'];
+  const demoDataPresent = data.customers.some((item) => item.customer_code === 'DEMO-CUS-0001')
+    && data.students.some((item) => item.student_code === 'DEMO-STU-0001')
+    && data.classes.some((item) => item.class_code === 'DEMO-CLS-0001')
+    && data.packages.some((item) => item.package_code === 'DEMO-PKG-0001')
+    && data.lessons.some((item) => String(item.lesson_code || '').startsWith('DEMO-LES-'));
+  const coachProfileExists = data.coaches.some((coach) => coach.profile_id);
+  const frontendEnvKeys = Object.keys(import.meta.env || {});
+  const serviceRoleExposed = frontendEnvKeys.some((key) => key.toLowerCase().includes('service_role'));
   const rows = [
-    checkRow('Supabase env variables loaded', hasSupabaseConfig, 'App has VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'),
-    checkRow('Current user profile exists', Boolean(profile?.id), profile?.email || 'No profile row loaded.'),
-    checkRow('Current user role', profile?.role === 'admin', `Current role: ${profile?.role || 'unknown'}`),
-    checkRow('Required tables accessible', requiredTables.every((name) => Array.isArray(data[name])), 'Core operational tables returned arrays.'),
-    checkRow('Required storage buckets exist', !bucketState.loading && requiredBuckets.every((name) => bucketNames.includes(name)), bucketState.loading ? 'Checking buckets...' : bucketState.error || `Found: ${bucketNames.join(', ') || 'none'}`),
-    checkRow('Admin modules accessible', Array.isArray(data.package_financials) && Array.isArray(data.expenses) && Array.isArray(data.audit_logs), 'Admin-only tables loaded for Admin profile.'),
-    checkRow('Coach financial modules hidden by UI loader', !coachTableNames.includes('package_financials') && !coachTableNames.includes('expenses'), 'Coach data loader excludes payments and expenses.'),
-    checkRow('Packages table accessible', Array.isArray(data.packages), `${data.packages.length} package record(s).`),
-    checkRow('Lessons table accessible', Array.isArray(data.lessons), `${data.lessons.length} lesson record(s).`),
-    checkRow('Payments hidden from Coach', !coachTableNames.includes('package_financials'), 'Coach loader never asks for package_financials.'),
-    checkRow('Expenses hidden from Coach', !coachTableNames.includes('expenses'), 'Coach loader never asks for expenses.'),
-    checkRow('Payroll access scoped', !coachTableNames.includes('expenses') && coachTableNames.includes('payroll_items'), 'Coach can load own payroll through RLS, not finance expenses.'),
+    checkRow('Supabase env loaded', hasSupabaseConfig ? 'pass' : 'fail', 'The app has the public Supabase URL and anon key.', 'Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local.'),
+    checkRow('Current session exists', session?.user?.id ? 'pass' : 'fail', session?.user?.email || 'No signed-in user session found.', 'Sign in again at /login.'),
+    checkRow('Current profile exists', profile?.id ? 'pass' : 'fail', profile?.email || 'No profile row loaded.', 'Create a profiles row matching this Auth user ID.'),
+    checkRow('Current role detected', ['admin', 'coach'].includes(profile?.role) ? 'pass' : 'fail', `Role: ${profile?.role || 'missing'}`, 'Set profile role to admin or coach.'),
+    checkRow('Admin / Coach role logic', profile?.role === 'admin' ? 'pass' : 'warning', profile?.role === 'admin' ? 'You are viewing Admin checks.' : 'You are not an Admin.', 'Open this page as Admin for full checks.'),
+    checkRow('Core tables accessible', requiredTables.every((name) => Array.isArray(data[name])) ? 'pass' : 'fail', 'Core operational tables should load as lists.', 'Run supabase/schema.sql in the test Supabase project.'),
+    checkRow('Required storage buckets exist', !bucketState.loading && requiredBuckets.every((name) => bucketNames.includes(name)) ? 'pass' : 'warning', bucketState.loading ? 'Checking buckets...' : bucketState.error || `Found: ${bucketNames.join(', ') || 'none'}`, 'Confirm private buckets exist: lesson-photos, payment-proofs, expense-receipts.'),
+    checkRow('Demo data present', demoDataPresent ? 'pass' : 'warning', demoDataPresent ? 'DEMO customer, students, class, package, and lessons found.' : 'Demo rows not found yet.', 'Run supabase/demo-seed.sql after replacing the Admin and Coach Auth user IDs.'),
+    checkRow('Coach profile exists', coachProfileExists ? 'pass' : 'warning', `${data.coaches.length} coach record(s), ${data.coaches.filter((coach) => coach.profile_id).length} linked to login profile.`, 'Create a coach row and link profile_id to the Coach Auth user.'),
+    checkRow('Payments hidden from Coach', !coachTableNames.includes('package_financials') ? 'pass' : 'fail', 'Coach loader does not request package_financials.', 'Keep payments out of coachTableNames and rely on RLS.'),
+    checkRow('Expenses hidden from Coach', !coachTableNames.includes('expenses') ? 'pass' : 'fail', 'Coach loader does not request expenses.', 'Keep expenses out of coachTableNames and rely on RLS.'),
+    checkRow('Customer price hidden from Coach', !coachTableNames.includes('package_financials') ? 'pass' : 'fail', 'Prices live in Admin-only package_financials.', 'Do not add price fields to coach-readable tables or coach UI.'),
+    checkRow('Payroll scope', !coachTableNames.includes('expenses') && coachTableNames.includes('payroll_items') ? 'pass' : 'fail', 'Coach can load own payroll_items through RLS, not company expenses.', 'Keep payroll RLS scoped by current_coach_id.'),
+    checkRow('No service_role key in frontend', serviceRoleExposed ? 'fail' : 'pass', serviceRoleExposed ? 'A service role-looking env variable is visible to the browser.' : 'Only public Vite env variables are available to the frontend.', 'Remove service_role keys from .env.local and Vercel frontend env. Use only VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'),
+    checkRow('Approved lesson protection', 'warning', 'Protected by schema trigger prevent_coach_sensitive_lesson_update when schema.sql is applied.', 'Run schema.sql and test with demo Coach after a lesson is approved.'),
   ];
   const counts = [
     ['Coaches', data.coaches.length],
@@ -693,12 +795,16 @@ function SystemCheckPage({ profile, data }) {
   return (
     <div className="grid gap-5">
       <Section title="System Check">
-        <p className="text-sm leading-6 text-slate-500">Run this page after setting up Supabase or loading demo data. It catches the common setup and permission mistakes before coaches use the system.</p>
+        <p className="text-sm leading-6 text-slate-500">Run this after setting up Supabase or loading demo data. Each row explains what is wrong and the next practical action.</p>
         <DataTable rows={rows} columns={[
           { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status}>{row.label}</StatusBadge> },
           { key: 'check', label: 'Check' },
           { key: 'detail', label: 'Result' },
+          { key: 'nextAction', label: 'Next action' },
         ]} />
+      </Section>
+      <Section title="Recommended Next Action">
+        <p className="text-sm leading-6 text-slate-600">{rows.find((row) => row.status === 'fail')?.nextAction || rows.find((row) => row.status === 'warning')?.nextAction || 'Looks good. Try the Admin and Coach demo flow next.'}</p>
       </Section>
       <Section title="Basic Data Counts">
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -709,13 +815,14 @@ function SystemCheckPage({ profile, data }) {
   );
 }
 
-function checkRow(check, pass, detail) {
+function checkRow(check, status, detail, nextAction) {
   return {
     id: check,
     check,
     detail,
-    status: pass ? 'approved' : 'needs_edit',
-    label: pass ? 'Pass' : 'Check',
+    nextAction,
+    status,
+    label: status === 'pass' ? 'Pass' : status === 'warning' ? 'Warning' : 'Fix',
   };
 }
 

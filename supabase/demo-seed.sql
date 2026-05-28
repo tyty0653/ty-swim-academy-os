@@ -6,8 +6,9 @@
 -- 2. Replace the two UUID values below with those Auth user IDs.
 -- 3. Run this after supabase/schema.sql.
 --
--- Reset/delete demo data:
---   Delete records with source = 'demo_seed' or code prefixes DEMO-*.
+-- Quick reset/delete demo data only:
+--   This file deletes and recreates records with DEMO-* codes or DEMO_SEED notes.
+--   It does not delete future real records.
 
 do $$
 declare
@@ -32,7 +33,11 @@ begin
   delete from public.lesson_change_logs where lesson_id in (select id from public.lessons where lesson_code like 'DEMO-%');
   delete from public.lesson_participants where lesson_id in (select id from public.lessons where lesson_code like 'DEMO-%');
   delete from public.lesson_photos where lesson_id in (select id from public.lessons where lesson_code like 'DEMO-%');
+  delete from public.expenses where linked_payroll_period_id in (
+    select pp.id from public.payroll_periods pp join public.coaches c on c.id = pp.coach_id where c.coach_code like 'DEMO%'
+  ) or notes like 'DEMO_SEED%';
   delete from public.payroll_items where lesson_id in (select id from public.lessons where lesson_code like 'DEMO-%');
+  delete from public.payroll_periods where coach_id in (select id from public.coaches where coach_code like 'DEMO%');
   delete from public.lessons where lesson_code like 'DEMO-%';
   delete from public.recurring_schedules where notes like 'DEMO_SEED%';
   delete from public.package_financials where notes like 'DEMO_SEED%';
@@ -43,7 +48,8 @@ begin
   delete from public.venues where venue_notes like 'DEMO_SEED%';
   delete from public.students where student_code like 'DEMO-%';
   delete from public.customers where customer_code like 'DEMO-%';
-  delete from public.coach_rates where notes like 'DEMO_SEED%';
+  delete from public.coach_rates where coach_id in (select id from public.coaches where coach_code like 'DEMO%') or notes like 'DEMO_SEED%';
+  delete from public.coaches where coach_code = 'DEMO';
 
   insert into public.profiles (id, full_name, email, role, active)
   values
@@ -56,7 +62,7 @@ begin
     active = true;
 
   insert into public.coaches (profile_id, coach_code, display_name, phone, areas_covered, status, notes)
-  values (v_coach_profile_id, 'DEMO', 'Demo Coach', '0100000000', 'Demo Area', 'active', 'DEMO_SEED')
+  values (v_coach_profile_id, 'DEMO-COACH', 'Demo Coach', '0100000000', 'Demo Area', 'active', 'DEMO_SEED')
   on conflict (coach_code) do update set
     profile_id = excluded.profile_id,
     display_name = excluded.display_name,
@@ -65,7 +71,7 @@ begin
   returning id into v_coach_id;
 
   insert into public.coach_rates (coach_id, class_type, default_rate, effective_from, active, notes)
-  values (v_coach_id, '1-2', 70, current_date - interval '30 days', true, 'DEMO_SEED')
+  values (v_coach_id, '1-2', 70, current_date - 30, true, 'DEMO_SEED')
   on conflict do nothing;
 
   insert into public.customers (customer_code, display_name, parent_name, whatsapp, source, status, internal_notes)
@@ -111,7 +117,7 @@ begin
   on conflict (class_id, student_id) do update set active = true, left_at = null;
 
   insert into public.packages (package_code, customer_id, class_id, package_type, total_lessons, used_lessons, remaining_lessons, validity_months, start_date, payment_date, expiry_date, status, imported_from_legacy, notes)
-  values ('DEMO-PKG-0001', v_customer_id, v_class_id, '8_lessons', 8, 0, 8, 4, current_date, current_date, current_date + interval '4 months', 'active', false, 'DEMO_SEED')
+  values ('DEMO-PKG-0001', v_customer_id, v_class_id, '8_lessons', 8, 0, 8, 4, current_date, current_date, (current_date + interval '4 months')::date, 'active', false, 'DEMO_SEED')
   on conflict (package_code) do update set
     customer_id = excluded.customer_id,
     class_id = excluded.class_id,
@@ -132,8 +138,17 @@ begin
   insert into public.lessons (lesson_code, class_id, package_id, coach_id, venue_id, recurring_schedule_id, scheduling_mode, scheduled_date, start_time, end_time, duration_minutes, status, count_package_lesson, coach_payable, created_by, updated_by, coach_notes)
   values
     ('DEMO-LES-0001', v_class_id, v_package_id, v_coach_id, v_venue_id, v_schedule_id, 'fixed_weekly', current_date, '17:00', '18:00', 60, 'scheduled', true, true, v_admin_profile_id, v_admin_profile_id, 'DEMO_SEED scheduled fixed weekly lesson'),
-    ('DEMO-LES-0002', v_class_id, v_package_id, v_coach_id, v_venue_id, null, 'flexible', current_date + interval '3 days', '10:00', '11:00', 60, 'scheduled', true, true, v_admin_profile_id, v_admin_profile_id, 'DEMO_SEED flexible lesson appointment')
+    ('DEMO-LES-0002', v_class_id, v_package_id, v_coach_id, v_venue_id, null, 'flexible', current_date + 3, '10:00', '11:00', 60, 'scheduled', true, true, v_admin_profile_id, v_admin_profile_id, 'DEMO_SEED flexible lesson appointment'),
+    ('DEMO-LES-0003', v_class_id, v_package_id, v_coach_id, v_venue_id, null, 'flexible', current_date - 1, '10:00', '11:00', 60, 'completed_pending_review', true, true, v_coach_profile_id, v_coach_profile_id, 'DEMO_SEED pending review lesson submitted by coach')
   on conflict (lesson_code) do nothing;
+
+  insert into public.lesson_participants (lesson_id, student_id, attendance, progress_note, next_focus)
+  select l.id, s.id, 'present', 'DEMO_SEED progress note', 'DEMO_SEED next focus'
+  from public.lessons l
+  cross join public.students s
+  where l.lesson_code in ('DEMO-LES-0001', 'DEMO-LES-0002', 'DEMO-LES-0003')
+    and s.student_code in ('DEMO-STU-0001', 'DEMO-STU-0002')
+  on conflict (lesson_id, student_id) do nothing;
 
   insert into public.consents (customer_id, internal_photo_allowed, marketing_photo_status, platforms_allowed, consent_date, notes)
   values (v_customer_id, true, 'ask_first', array['internal'], current_date, 'DEMO_SEED fake consent row')

@@ -18,6 +18,8 @@ VITE_SUPABASE_URL=your-project-url
 VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
+Do not put a Supabase `service_role` key in `.env.local` or Vercel frontend environment variables.
+
 Run `supabase/schema.sql` in Supabase, create the first Admin profile, then open `/login`.
 
 Full setup notes are in `docs/ty-swim-academy-os.md`.
