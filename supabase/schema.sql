@@ -432,6 +432,51 @@ create trigger audit_payroll after insert or update on public.payroll_periods fo
 create trigger audit_expenses after insert or update on public.expenses for each row execute function public.audit_row();
 create trigger audit_payments after insert or update on public.package_financials for each row execute function public.audit_row();
 
+create or replace function public.prevent_coach_sensitive_lesson_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if public.is_admin() then
+    return new;
+  end if;
+
+  if old.coach_id is distinct from public.current_coach_id() then
+    raise exception 'Coach can only update own lessons';
+  end if;
+
+  if old.status = 'approved' then
+    raise exception 'Approved lessons are read-only for Coach';
+  end if;
+
+  if new.class_id is distinct from old.class_id
+    or new.package_id is distinct from old.package_id
+    or new.coach_id is distinct from old.coach_id
+    or new.original_coach_id is distinct from old.original_coach_id
+    or new.count_package_lesson is distinct from old.count_package_lesson
+    or new.coach_payable is distinct from old.coach_payable
+    or new.need_replacement is distinct from old.need_replacement
+    or new.approved_package_applied is distinct from old.approved_package_applied
+    or new.admin_reviewed_at is distinct from old.admin_reviewed_at
+    or new.admin_reviewed_by is distinct from old.admin_reviewed_by
+    or new.admin_notes is distinct from old.admin_notes then
+    raise exception 'Coach cannot edit financial or Admin review fields';
+  end if;
+
+  if new.status not in ('scheduled', 'rescheduled', 'completed_pending_review', 'cancelled_pending_review', 'needs_edit') then
+    raise exception 'Coach cannot set this lesson status';
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger protect_coach_lesson_update
+before update on public.lessons
+for each row execute function public.prevent_coach_sensitive_lesson_update();
+
 create or replace function public.approve_lesson(p_lesson_id uuid)
 returns void
 language plpgsql
@@ -679,10 +724,25 @@ create policy coach_update_own_unapproved_lessons on public.lessons for update u
 );
 
 create policy admin_all_participants on public.lesson_participants for all using (public.is_admin()) with check (public.is_admin());
-create policy coach_participants on public.lesson_participants for all using (public.is_assigned_lesson(lesson_id)) with check (public.is_assigned_lesson(lesson_id));
+create policy coach_read_own_participants on public.lesson_participants for select using (public.is_assigned_lesson(lesson_id));
+create policy coach_insert_own_participants on public.lesson_participants for insert with check (
+  public.is_assigned_lesson(lesson_id)
+  and exists (select 1 from public.lessons l where l.id = public.lesson_participants.lesson_id and l.status <> 'approved')
+);
+create policy coach_update_own_participants on public.lesson_participants for update using (
+  public.is_assigned_lesson(lesson_id)
+  and exists (select 1 from public.lessons l where l.id = public.lesson_participants.lesson_id and l.status <> 'approved')
+) with check (
+  public.is_assigned_lesson(lesson_id)
+  and exists (select 1 from public.lessons l where l.id = public.lesson_participants.lesson_id and l.status <> 'approved')
+);
 
 create policy admin_all_photos on public.lesson_photos for all using (public.is_admin()) with check (public.is_admin());
-create policy coach_photos on public.lesson_photos for all using (public.is_assigned_lesson(lesson_id)) with check (public.is_assigned_lesson(lesson_id));
+create policy coach_read_own_photos on public.lesson_photos for select using (public.is_assigned_lesson(lesson_id));
+create policy coach_insert_own_photos on public.lesson_photos for insert with check (
+  public.is_assigned_lesson(lesson_id)
+  and exists (select 1 from public.lessons l where l.id = public.lesson_photos.lesson_id and l.status <> 'approved')
+);
 
 create policy admin_all_change_logs on public.lesson_change_logs for all using (public.is_admin()) with check (public.is_admin());
 create policy coach_read_own_change_logs on public.lesson_change_logs for select using (public.is_assigned_lesson(lesson_id));

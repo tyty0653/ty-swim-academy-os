@@ -21,6 +21,26 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 
 If env variables are missing, the app shows a setup message instead of crashing.
 
+## Daily Navigation
+
+Admin sees:
+
+- Today
+- Students
+- Schedule
+- Review
+- Money
+- More
+
+Coach sees:
+
+- Today
+- My Schedule
+- My Students
+- My Pay
+
+Advanced routes such as `/customers`, `/venues`, `/classes`, `/packages`, `/payments`, `/expenses`, `/import`, `/data-cleanup`, `/reports`, and `/settings` still exist, but they are grouped under the simplified daily navigation.
+
 ## First Admin
 
 1. In Supabase Auth, create an email/password user for the owner/Admin.

@@ -1,22 +1,32 @@
-export const osNav = [
-  ['dashboard', '/dashboard', 'Dashboard'],
-  ['customers', '/customers', 'Customers'],
+export const adminNav = [
+  ['dashboard', '/dashboard', 'Today'],
   ['students', '/students', 'Students'],
-  ['venues', '/venues', 'Venues'],
-  ['classes', '/classes', 'Classes'],
-  ['packages', '/packages', 'Packages'],
-  ['lessons', '/lessons', 'Schedule'],
+  ['schedule', '/schedule', 'Schedule'],
   ['review', '/review', 'Review'],
-  ['payroll', '/payroll', 'Payroll'],
+  ['money', '/money', 'Money'],
+  ['more', '/more', 'More'],
+];
+
+export const coachNav = [
+  ['dashboard', '/dashboard', 'Today'],
+  ['schedule', '/schedule', 'My Schedule'],
+  ['students', '/students', 'My Students'],
+  ['payroll', '/payroll', 'My Pay'],
+];
+
+export const legacyAdminRoutes = [
+  ['customers', '/customers', 'Customers / Families'],
+  ['venues', '/venues', 'Venues'],
+  ['classes', '/classes', 'Classes / Groups'],
+  ['packages', '/packages', 'Packages'],
+  ['lessons', '/lessons', 'Lesson History'],
   ['payments', '/payments', 'Payments'],
   ['expenses', '/expenses', 'Expenses'],
-  ['import', '/import', 'Import'],
-  ['cleanup', '/data-cleanup', 'Cleanup'],
+  ['import', '/import', 'CSV Import'],
+  ['cleanup', '/data-cleanup', 'Data Cleanup'],
   ['reports', '/reports', 'Reports'],
   ['settings', '/settings', 'Settings'],
 ];
-
-export const coachHiddenNav = new Set(['payments', 'expenses', 'import', 'cleanup', 'settings', 'review']);
 
 export const statusLabels = {
   scheduled: 'Scheduled',

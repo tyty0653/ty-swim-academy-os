@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { hasSupabaseConfig, supabase } from '../lib/supabaseClient.js';
 import { Button, Card, DataTable, EmptySetup, Field, Input, Modal, Section, Select, StatusBadge, Textarea, Toasts } from './OsComponents.jsx';
-import { classTypes, coachHiddenNav, expenseCategories, osNav, packageTypes, paymentMethods } from './osConstants.js';
+import { adminNav, classTypes, coachNav, expenseCategories, legacyAdminRoutes, packageTypes, paymentMethods } from './osConstants.js';
 import { derivePackageExpiry, downloadCsv, formatDate, formatMoney, getMapped, parseCsv, placeholder, todayISO } from './osUtils.js';
 
-const tableNames = [
+const allTableNames = [
   'profiles',
   'coaches',
   'customers',
@@ -28,7 +28,8 @@ const tableNames = [
   'audit_logs',
 ];
 
-const initialData = Object.fromEntries(tableNames.map((name) => [name, []]));
+const coachTableNames = allTableNames.filter((name) => !['package_financials', 'expenses', 'import_batches', 'audit_logs'].includes(name));
+const initialData = Object.fromEntries(allTableNames.map((name) => [name, []]));
 
 function getPathInfo() {
   const rawPath = window.location.pathname.replace(/\/$/, '') || '/dashboard';
@@ -128,10 +129,11 @@ function ProtectedOs({ pathInfo }) {
       .maybeSingle();
     if (profileError) toast(profileError.message);
     setProfile(profileRow);
-    const tableResults = await Promise.all(tableNames.map((name) => supabase.from(name).select('*').limit(1000)));
+    const tablesToLoad = profileRow?.role === 'admin' ? allTableNames : coachTableNames;
+    const tableResults = await Promise.all(tablesToLoad.map((name) => supabase.from(name).select('*').limit(1000)));
     const next = { ...initialData };
     tableResults.forEach((result, index) => {
-      if (!result.error) next[tableNames[index]] = result.data || [];
+      if (!result.error) next[tablesToLoad[index]] = result.data || [];
     });
     setData(next);
     setLoading(false);
@@ -169,7 +171,7 @@ function LockedProfile() {
 
 function OsShell({ profile, pathInfo, data, reload, toast, children }) {
   const isAdmin = profile.role === 'admin';
-  const nav = osNav.filter(([key]) => isAdmin || !coachHiddenNav.has(key));
+  const nav = isAdmin ? adminNav : coachNav;
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -215,22 +217,30 @@ function OsShell({ profile, pathInfo, data, reload, toast, children }) {
 }
 
 function activeNav(pathInfo, key) {
-  return (key === 'dashboard' && pathInfo.path === '/dashboard') || pathInfo.section === key || (key === 'cleanup' && pathInfo.section === 'data-cleanup');
+  if (key === 'dashboard') return pathInfo.path === '/dashboard';
+  if (key === 'schedule') return ['schedule', 'lessons'].includes(pathInfo.section);
+  if (key === 'students') return ['students', 'customers', 'venues', 'classes', 'packages'].includes(pathInfo.section);
+  if (key === 'money') return ['money', 'payments', 'payroll', 'expenses'].includes(pathInfo.section);
+  if (key === 'more') return ['more', 'import', 'data-cleanup', 'reports', 'settings'].includes(pathInfo.section);
+  return pathInfo.section === key;
 }
 
 function pageTitle(pathInfo) {
-  if (pathInfo.path === '/dashboard') return 'Dashboard';
+  if (pathInfo.path === '/dashboard') return 'Today';
   return {
     customers: 'Customers',
     students: 'Students',
+    schedule: 'Schedule',
     venues: 'Venues',
     classes: 'Classes',
     packages: 'Packages',
     lessons: 'Schedule / Lessons',
     review: 'Review Queue',
+    money: 'Money',
     payroll: 'Payroll',
     payments: 'Payments',
     expenses: 'Expenses',
+    more: 'More',
     import: 'CSV Import',
     'data-cleanup': 'Data Cleanup',
     reports: 'Reports',
@@ -245,16 +255,18 @@ function RoutePage(props) {
   if (pathInfo.section === 'customers' && pathInfo.id) return <CustomerDetail {...props} />;
   if (pathInfo.section === 'lessons' && pathInfo.id) return <LessonDetail {...props} />;
   if (pathInfo.section === 'customers') return <CustomersPage {...props} />;
-  if (pathInfo.section === 'students') return <StudentsPage {...props} />;
+  if (pathInfo.section === 'students') return isAdmin ? <StudentsHub {...props} /> : <StudentsPage {...props} />;
   if (pathInfo.section === 'venues') return <VenuesPage {...props} />;
   if (pathInfo.section === 'classes') return <ClassesPage {...props} />;
   if (pathInfo.section === 'packages') return <PackagesPage {...props} />;
-  if (pathInfo.section === 'lessons') return <LessonsPage {...props} />;
+  if (pathInfo.section === 'lessons' || pathInfo.section === 'schedule') return <LessonsPage {...props} />;
   if (pathInfo.section === 'payroll') return <PayrollPage {...props} />;
   if (!isAdmin) return <NoAccess />;
   if (pathInfo.section === 'review') return <ReviewPage {...props} />;
+  if (pathInfo.section === 'money') return <MoneyPage {...props} />;
   if (pathInfo.section === 'payments') return <PaymentsPage {...props} />;
   if (pathInfo.section === 'expenses') return <ExpensesPage {...props} />;
+  if (pathInfo.section === 'more') return <MorePage {...props} />;
   if (pathInfo.section === 'import') return <ImportPage {...props} />;
   if (pathInfo.section === 'data-cleanup') return <CleanupPage {...props} />;
   if (pathInfo.section === 'reports') return <ReportsPage {...props} />;
@@ -264,6 +276,42 @@ function RoutePage(props) {
 
 function NoAccess() {
   return <Section title="No access"><p className="text-sm text-slate-500">This page is Admin only.</p></Section>;
+}
+
+function EmptyState({ title, body, action }) {
+  return (
+    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
+      <p className="font-semibold text-slate-950">{title}</p>
+      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">{body}</p>
+      {action ? <div className="mt-4">{action}</div> : null}
+    </div>
+  );
+}
+
+function OnboardingChecklist({ data }) {
+  const steps = [
+    ['Add coach', data.coaches.length > 0, '/more'],
+    ['Add customer/family', data.customers.length > 0, '/students'],
+    ['Add student', data.students.length > 0, '/students'],
+    ['Add venue', data.venues.length > 0, '/students'],
+    ['Create class/group', data.classes.length > 0, '/students'],
+    ['Create package', data.packages.length > 0, '/students'],
+    ['Schedule first lesson', data.lessons.length > 0, '/schedule'],
+  ];
+  if (steps.every(([, done]) => done)) return null;
+  return (
+    <Section title="Setup Checklist">
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+        {steps.map(([label, done, href], index) => (
+          <button key={label} onClick={() => go(href)} className={`rounded-lg border p-3 text-left ${done ? 'border-emerald-100 bg-emerald-50' : 'border-slate-200 bg-white hover:border-sky-200'}`}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step {index + 1}</p>
+            <p className="mt-1 font-semibold text-slate-950">{label}</p>
+            <p className={`mt-2 text-xs font-semibold ${done ? 'text-emerald-700' : 'text-sky-700'}`}>{done ? 'Done' : 'Open'}</p>
+          </button>
+        ))}
+      </div>
+    </Section>
+  );
 }
 
 function Dashboard({ profile, data }) {
@@ -285,20 +333,18 @@ function AdminDashboard({ data }) {
   const expiredWithLessons = data.packages.filter((pkg) => daysUntil(pkg.expiry_date) < 0 && Number(pkg.remaining_lessons) > 0);
   const replacement = data.lessons.filter((lesson) => lesson.need_replacement);
   const cleanup = cleanupRows(data).length;
-  const monthlyPayments = sumThisMonth(data.package_financials, 'payment_date', 'amount');
-  const monthlyExpenses = sumThisMonth(data.expenses, 'expense_date', 'amount');
-  const salaryPayable = data.payroll_items.filter((item) => item.status !== 'paid' && item.status !== 'void').reduce((sum, item) => sum + Number(item.pay_amount || 0), 0);
 
   return (
     <div className="grid gap-5">
+      <OnboardingChecklist data={data} />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Card title="Today's lessons" value={lessonsToday.length} />
         <Card title="Pending review" value={pending.length} tone="amber" />
         <Card title="Reschedules to check" value={reschedules.length} tone="rose" />
         <Card title="Cleanup items" value={cleanup} tone="slate" />
       </div>
-      <div className="grid gap-5 xl:grid-cols-2">
-        <LessonList title="Today / This Week" rows={weekLessons} data={data} />
+      <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+        <LessonList title="Today and This Week" rows={weekLessons} data={data} empty="No scheduled lessons in this view." />
         <AttentionList rows={[
           ['Packages with 1 lesson', oneRemaining.length, '/packages'],
           ['Packages with 0 lessons', zeroRemaining.length, '/packages'],
@@ -307,14 +353,6 @@ function AdminDashboard({ data }) {
           ['Lessons needing replacement', replacement.length, '/lessons'],
         ]} />
       </div>
-      <Section title="Light Finance Summary">
-        <div className="grid gap-3 md:grid-cols-4">
-          <Card title="Monthly collected" value={formatMoney(monthlyPayments)} tone="green" />
-          <Card title="Monthly expenses" value={formatMoney(monthlyExpenses)} tone="rose" />
-          <Card title="Coach salary payable" value={formatMoney(salaryPayable)} tone="amber" />
-          <Card title="Estimated net" value={formatMoney(monthlyPayments - monthlyExpenses - salaryPayable)} tone="sky" />
-        </div>
-      </Section>
     </div>
   );
 }
@@ -334,24 +372,48 @@ function CoachDashboard({ profile, data }) {
         <Card title="Pending records" value={pending.length} tone="amber" />
         <Card title="Expected payroll" value={formatMoney(payroll.reduce((sum, item) => sum + Number(item.pay_amount || 0), 0))} tone="green" />
       </div>
-      <LessonList title="My Upcoming Lessons" rows={ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 10)} data={data} coachView />
-      <Section title="Quick Access">
+      <CoachTodayCards lessons={today.length ? today : ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 5)} data={data} />
+      <LessonList title="My Schedule" rows={ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 10)} data={data} coachView empty="No upcoming assigned lessons." />
+    </div>
+  );
+}
+
+function CoachTodayCards({ lessons, data }) {
+  return (
+    <Section title="Today">
+      {lessons.length === 0 ? (
+        <EmptyState title="No lessons today" body="Assigned lessons will appear here with contact, map, safety alerts, and a fast submit button." />
+      ) : (
         <div className="grid gap-3 md:grid-cols-2">
-          {ownLessons.slice(0, 6).map((lesson) => {
+          {lessons.map((lesson) => {
             const cls = data.classes.find((item) => item.id === lesson.class_id);
             const customer = data.customers.find((item) => item.id === cls?.customer_id);
             const venue = data.venues.find((item) => item.id === lesson.venue_id);
+            const mapsLink = venue?.google_maps_link || '';
+            const whatsapp = customer?.whatsapp || '';
+            const approved = lesson.status === 'approved';
             return (
-              <button key={lesson.id} className="rounded-lg border border-slate-200 bg-white p-4 text-left hover:border-sky-200" onClick={() => go(`/lessons/${lesson.id}`)}>
-                <p className="font-semibold text-slate-950">{cls?.class_name || lesson.lesson_code}</p>
-                <p className="mt-1 text-sm text-slate-500">{customer?.whatsapp || 'No WhatsApp'} | {venue?.area || venue?.full_address || 'No address'}</p>
-                <p className="mt-2 text-xs font-semibold text-rose-600">{studentAlerts(cls, data) || 'No health/safety alerts'}</p>
-              </button>
+              <article key={lesson.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-sky-700">{lesson.start_time || 'Time TBC'} - {lesson.end_time || ''}</p>
+                    <h3 className="mt-1 text-lg font-semibold text-slate-950">{cls?.class_name || lesson.lesson_code}</h3>
+                    <p className="mt-1 text-sm text-slate-500">{venue?.area || venue?.venue_name || 'Venue not set'}</p>
+                  </div>
+                  <StatusBadge value={lesson.status} />
+                </div>
+                <p className="mt-3 rounded-lg bg-rose-50 p-3 text-sm font-medium text-rose-700">{studentAlerts(cls, data) || 'No health/safety alerts recorded.'}</p>
+                <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                  <a className="inline-flex min-h-10 items-center justify-center rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700" href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">WhatsApp</a>
+                  <a className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700" href={mapsLink || undefined} target="_blank" rel="noreferrer">Map</a>
+                  <Button disabled={approved} onClick={() => go(`/lessons/${lesson.id}`)}>{approved ? 'Approved' : 'Submit Record'}</Button>
+                </div>
+              </article>
             );
           })}
         </div>
-      </Section>
-    </div>
+      )}
+    </Section>
   );
 }
 
@@ -370,11 +432,12 @@ function AttentionList({ rows }) {
   );
 }
 
-function LessonList({ title, rows, data, coachView = false }) {
+function LessonList({ title, rows, data, coachView = false, empty = 'No lessons yet.' }) {
   return (
     <Section title={title}>
       <DataTable
         rows={rows}
+        empty={empty}
         onRowClick={(row) => go(`/lessons/${row.id}`)}
         columns={[
           { key: 'date', label: 'Date', render: (row) => `${formatDate(row.scheduled_date)} ${row.start_time || ''}` },
@@ -390,6 +453,34 @@ function LessonList({ title, rows, data, coachView = false }) {
         ]}
       />
     </Section>
+  );
+}
+
+function StudentsHub(props) {
+  const [active, setActive] = useState('customers');
+  const tabs = [
+    ['customers', 'Families'],
+    ['students', 'Students'],
+    ['venues', 'Venues'],
+    ['classes', 'Classes'],
+    ['packages', 'Packages'],
+  ];
+  return (
+    <div className="grid gap-5">
+      <Section title="Student Workflow">
+        <p className="text-sm leading-6 text-slate-500">Use this area for the full family-to-class setup: customer, student, venue, class/group, and package. Customer profiles still show lesson history and payment history for Admin.</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {tabs.map(([key, label]) => (
+            <Button key={key} variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{label}</Button>
+          ))}
+        </div>
+      </Section>
+      {active === 'customers' ? <CustomersPage {...props} /> : null}
+      {active === 'students' ? <StudentsPage {...props} /> : null}
+      {active === 'venues' ? <VenuesPage {...props} /> : null}
+      {active === 'classes' ? <ClassesPage {...props} /> : null}
+      {active === 'packages' ? <PackagesPage {...props} /> : null}
+    </div>
   );
 }
 
@@ -427,6 +518,86 @@ function CustomersPage({ profile, data, reload, toast }) {
       ]}
     />
   );
+}
+
+function MoneyPage(props) {
+  const [active, setActive] = useState('summary');
+  const tabs = [
+    ['summary', 'Summary'],
+    ['payments', 'Payments'],
+    ['payroll', 'Payroll'],
+    ['expenses', 'Expenses'],
+  ];
+  const { data } = props;
+  const month = todayISO().slice(0, 7);
+  const payments = sumThisMonth(data.package_financials, 'payment_date', 'amount');
+  const expenses = sumThisMonth(data.expenses, 'expense_date', 'amount');
+  const salary = data.payroll_items.filter((row) => row.status !== 'void' && row.status !== 'paid').reduce((sum, row) => sum + Number(row.pay_amount || 0), 0);
+  return (
+    <div className="grid gap-5">
+      <Section title="Money">
+        <p className="text-sm leading-6 text-slate-500">Admin-only finance workspace for payments, payroll, expenses, and export/accounting checks.</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {tabs.map(([key, label]) => <Button key={key} variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{label}</Button>)}
+        </div>
+      </Section>
+      {active === 'summary' ? (
+        <Section title={`Accounting Summary ${month}`}>
+          <div className="grid gap-3 md:grid-cols-4">
+            <Card title="Payments collected" value={formatMoney(payments)} tone="green" />
+            <Card title="Expenses" value={formatMoney(expenses)} tone="rose" />
+            <Card title="Coach salary payable" value={formatMoney(salary)} tone="amber" />
+            <Card title="Estimated net" value={formatMoney(payments - expenses - salary)} />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button variant="ghost" onClick={() => downloadCsv(`ty-payments-${month}.csv`, data.package_financials)}>Export payments</Button>
+            <Button variant="ghost" onClick={() => downloadCsv(`ty-expenses-${month}.csv`, data.expenses)}>Export expenses</Button>
+            <Button variant="ghost" onClick={() => downloadCsv(`ty-payroll-items-${month}.csv`, data.payroll_items)}>Export payroll</Button>
+          </div>
+        </Section>
+      ) : null}
+      {active === 'payments' ? <PaymentsPage {...props} /> : null}
+      {active === 'payroll' ? <PayrollPage {...props} /> : null}
+      {active === 'expenses' ? <ExpensesPage {...props} /> : null}
+    </div>
+  );
+}
+
+function MorePage(props) {
+  const tools = legacyAdminRoutes.filter(([key]) => ['import', 'cleanup', 'reports', 'settings', 'customers', 'venues', 'classes', 'packages', 'lessons'].includes(key));
+  return (
+    <div className="grid gap-5">
+      <Section title="More">
+        <p className="text-sm leading-6 text-slate-500">Advanced and occasional tools live here so the daily menu stays simple.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {tools.map(([key, href, label]) => (
+            <button key={key} onClick={() => go(href)} className="rounded-lg border border-slate-200 bg-white p-4 text-left hover:border-sky-200 hover:bg-sky-50">
+              <p className="font-semibold text-slate-950">{label}</p>
+              <p className="mt-1 text-sm text-slate-500">{moreToolDescription(key)}</p>
+            </button>
+          ))}
+        </div>
+      </Section>
+      <Section title="Users and Coach Rates">
+        <p className="text-sm leading-6 text-slate-500">Open Settings to manage Admin/Coach users, coach profiles, and coach rates.</p>
+        <div className="mt-4"><Button onClick={() => go('/settings')}>Open Settings</Button></div>
+      </Section>
+    </div>
+  );
+}
+
+function moreToolDescription(key) {
+  return {
+    import: 'Bring in old Google Sheet CSV data.',
+    cleanup: 'Find missing names, address, age, consent, coach, and proof records.',
+    reports: 'Monthly lesson, renewal, payment, expense, and payroll exports.',
+    settings: 'Users, coaches, rates, and system settings.',
+    customers: 'Detailed customer list route.',
+    venues: 'Venue list route.',
+    classes: 'Class/group list route.',
+    packages: 'Package list route.',
+    lessons: 'Detailed lesson history route.',
+  }[key] || 'Open tool';
 }
 
 function CustomerDetail({ profile, pathInfo, data, reload, toast }) {
@@ -1215,8 +1386,8 @@ function ImportPage({ data, reload, toast }) {
 }
 
 function mapImportRow(row, index, type, data) {
-  const phone = String(getMapped(row, ['电话号码', 'phone_number', 'phone', 'Phone'])).trim();
-  const coachCode = getMapped(row, ['教练', 'coach_code', 'coach']);
+  const phone = String(getMapped(row, ['电话号码', '電話號碼', 'phone_number', 'phone', 'Phone'])).trim();
+  const coachCode = getMapped(row, ['教练', '教練', 'coach_code', 'coach']);
   const coach = data.coaches.find((item) => item.coach_code === coachCode || item.display_name === coachCode);
   if (type === 'lesson_records') {
     return {
@@ -1224,11 +1395,11 @@ function mapImportRow(row, index, type, data) {
       phone,
       coach_code: coachCode,
       coach_id: coach?.id || '',
-      lesson_date: getMapped(row, ['上课日期', 'lesson_date']),
-      wage: getMapped(row, ['工资', 'wage']),
-      note: getMapped(row, ['备注', 'note']),
-      payroll_status: getMapped(row, ['结账', 'payroll_status']),
-      payroll_paid_date: getMapped(row, ['结账日期', 'payroll_paid_date']),
+      lesson_date: getMapped(row, ['上课日期', '上課日期', 'lesson_date']),
+      wage: getMapped(row, ['工资', '工資', 'wage']),
+      note: getMapped(row, ['备注', '備註', 'note']),
+      payroll_status: getMapped(row, ['结账', '結賬', 'payroll_status']),
+      payroll_paid_date: getMapped(row, ['结账日期', '結賬日期', 'payroll_paid_date']),
     };
   }
   return {
@@ -1237,23 +1408,22 @@ function mapImportRow(row, index, type, data) {
     customer_name: placeholder('Customer', phone),
     student_name: placeholder('Student', phone),
     group_name: placeholder('Group', phone),
-    class_type: getMapped(row, ['课程', 'class_type']) || '1-1',
+    class_type: getMapped(row, ['课程', '課程', 'class_type']) || '1-1',
     coach_code: coachCode,
     coach_id: coach?.id || '',
     package_total: getMapped(row, ['配套', 'package_total']) || 4,
-    status: getMapped(row, ['状态', 'status']) || 'active',
-    start_date: getMapped(row, ['开始日期', 'start_date']) || todayISO(),
-    last_lesson_date: getMapped(row, ['最后上课日期', 'last_lesson_date']),
-    price: getMapped(row, ['价钱', 'price']),
-    coach_wage: getMapped(row, ['教练工资', 'coach_wage']),
-    referral_fee: getMapped(row, ['介绍费', 'referral_fee']),
-    total: getMapped(row, ['总', 'total']),
+    status: getMapped(row, ['状态', '狀態', 'status']) || 'active',
+    start_date: getMapped(row, ['开始日期', '開始日期', 'start_date']) || todayISO(),
+    last_lesson_date: getMapped(row, ['最后上课日期', '最後上課日期', 'last_lesson_date']),
+    price: getMapped(row, ['价钱', '價錢', 'price']),
+    coach_wage: getMapped(row, ['教练工资', '教練工資', 'coach_wage']),
+    referral_fee: getMapped(row, ['介绍费', '介紹費', 'referral_fee']),
+    total: getMapped(row, ['总', '總', 'total']),
     used_lessons: getMapped(row, ['已上堂', 'used_lessons']) || 0,
-    remaining_lessons: getMapped(row, ['剩余堂', 'remaining_lessons']) || 0,
+    remaining_lessons: getMapped(row, ['剩余堂', '剩餘堂', 'remaining_lessons']) || 0,
     reminder: getMapped(row, ['要求提醒', 'reminder']),
   };
 }
-
 async function importSummary(item) {
   const { data: customer, error: customerError } = await supabase.from('customers').insert({ display_name: item.customer_name, parent_name: item.customer_name, whatsapp: item.phone, status: item.status, source: 'legacy_google_sheet' }).select('*').single();
   if (customerError) return false;
