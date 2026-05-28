@@ -7,6 +7,7 @@ Date: 2026-05-28
 - [x] `npm install` completed with 0 vulnerabilities.
 - [x] `npm run build` completed successfully after the QA/UI changes.
 - [x] Standalone Vite routes returned HTTP 200 for `/`, `/login`, and `/dashboard`.
+- [x] Added `npm run smoke:routes` for repeatable local route checks.
 - [x] Missing Supabase env variables keep the app from crashing and show the setup screen.
 
 ## Schema And Frontend Consistency
@@ -15,6 +16,7 @@ Date: 2026-05-28
 - [x] Coach data loading no longer requests Admin-only `package_financials`, `expenses`, `import_batches`, or `audit_logs`.
 - [x] Admin data loading still includes operational, finance, payroll, import, and audit tables.
 - [x] CSV import field mapping supports English headers and Chinese simplified/traditional headers.
+- [x] Added `supabase/demo-seed.sql` with safe fake data and replaceable Auth user ID placeholders.
 
 ## Auth And Roles
 
@@ -64,6 +66,17 @@ Date: 2026-05-28
 - [x] Coach navigation hides Money, Review, Import, Cleanup, Reports, Settings, Payments, and Expenses.
 - [x] Coach data loading excludes payment/expense/audit/import tables.
 - [x] Coach-facing screens do not show customer charged price, company income, payments, expenses, profit, or other coaches' payroll.
+- [x] Added Admin-only `/system-check` page under More.
+
+## UX QA
+
+- [x] Admin Today page is a control centre with quick actions instead of a finance-heavy dashboard.
+- [x] Students page now starts with a guided setup flow and hides advanced tables until needed.
+- [x] Schedule page clearly separates Fixed Weekly and Flexible / Coach-arranged modes.
+- [x] Review page groups Pending, Rescheduled, Cancelled, Needs Edit, and Missing Photos.
+- [x] Money page groups Payments, Coach Payroll, Expenses, and Export / Accounting Summary.
+- [x] Coach Today cards are mobile-first and show contact, map, safety, photo requirement, and Submit Record.
+- [x] Coach lesson submission is simplified to attendance, completed/cancelled, progress, next focus, photo, and submit.
 
 ## Live Supabase Test Still Recommended
 

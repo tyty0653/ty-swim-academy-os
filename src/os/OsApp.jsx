@@ -237,6 +237,7 @@ function pageTitle(pathInfo) {
     lessons: 'Schedule / Lessons',
     review: 'Review Queue',
     money: 'Money',
+    'system-check': 'System Check',
     payroll: 'Payroll',
     payments: 'Payments',
     expenses: 'Expenses',
@@ -264,6 +265,7 @@ function RoutePage(props) {
   if (!isAdmin) return <NoAccess />;
   if (pathInfo.section === 'review') return <ReviewPage {...props} />;
   if (pathInfo.section === 'money') return <MoneyPage {...props} />;
+  if (pathInfo.section === 'system-check') return <SystemCheckPage {...props} />;
   if (pathInfo.section === 'payments') return <PaymentsPage {...props} />;
   if (pathInfo.section === 'expenses') return <ExpensesPage {...props} />;
   if (pathInfo.section === 'more') return <MorePage {...props} />;
@@ -289,6 +291,8 @@ function EmptyState({ title, body, action }) {
 }
 
 function OnboardingChecklist({ data }) {
+  const hasCoachSubmission = data.lessons.some((lesson) => ['completed_pending_review', 'cancelled_pending_review', 'approved'].includes(lesson.status));
+  const hasApprovedLesson = data.lessons.some((lesson) => lesson.status === 'approved');
   const steps = [
     ['Add coach', data.coaches.length > 0, '/more'],
     ['Add customer/family', data.customers.length > 0, '/students'],
@@ -297,6 +301,8 @@ function OnboardingChecklist({ data }) {
     ['Create class/group', data.classes.length > 0, '/students'],
     ['Create package', data.packages.length > 0, '/students'],
     ['Schedule first lesson', data.lessons.length > 0, '/schedule'],
+    ['Test coach submission', hasCoachSubmission, '/review'],
+    ['Approve lesson', hasApprovedLesson, '/review'],
   ];
   if (steps.every(([, done]) => done)) return null;
   return (
@@ -333,16 +339,29 @@ function AdminDashboard({ data }) {
   const expiredWithLessons = data.packages.filter((pkg) => daysUntil(pkg.expiry_date) < 0 && Number(pkg.remaining_lessons) > 0);
   const replacement = data.lessons.filter((lesson) => lesson.need_replacement);
   const cleanup = cleanupRows(data).length;
+  const controlCards = [
+    ['Today’s lessons', lessonsToday.length, 'Lessons happening today.', '/schedule', 'sky'],
+    ['Pending review', pending.length, 'Coach submissions waiting for Admin.', '/review', 'amber'],
+    ['Coach reschedule alerts', reschedules.length, 'Date/time changes to acknowledge.', '/review', 'rose'],
+    ['1 lesson remaining', oneRemaining.length, 'Renewal reminders.', '/students', 'amber'],
+    ['Expiring soon', expiring.length, 'Packages expiring within 7 days.', '/students', 'rose'],
+    ['Replacement needed', replacement.length, 'Lessons marked for replacement.', '/schedule', 'slate'],
+    ['Missing important data', cleanup, 'Names, address, age, consent, proof, or coach gaps.', '/data-cleanup', 'slate'],
+  ];
 
   return (
     <div className="grid gap-5">
       <OnboardingChecklist data={data} />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Card title="Today's lessons" value={lessonsToday.length} />
-        <Card title="Pending review" value={pending.length} tone="amber" />
-        <Card title="Reschedules to check" value={reschedules.length} tone="rose" />
-        <Card title="Cleanup items" value={cleanup} tone="slate" />
-      </div>
+      <Section title="Today Control Centre" action={<div className="flex flex-wrap gap-2"><Button onClick={() => go('/students')}>Add Customer</Button><Button variant="soft" onClick={() => go('/students')}>Add Class</Button><Button variant="soft" onClick={() => go('/students')}>Add Package</Button><Button variant="ghost" onClick={() => go('/schedule')}>Schedule Lesson</Button><Button variant="ghost" onClick={() => go('/review')}>Review Lessons</Button></div>}>
+        <p className="mb-4 text-sm leading-6 text-slate-500">Start here each day. These cards show what needs attention before lessons and payments become a problem.</p>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {controlCards.map(([title, value, note, href, tone]) => (
+            <button key={title} onClick={() => go(href)} className="text-left">
+              <Card title={title} value={value} note={note} tone={tone} />
+            </button>
+          ))}
+        </div>
+      </Section>
       <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
         <LessonList title="Today and This Week" rows={weekLessons} data={data} empty="No scheduled lessons in this view." />
         <AttentionList rows={[
@@ -392,15 +411,20 @@ function CoachTodayCards({ lessons, data }) {
             const mapsLink = venue?.google_maps_link || '';
             const whatsapp = customer?.whatsapp || '';
             const approved = lesson.status === 'approved';
+            const photoRequired = Boolean(cls?.photo_required || lesson.photo_required);
             return (
               <article key={lesson.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-sky-700">{lesson.start_time || 'Time TBC'} - {lesson.end_time || ''}</p>
                     <h3 className="mt-1 text-lg font-semibold text-slate-950">{cls?.class_name || lesson.lesson_code}</h3>
-                    <p className="mt-1 text-sm text-slate-500">{venue?.area || venue?.venue_name || 'Venue not set'}</p>
+                    <p className="mt-1 text-sm text-slate-700">{classStudentNames(cls?.id, data)}</p>
+                    <p className="mt-1 text-sm text-slate-500">{venue?.full_address || venue?.area || venue?.venue_name || 'Venue not set'}</p>
                   </div>
-                  <StatusBadge value={lesson.status} />
+                  <div className="grid justify-items-end gap-2">
+                    <StatusBadge value={lesson.status} />
+                    {photoRequired ? <StatusBadge value="needs_edit">Photo required</StatusBadge> : null}
+                  </div>
                 </div>
                 <p className="mt-3 rounded-lg bg-rose-50 p-3 text-sm font-medium text-rose-700">{studentAlerts(cls, data) || 'No health/safety alerts recorded.'}</p>
                 <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -458,6 +482,7 @@ function LessonList({ title, rows, data, coachView = false, empty = 'No lessons 
 
 function StudentsHub(props) {
   const [active, setActive] = useState('customers');
+  const [advanced, setAdvanced] = useState(false);
   const tabs = [
     ['customers', 'Families'],
     ['students', 'Students'],
@@ -468,18 +493,42 @@ function StudentsHub(props) {
   return (
     <div className="grid gap-5">
       <Section title="Student Workflow">
-        <p className="text-sm leading-6 text-slate-500">Use this area for the full family-to-class setup: customer, student, venue, class/group, and package. Customer profiles still show lesson history and payment history for Admin.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {tabs.map(([key, label]) => (
-            <Button key={key} variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{label}</Button>
+        <p className="text-sm leading-6 text-slate-500">Use this guided flow when adding a new family. It keeps the daily work in one place while the advanced tables stay available below.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {[
+            ['1', 'Add Family / Customer', 'Parent name and WhatsApp.', 'customers'],
+            ['2', 'Add Student(s)', 'Age, level, health and safety notes.', 'students'],
+            ['3', 'Add Venue / Address', 'Pool address, map, access notes.', 'venues'],
+            ['4', 'Create Class / Group', '1-1 to 1-4, coach, schedule mode.', 'classes'],
+            ['5', 'Add Package', 'Lessons, expiry, remaining count.', 'packages'],
+            ['6', 'Schedule First Lesson', 'Fixed weekly or flexible appointment.', 'schedule'],
+          ].map(([number, title, body, target]) => (
+            <button key={title} onClick={() => target === 'schedule' ? go('/schedule') : (setActive(target), setAdvanced(true))} className="rounded-lg border border-slate-200 bg-white p-4 text-left hover:border-sky-200 hover:bg-sky-50">
+              <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Step {number}</p>
+              <p className="mt-1 font-semibold text-slate-950">{title}</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">{body}</p>
+            </button>
           ))}
         </div>
+        <div className="mt-4"><Button variant="ghost" onClick={() => setAdvanced((value) => !value)}>{advanced ? 'Hide advanced tables' : 'Show advanced tables'}</Button></div>
       </Section>
-      {active === 'customers' ? <CustomersPage {...props} /> : null}
-      {active === 'students' ? <StudentsPage {...props} /> : null}
-      {active === 'venues' ? <VenuesPage {...props} /> : null}
-      {active === 'classes' ? <ClassesPage {...props} /> : null}
-      {active === 'packages' ? <PackagesPage {...props} /> : null}
+      {!advanced ? <EmptyState title="No students yet? Start by adding a family." body="Open the guided steps above. Add the family first, then add students, venue, class, package, and first lesson." action={<Button onClick={() => setAdvanced(true)}>Open advanced tables</Button>} /> : null}
+      {advanced ? (
+        <>
+          <Section title="Advanced Student Tables">
+            <div className="flex flex-wrap gap-2">
+              {tabs.map(([key, label]) => (
+                <Button key={key} variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{label}</Button>
+              ))}
+            </div>
+          </Section>
+          {active === 'customers' ? <CustomersPage {...props} /> : null}
+          {active === 'students' ? <StudentsPage {...props} /> : null}
+          {active === 'venues' ? <VenuesPage {...props} /> : null}
+          {active === 'classes' ? <ClassesPage {...props} /> : null}
+          {active === 'packages' ? <PackagesPage {...props} /> : null}
+        </>
+      ) : null}
     </div>
   );
 }
@@ -564,7 +613,7 @@ function MoneyPage(props) {
 }
 
 function MorePage(props) {
-  const tools = legacyAdminRoutes.filter(([key]) => ['import', 'cleanup', 'reports', 'settings', 'customers', 'venues', 'classes', 'packages', 'lessons'].includes(key));
+  const tools = legacyAdminRoutes.filter(([key]) => ['system-check', 'import', 'cleanup', 'reports', 'settings', 'customers', 'venues', 'classes', 'packages', 'lessons'].includes(key));
   return (
     <div className="grid gap-5">
       <Section title="More">
@@ -588,6 +637,7 @@ function MorePage(props) {
 
 function moreToolDescription(key) {
   return {
+    'system-check': 'Run setup, access, bucket, and data checks.',
     import: 'Bring in old Google Sheet CSV data.',
     cleanup: 'Find missing names, address, age, consent, coach, and proof records.',
     reports: 'Monthly lesson, renewal, payment, expense, and payroll exports.',
@@ -598,6 +648,75 @@ function moreToolDescription(key) {
     packages: 'Package list route.',
     lessons: 'Detailed lesson history route.',
   }[key] || 'Open tool';
+}
+
+function SystemCheckPage({ profile, data }) {
+  const [bucketState, setBucketState] = useState({ loading: true, names: [], error: '' });
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      const { data: buckets, error } = await supabase.storage.listBuckets();
+      if (cancelled) return;
+      setBucketState({ loading: false, names: buckets?.map((bucket) => bucket.name) || [], error: error?.message || '' });
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const bucketNames = bucketState.names;
+  const requiredBuckets = ['lesson-photos', 'payment-proofs', 'expense-receipts'];
+  const requiredTables = ['profiles', 'coaches', 'customers', 'students', 'venues', 'classes', 'packages', 'lessons', 'payroll_items'];
+  const rows = [
+    checkRow('Supabase env variables loaded', hasSupabaseConfig, 'App has VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'),
+    checkRow('Current user profile exists', Boolean(profile?.id), profile?.email || 'No profile row loaded.'),
+    checkRow('Current user role', profile?.role === 'admin', `Current role: ${profile?.role || 'unknown'}`),
+    checkRow('Required tables accessible', requiredTables.every((name) => Array.isArray(data[name])), 'Core operational tables returned arrays.'),
+    checkRow('Required storage buckets exist', !bucketState.loading && requiredBuckets.every((name) => bucketNames.includes(name)), bucketState.loading ? 'Checking buckets...' : bucketState.error || `Found: ${bucketNames.join(', ') || 'none'}`),
+    checkRow('Admin modules accessible', Array.isArray(data.package_financials) && Array.isArray(data.expenses) && Array.isArray(data.audit_logs), 'Admin-only tables loaded for Admin profile.'),
+    checkRow('Coach financial modules hidden by UI loader', !coachTableNames.includes('package_financials') && !coachTableNames.includes('expenses'), 'Coach data loader excludes payments and expenses.'),
+    checkRow('Packages table accessible', Array.isArray(data.packages), `${data.packages.length} package record(s).`),
+    checkRow('Lessons table accessible', Array.isArray(data.lessons), `${data.lessons.length} lesson record(s).`),
+    checkRow('Payments hidden from Coach', !coachTableNames.includes('package_financials'), 'Coach loader never asks for package_financials.'),
+    checkRow('Expenses hidden from Coach', !coachTableNames.includes('expenses'), 'Coach loader never asks for expenses.'),
+    checkRow('Payroll access scoped', !coachTableNames.includes('expenses') && coachTableNames.includes('payroll_items'), 'Coach can load own payroll through RLS, not finance expenses.'),
+  ];
+  const counts = [
+    ['Coaches', data.coaches.length],
+    ['Customers', data.customers.length],
+    ['Students', data.students.length],
+    ['Classes', data.classes.length],
+    ['Packages', data.packages.length],
+    ['Lessons', data.lessons.length],
+  ];
+  return (
+    <div className="grid gap-5">
+      <Section title="System Check">
+        <p className="text-sm leading-6 text-slate-500">Run this page after setting up Supabase or loading demo data. It catches the common setup and permission mistakes before coaches use the system.</p>
+        <DataTable rows={rows} columns={[
+          { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status}>{row.label}</StatusBadge> },
+          { key: 'check', label: 'Check' },
+          { key: 'detail', label: 'Result' },
+        ]} />
+      </Section>
+      <Section title="Basic Data Counts">
+        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+          {counts.map(([label, value]) => <Card key={label} title={label} value={value} tone={value > 0 ? 'sky' : 'amber'} />)}
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+function checkRow(check, pass, detail) {
+  return {
+    id: check,
+    check,
+    detail,
+    status: pass ? 'approved' : 'needs_edit',
+    label: pass ? 'Pass' : 'Check',
+  };
 }
 
 function CustomerDetail({ profile, pathInfo, data, reload, toast }) {
@@ -911,10 +1030,27 @@ function LessonsPage({ profile, data, reload, toast }) {
       && (!filters.pending || ['completed_pending_review', 'cancelled_pending_review'].includes(lesson.status))
       && (!filters.replacement || lesson.need_replacement);
   });
+  const fixedSchedules = data.recurring_schedules.filter((schedule) => isAdmin || schedule.coach_id === coach?.id);
+  const flexibleClasses = data.classes.filter((cls) => cls.scheduling_mode === 'flexible' && (isAdmin || cls.assigned_coach_id === coach?.id));
+  const fixedLessons = rows.filter((lesson) => lesson.scheduling_mode === 'fixed_weekly');
+  const flexibleLessons = rows.filter((lesson) => lesson.scheduling_mode === 'flexible');
 
   return (
     <div className="grid gap-5">
-      <Section title="Filters" action={<div className="flex gap-2">{isAdmin ? <Button variant="soft" onClick={() => setRecurring({})}>Recurring schedule</Button> : null}<Button onClick={() => setFlexible({})}>Flexible lesson</Button></div>}>
+      <Section title="Schedule Modes" action={<div className="flex gap-2">{isAdmin ? <Button variant="soft" onClick={() => setRecurring({})}>Create Fixed Weekly</Button> : null}<Button onClick={() => setFlexible({})}>Create Flexible Lesson</Button></div>}>
+        <p className="text-sm leading-6 text-slate-500">Fixed Weekly is for regular day/time classes. Flexible is for coach-arranged appointments after coordinating with the family.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="rounded-lg border border-sky-100 bg-sky-50 p-4">
+            <p className="font-semibold text-slate-950">Fixed Weekly</p>
+            <p className="mt-1 text-sm text-slate-600">{fixedSchedules.length} recurring schedule(s), {fixedLessons.length} generated lesson(s) in this view.</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <p className="font-semibold text-slate-950">Flexible / Coach-arranged</p>
+            <p className="mt-1 text-sm text-slate-600">{flexibleClasses.length} flexible class(es), {flexibleLessons.length} lesson appointment(s) in this view.</p>
+          </div>
+        </div>
+      </Section>
+      <Section title="Filters">
         <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-8">
           <Field label="From"><Input type="date" value={filters.dateFrom} onChange={(event) => setFilters({ ...filters, dateFrom: event.target.value })} /></Field>
           <Field label="To"><Input type="date" value={filters.dateTo} onChange={(event) => setFilters({ ...filters, dateTo: event.target.value })} /></Field>
@@ -926,7 +1062,28 @@ function LessonsPage({ profile, data, reload, toast }) {
           <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={filters.replacement} onChange={(event) => setFilters({ ...filters, replacement: event.target.checked })} /> Replacement</label>
         </div>
       </Section>
-      <LessonList title="Lessons" rows={rows} data={data} coachView={!isAdmin} />
+      {isAdmin ? (
+        <Section title="Fixed Weekly Schedules">
+          <DataTable rows={fixedSchedules} empty="No fixed weekly schedule yet." columns={[
+            { key: 'class', label: 'Class', render: (row) => data.classes.find((cls) => cls.id === row.class_id)?.class_name || '-' },
+            { key: 'day', label: 'Day', render: (row) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][row.day_of_week] || '-' },
+            { key: 'time', label: 'Time', render: (row) => `${row.start_time || ''} - ${row.end_time || ''}` },
+            { key: 'coach', label: 'Coach', render: (row) => data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-' },
+            { key: 'venue', label: 'Venue', render: (row) => data.venues.find((item) => item.id === row.venue_id)?.venue_name || data.venues.find((item) => item.id === row.venue_id)?.area || '-' },
+            { key: 'next', label: 'Next lesson', render: (row) => data.lessons.filter((lesson) => lesson.recurring_schedule_id === row.id && lesson.scheduled_date >= todayISO()).sort((a, b) => String(a.scheduled_date).localeCompare(String(b.scheduled_date)))[0]?.scheduled_date || '-' },
+          ]} />
+        </Section>
+      ) : null}
+      <LessonList title="Fixed Weekly Lessons" rows={fixedLessons} data={data} coachView={!isAdmin} empty="No fixed weekly lessons in this view." />
+      <Section title="Flexible Classes Needing Arrangement">
+        <DataTable rows={flexibleClasses} empty="No flexible classes." columns={[
+          { key: 'class_name', label: 'Class / Group' },
+          { key: 'coach', label: 'Coach', render: (row) => data.coaches.find((item) => item.id === row.assigned_coach_id)?.display_name || '-' },
+          { key: 'students', label: 'Students', render: (row) => classStudentNames(row.id, data) },
+          { key: 'action', label: 'Action', render: () => <Button onClick={(event) => { event.stopPropagation(); setFlexible({}); }}>Create appointment</Button> },
+        ]} />
+      </Section>
+      <LessonList title="Flexible Lessons" rows={flexibleLessons} data={data} coachView={!isAdmin} empty="No flexible lessons in this view." />
       {recurring ? <RecurringModal data={data} reload={reload} toast={toast} onClose={() => setRecurring(null)} /> : null}
       {flexible ? <FlexibleLessonModal profile={profile} data={data} reload={reload} toast={toast} onClose={() => setFlexible(null)} /> : null}
     </div>
@@ -1033,14 +1190,14 @@ function LessonDetail({ profile, pathInfo, data, reload, toast }) {
     if (JSON.stringify(oldSchedule) !== JSON.stringify(newSchedule)) {
       if (!rescheduleReason.trim()) {
         toast('Please add a reschedule reason');
-        return;
+        return false;
       }
       updates.status = lesson.status === 'approved' ? 'approved' : 'rescheduled';
     }
     const { error } = await supabase.from('lessons').update(updates).eq('id', lesson.id);
     if (error) {
       toast(error.message);
-      return;
+      return false;
     }
     if (JSON.stringify(oldSchedule) !== JSON.stringify(newSchedule)) {
       await supabase.from('lesson_change_logs').insert({ lesson_id: lesson.id, changed_by: profile.id, change_type: 'reschedule', old_value: oldSchedule, new_value: newSchedule, reason: rescheduleReason, admin_seen: isAdmin });
@@ -1051,10 +1208,12 @@ function LessonDetail({ profile, pathInfo, data, reload, toast }) {
     }
     toast('Lesson saved');
     await reload();
+    return true;
   };
 
   const submitReview = async (status = 'completed_pending_review') => {
-    await saveLesson();
+    const saved = await saveLesson();
+    if (!saved) return;
     const { error } = await supabase.from('lessons').update({ status, coach_submitted_at: new Date().toISOString(), updated_by: profile.id }).eq('id', lesson.id);
     if (error) toast(error.message);
     else {
@@ -1080,6 +1239,29 @@ function LessonDetail({ profile, pathInfo, data, reload, toast }) {
       await reload();
     }
   };
+
+  if (!isAdmin) {
+    return (
+      <CoachLessonSubmission
+        lesson={lesson}
+        cls={cls}
+        customer={customer}
+        venue={venue}
+        data={data}
+        form={form}
+        setForm={setForm}
+        participants={participants}
+        setParticipants={setParticipants}
+        rescheduleReason={rescheduleReason}
+        setRescheduleReason={setRescheduleReason}
+        coachLocked={coachLocked}
+        saveLesson={saveLesson}
+        submitReview={submitReview}
+        reload={reload}
+        toast={toast}
+      />
+    );
+  }
 
   return (
     <div className="grid gap-5">
@@ -1137,7 +1319,62 @@ function LessonDetail({ profile, pathInfo, data, reload, toast }) {
   );
 }
 
-function LessonPhotos({ lesson, data, reload, toast }) {
+function CoachLessonSubmission({ lesson, cls, customer, venue, data, form, setForm, participants, setParticipants, rescheduleReason, setRescheduleReason, coachLocked, saveLesson, submitReview, reload, toast }) {
+  const photoRequired = Boolean(cls?.photo_required || lesson.photo_required);
+  return (
+    <div className="grid gap-5">
+      <Section title={cls?.class_name || lesson.lesson_code} action={<Button variant="ghost" onClick={() => go('/schedule')}>Back</Button>}>
+        <div className="grid gap-3 md:grid-cols-3">
+          <Info label="Time" value={`${lesson.scheduled_date} ${lesson.start_time || ''} - ${lesson.end_time || ''}`} />
+          <Info label="Students" value={classStudentNames(cls?.id, data)} />
+          <Info label="Status" value={<StatusBadge value={lesson.status} />} />
+          <Info label="WhatsApp" value={customer?.whatsapp || '-'} />
+          <Info label="Venue" value={venue?.full_address || venue?.venue_name || '-'} />
+          <Info label="Photo" value={photoRequired ? <StatusBadge value="needs_edit">Required</StatusBadge> : 'Optional'} />
+        </div>
+        <p className="mt-4 rounded-lg bg-rose-50 p-3 text-sm font-medium text-rose-700">{studentAlerts(cls, data) || 'No health/safety alerts recorded.'}</p>
+      </Section>
+      <Section title={coachLocked ? 'Approved Lesson Record' : 'Submit Lesson Record'}>
+        {coachLocked ? <p className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm font-medium text-emerald-700">This lesson is approved and read-only.</p> : null}
+        <div className="grid gap-3 md:grid-cols-4">
+          <Field label="Lesson date"><Input disabled={coachLocked} type="date" value={form.scheduled_date || ''} onChange={(event) => setForm({ ...form, scheduled_date: event.target.value })} /></Field>
+          <Field label="Start"><Input disabled={coachLocked} type="time" value={form.start_time || ''} onChange={(event) => setForm({ ...form, start_time: event.target.value })} /></Field>
+          <Field label="End"><Input disabled={coachLocked} type="time" value={form.end_time || ''} onChange={(event) => setForm({ ...form, end_time: event.target.value })} /></Field>
+          <Field label="Reschedule reason"><Input disabled={coachLocked} value={rescheduleReason} onChange={(event) => setRescheduleReason(event.target.value)} placeholder="Only if time changed" /></Field>
+        </div>
+        <div className="mt-4 grid gap-3">
+          {participants.map((item, index) => {
+            const student = data.students.find((row) => row.id === item.student_id);
+            return (
+              <div key={item.student_id} className="rounded-lg border border-slate-200 p-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-semibold text-slate-950">{student?.display_name}</p>
+                    <p className="text-xs text-rose-600">{student?.safety_alert || student?.health_notes || student?.special_needs || ''}</p>
+                  </div>
+                  <Select disabled={coachLocked} value={item.attendance} onChange={(event) => setParticipants(participants.map((row, rowIndex) => rowIndex === index ? { ...row, attendance: event.target.value } : row))}>{['present', 'absent', 'sick', 'late', 'no_show', 'not_applicable'].map((value) => <option key={value}>{value}</option>)}</Select>
+                </div>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <Textarea disabled={coachLocked} placeholder="Short progress note" value={item.progress_note || ''} onChange={(event) => setParticipants(participants.map((row, rowIndex) => rowIndex === index ? { ...row, progress_note: event.target.value } : row))} />
+                  <Textarea disabled={coachLocked} placeholder="Next focus" value={item.next_focus || ''} onChange={(event) => setParticipants(participants.map((row, rowIndex) => rowIndex === index ? { ...row, next_focus: event.target.value } : row))} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <Field label="Coach note"><Textarea disabled={coachLocked} value={form.coach_notes || ''} onChange={(event) => setForm({ ...form, coach_notes: event.target.value })} placeholder="Optional note for Admin" /></Field>
+        <LessonPhotos lesson={lesson} data={data} reload={reload} toast={toast} disabled={coachLocked} />
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button variant="ghost" onClick={saveLesson} disabled={coachLocked}>Save draft</Button>
+          <Button onClick={() => submitReview('completed_pending_review')} disabled={coachLocked}>Lesson completed</Button>
+          <Button variant="soft" onClick={() => submitReview('cancelled_pending_review')} disabled={coachLocked}>Lesson cancelled</Button>
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+function LessonPhotos({ lesson, data, reload, toast, disabled = false }) {
   const [type, setType] = useState('attendance_proof');
   const photos = data.lesson_photos?.filter((photo) => photo.lesson_id === lesson.id) || [];
   const upload = async (event) => {
@@ -1156,8 +1393,8 @@ function LessonPhotos({ lesson, data, reload, toast }) {
   return (
     <div className="mt-4 rounded-lg border border-slate-200 p-3">
       <div className="flex flex-wrap items-center gap-3">
-        <Select value={type} onChange={(event) => setType(event.target.value)}>{['attendance_proof', 'progress_record', 'pool_issue', 'marketing_candidate', 'other'].map((item) => <option key={item}>{item}</option>)}</Select>
-        <Input type="file" accept="image/*" onChange={upload} />
+        <Select disabled={disabled} value={type} onChange={(event) => setType(event.target.value)}>{['attendance_proof', 'progress_record', 'pool_issue', 'marketing_candidate', 'other'].map((item) => <option key={item}>{item}</option>)}</Select>
+        <Input disabled={disabled} type="file" accept="image/*" onChange={upload} />
       </div>
       <div className="mt-3 grid gap-2 md:grid-cols-3">{photos.map((photo) => <div key={photo.id} className="rounded-lg bg-slate-50 p-3 text-sm">{photo.photo_type}<br /><span className="text-xs text-slate-500">{photo.storage_path}</span></div>)}</div>
     </div>
@@ -1202,7 +1439,18 @@ function AuditPanels({ lesson, data }) {
 }
 
 function ReviewPage({ data, reload, toast }) {
-  const rows = data.lessons.filter((lesson) => ['completed_pending_review', 'cancelled_pending_review', 'needs_edit'].includes(lesson.status) || data.lesson_change_logs.some((log) => log.lesson_id === lesson.id && !log.admin_seen));
+  const [active, setActive] = useState('pending');
+  const groups = {
+    pending: data.lessons.filter((lesson) => lesson.status === 'completed_pending_review'),
+    rescheduled: data.lessons.filter((lesson) => data.lesson_change_logs.some((log) => log.lesson_id === lesson.id && !log.admin_seen)),
+    cancelled: data.lessons.filter((lesson) => lesson.status === 'cancelled_pending_review'),
+    needs_edit: data.lessons.filter((lesson) => lesson.status === 'needs_edit'),
+    missing_photos: data.lessons.filter((lesson) => {
+      const cls = data.classes.find((item) => item.id === lesson.class_id);
+      return cls?.photo_required && !data.lesson_photos.some((photo) => photo.lesson_id === lesson.id);
+    }),
+  };
+  const rows = groups[active] || [];
   const approve = async (lesson) => {
     const { error } = await supabase.rpc('approve_lesson', { p_lesson_id: lesson.id });
     if (error) toast(error.message);
@@ -1211,21 +1459,43 @@ function ReviewPage({ data, reload, toast }) {
       await reload();
     }
   };
+  const updateStatus = async (lesson, status) => {
+    const { error } = await supabase.from('lessons').update({ status, admin_reviewed_at: new Date().toISOString(), admin_reviewed_by: (await supabase.auth.getUser()).data.user?.id }).eq('id', lesson.id);
+    if (error) toast(error.message);
+    else {
+      toast('Review updated');
+      await reload();
+    }
+  };
   return (
-    <Section title="Admin Review Queue">
-      <DataTable rows={rows} onRowClick={(row) => go(`/lessons/${row.id}`)} columns={[
-        { key: 'lesson_code', label: 'Lesson' },
-        { key: 'date', label: 'Date', render: (row) => `${row.scheduled_date} ${row.start_time || ''}` },
-        { key: 'class', label: 'Class', render: (row) => data.classes.find((cls) => cls.id === row.class_id)?.class_name || '-' },
-        { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status} /> },
-        { key: 'photo', label: 'Photo', render: (row) => {
-          const cls = data.classes.find((item) => item.id === row.class_id);
-          const count = (data.lesson_photos || []).filter((photo) => photo.lesson_id === row.id).length;
-          return cls?.photo_required && count === 0 ? <StatusBadge value="needs_edit">Missing required</StatusBadge> : count;
-        } },
-        { key: 'action', label: 'Action', render: (row) => <Button onClick={(event) => { event.stopPropagation(); approve(row); }}>Approve</Button> },
-      ]} />
-    </Section>
+    <div className="grid gap-5">
+      <Section title="Review">
+        <p className="text-sm leading-6 text-slate-500">This is the Admin approval desk. Open a row for details, or use the quick actions when the record is straightforward.</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {[
+            ['pending', 'Pending lesson records'],
+            ['rescheduled', 'Rescheduled lessons'],
+            ['cancelled', 'Cancelled lessons'],
+            ['needs_edit', 'Needs edit'],
+            ['missing_photos', 'Missing required photos'],
+          ].map(([key, label]) => <Button key={key} variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{label} ({groups[key].length})</Button>)}
+        </div>
+      </Section>
+      <Section title="Review Queue">
+        <DataTable rows={rows} empty="No pending review in this category." onRowClick={(row) => go(`/lessons/${row.id}`)} columns={[
+          { key: 'lesson_code', label: 'Lesson' },
+          { key: 'date', label: 'Date', render: (row) => `${row.scheduled_date} ${row.start_time || ''}` },
+          { key: 'class', label: 'Class', render: (row) => data.classes.find((cls) => cls.id === row.class_id)?.class_name || '-' },
+          { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status} /> },
+          { key: 'photo', label: 'Photo', render: (row) => {
+            const cls = data.classes.find((item) => item.id === row.class_id);
+            const count = (data.lesson_photos || []).filter((photo) => photo.lesson_id === row.id).length;
+            return cls?.photo_required && count === 0 ? <StatusBadge value="needs_edit">Missing required</StatusBadge> : count;
+          } },
+          { key: 'action', label: 'Actions', render: (row) => <div className="flex flex-wrap gap-2"><Button onClick={(event) => { event.stopPropagation(); approve(row); }}>Approve</Button><Button variant="soft" onClick={(event) => { event.stopPropagation(); updateStatus(row, 'needs_edit'); }}>Request edit</Button><Button variant="danger" onClick={(event) => { event.stopPropagation(); updateStatus(row, 'rejected'); }}>Reject</Button></div> },
+        ]} />
+      </Section>
+    </div>
   );
 }
 

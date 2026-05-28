@@ -146,3 +146,17 @@ Most list pages include CSV export. Payroll, reports, renewals, and operational 
 - Add richer calendar views after real operational data is loaded.
 - Add bulk CSV row error reporting table if imports become large.
 - Add notification delivery through email/WhatsApp after Admin notification rules are finalized.
+
+## Vercel Later
+
+Do not deploy this app to Vercel until local QA and Supabase test-project QA are stable.
+
+Recommended order:
+
+1. Test locally with `.env.local`.
+2. Run `supabase/schema.sql` in a Supabase test project.
+3. Load fake data with `supabase/demo-seed.sql`.
+4. Run the Admin and Coach flows in `docs/ty-swim-academy-os-testing-guide.md`.
+5. Deploy to Vercel only after System Check is clean and the demo flow feels stable.
+
+Future recommended URL: `os.tyswimacademy.com`.

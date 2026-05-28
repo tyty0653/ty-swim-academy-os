@@ -21,3 +21,12 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 Run `supabase/schema.sql` in Supabase, create the first Admin profile, then open `/login`.
 
 Full setup notes are in `docs/ty-swim-academy-os.md`.
+
+## Local QA
+
+```bash
+npm run build
+npm run smoke:routes
+```
+
+Use `supabase/demo-seed.sql` with a Supabase test project for fake Admin/Coach workflow data. See `docs/ty-swim-academy-os-testing-guide.md`.

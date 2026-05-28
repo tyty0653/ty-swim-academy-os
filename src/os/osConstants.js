@@ -15,6 +15,7 @@ export const coachNav = [
 ];
 
 export const legacyAdminRoutes = [
+  ['system-check', '/system-check', 'System Check'],
   ['customers', '/customers', 'Customers / Families'],
   ['venues', '/venues', 'Venues'],
   ['classes', '/classes', 'Classes / Groups'],
