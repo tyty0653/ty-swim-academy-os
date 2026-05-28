@@ -36,9 +36,9 @@ try {
     results.push({ route, status: response.status, ok: response.ok });
   }
   const failed = results.filter((result) => !result.ok);
-  for (const result of results) {
-    console.log(`${result.ok ? 'PASS' : 'FAIL'} ${result.status} ${result.route}`);
-  }
+  const output = results.map((result) => `${result.ok ? 'PASS' : 'FAIL'} ${result.status} ${result.route}`).join('\n');
+  process.stdout.write(`${output}\n`);
+  await new Promise((resolve) => process.stdout.write('', resolve));
   if (failed.length) process.exitCode = 1;
 } finally {
   if (isWindows) {

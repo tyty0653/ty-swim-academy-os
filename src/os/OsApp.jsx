@@ -346,10 +346,10 @@ function RoutePage(props) {
   if (pathInfo.section === 'packages') return <PackagesPage {...props} />;
   if (pathInfo.section === 'lessons' || pathInfo.section === 'schedule') return <LessonsPage {...props} />;
   if (pathInfo.section === 'payroll') return <PayrollPage {...props} />;
+  if (pathInfo.section === 'system-check') return <SystemCheckPage {...props} />;
   if (!isAdmin) return <NoAccess />;
   if (pathInfo.section === 'review') return <ReviewPage {...props} />;
   if (pathInfo.section === 'money') return <MoneyPage {...props} />;
-  if (pathInfo.section === 'system-check') return <SystemCheckPage {...props} />;
   if (pathInfo.section === 'payments') return <PaymentsPage {...props} />;
   if (pathInfo.section === 'expenses') return <ExpensesPage {...props} />;
   if (pathInfo.section === 'more') return <MorePage {...props} />;
@@ -482,6 +482,9 @@ function CoachDashboard({ profile, data }) {
         <Card title="Pending records" value={pending.length} tone="amber" />
         <Card title="Expected payroll" value={formatMoney(payroll.reduce((sum, item) => sum + Number(item.pay_amount || 0), 0))} tone="green" />
       </div>
+      <Section title="Coach Check" action={<Button variant="ghost" onClick={() => go('/system-check')}>Run Coach Check</Button>}>
+        <p className="text-sm leading-6 text-slate-500">Use this after demo setup to confirm assigned lessons, students, venues, and payroll are visible while payments and expenses stay hidden.</p>
+      </Section>
       <CoachTodayCards lessons={today.length ? today : ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 5)} data={data} />
       <LessonList title="My Schedule" rows={ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 10)} data={data} coachView empty="No upcoming assigned lessons." />
     </div>
@@ -759,31 +762,53 @@ function SystemCheckPage({ session, profile, data }) {
   const bucketNames = bucketState.names;
   const requiredBuckets = ['lesson-photos', 'payment-proofs', 'expense-receipts'];
   const requiredTables = ['profiles', 'coaches', 'customers', 'students', 'venues', 'classes', 'packages', 'lessons', 'payroll_items'];
+  const isAdmin = profile?.role === 'admin';
+  const isCoach = profile?.role === 'coach';
+  const ownCoach = data.coaches.find((coach) => coach.profile_id === profile?.id);
   const demoDataPresent = data.customers.some((item) => item.customer_code === 'DEMO-CUS-0001')
     && data.students.some((item) => item.student_code === 'DEMO-STU-0001')
     && data.classes.some((item) => item.class_code === 'DEMO-CLS-0001')
     && data.packages.some((item) => item.package_code === 'DEMO-PKG-0001')
     && data.lessons.some((item) => String(item.lesson_code || '').startsWith('DEMO-LES-'));
+  const pendingReviewLesson = data.lessons.some((lesson) => lesson.status === 'completed_pending_review');
+  const assignedLessonCount = ownCoach ? data.lessons.filter((lesson) => lesson.coach_id === ownCoach.id).length : 0;
+  const assignedClassCount = ownCoach ? data.classes.filter((cls) => cls.assigned_coach_id === ownCoach.id).length : 0;
+  const visiblePayrollForOtherCoach = isCoach && ownCoach ? data.payroll_items.some((item) => item.coach_id !== ownCoach.id) : false;
   const coachProfileExists = data.coaches.some((coach) => coach.profile_id);
   const frontendEnvKeys = Object.keys(import.meta.env || {});
   const serviceRoleExposed = frontendEnvKeys.some((key) => key.toLowerCase().includes('service_role'));
-  const rows = [
+  const baseRows = [
     checkRow('Supabase env loaded', hasSupabaseConfig ? 'pass' : 'fail', 'The app has the public Supabase URL and anon key.', 'Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local.'),
     checkRow('Current session exists', session?.user?.id ? 'pass' : 'fail', session?.user?.email || 'No signed-in user session found.', 'Sign in again at /login.'),
     checkRow('Current profile exists', profile?.id ? 'pass' : 'fail', profile?.email || 'No profile row loaded.', 'Create a profiles row matching this Auth user ID.'),
     checkRow('Current role detected', ['admin', 'coach'].includes(profile?.role) ? 'pass' : 'fail', `Role: ${profile?.role || 'missing'}`, 'Set profile role to admin or coach.'),
-    checkRow('Admin / Coach role logic', profile?.role === 'admin' ? 'pass' : 'warning', profile?.role === 'admin' ? 'You are viewing Admin checks.' : 'You are not an Admin.', 'Open this page as Admin for full checks.'),
+    checkRow('Admin / Coach role logic', ['admin', 'coach'].includes(profile?.role) ? 'pass' : 'fail', `You are viewing ${profile?.role || 'unknown'} checks.`, 'Use Admin login for Admin checks and Coach login for Coach restriction checks.'),
     checkRow('Core tables accessible', requiredTables.every((name) => Array.isArray(data[name])) ? 'pass' : 'fail', 'Core operational tables should load as lists.', 'Run supabase/schema.sql in the test Supabase project.'),
     checkRow('Required storage buckets exist', !bucketState.loading && requiredBuckets.every((name) => bucketNames.includes(name)) ? 'pass' : 'warning', bucketState.loading ? 'Checking buckets...' : bucketState.error || `Found: ${bucketNames.join(', ') || 'none'}`, 'Confirm private buckets exist: lesson-photos, payment-proofs, expense-receipts.'),
     checkRow('Demo data present', demoDataPresent ? 'pass' : 'warning', demoDataPresent ? 'DEMO customer, students, class, package, and lessons found.' : 'Demo rows not found yet.', 'Run supabase/demo-seed.sql after replacing the Admin and Coach Auth user IDs.'),
+    checkRow('Pending review lesson exists', pendingReviewLesson ? 'pass' : 'warning', pendingReviewLesson ? 'A lesson is waiting for Admin review.' : 'No completed_pending_review lesson is visible.', 'Run demo-seed.sql or submit a lesson as Coach.'),
     checkRow('Coach profile exists', coachProfileExists ? 'pass' : 'warning', `${data.coaches.length} coach record(s), ${data.coaches.filter((coach) => coach.profile_id).length} linked to login profile.`, 'Create a coach row and link profile_id to the Coach Auth user.'),
+    checkRow('No service_role key in frontend', serviceRoleExposed ? 'fail' : 'pass', serviceRoleExposed ? 'A service role-looking env variable is visible to the browser.' : 'Only public Vite env variables are available to the frontend.', 'Remove service_role keys from .env.local and Vercel frontend env. Use only VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'),
+  ];
+  const adminRows = [
+    checkRow('Admin profile active', isAdmin && profile?.active ? 'pass' : 'warning', isAdmin ? 'Current user is an active Admin.' : 'You are not signed in as Admin.', 'Sign in as Admin for Admin setup checks.'),
+    checkRow('Payment data accessible to Admin', isAdmin && Array.isArray(data.package_financials) ? 'pass' : 'warning', `${data.package_financials.length} payment row(s) loaded.`, 'If this is not Admin, log in as Admin. If Admin sees an error, check package_financials RLS.'),
+    checkRow('Expenses accessible to Admin', isAdmin && Array.isArray(data.expenses) ? 'pass' : 'warning', `${data.expenses.length} expense row(s) loaded.`, 'If Admin cannot load expenses, check expenses RLS.'),
+    checkRow('Payroll accessible to Admin', isAdmin && Array.isArray(data.payroll_items) && Array.isArray(data.payroll_periods) ? 'pass' : 'warning', `${data.payroll_items.length} payroll item(s), ${data.payroll_periods.length} payroll period(s).`, 'Generate payroll after approving the demo lesson.'),
+    checkRow('Coach restrictions need Coach login', isAdmin ? 'warning' : 'pass', isAdmin ? 'Admin cannot prove Coach RLS from this session.' : 'You are signed in as Coach.', 'Log in as Coach and open /system-check, then run npm run qa:check with Coach credentials.'),
+  ];
+  const coachRows = [
+    checkRow('Coach profile linked', isCoach && ownCoach?.id ? 'pass' : 'warning', ownCoach?.coach_code || 'No coach row linked to this profile.', 'Set coaches.profile_id to this Coach Auth user ID.'),
+    checkRow('Coach can see assigned lessons', isCoach && assignedLessonCount > 0 ? 'pass' : 'warning', `${assignedLessonCount} assigned lesson(s) visible.`, 'Run demo-seed.sql with this Coach Auth user ID or assign a class/lesson to this coach.'),
+    checkRow('Coach can see assigned classes/students/venues', isCoach && assignedClassCount > 0 && data.students.length > 0 && data.venues.length > 0 ? 'pass' : 'warning', `${assignedClassCount} class(es), ${data.students.length} student(s), ${data.venues.length} venue(s) visible.`, 'Check class assignment and RLS if these are empty.'),
     checkRow('Payments hidden from Coach', !coachTableNames.includes('package_financials') ? 'pass' : 'fail', 'Coach loader does not request package_financials.', 'Keep payments out of coachTableNames and rely on RLS.'),
     checkRow('Expenses hidden from Coach', !coachTableNames.includes('expenses') ? 'pass' : 'fail', 'Coach loader does not request expenses.', 'Keep expenses out of coachTableNames and rely on RLS.'),
     checkRow('Customer price hidden from Coach', !coachTableNames.includes('package_financials') ? 'pass' : 'fail', 'Prices live in Admin-only package_financials.', 'Do not add price fields to coach-readable tables or coach UI.'),
-    checkRow('Payroll scope', !coachTableNames.includes('expenses') && coachTableNames.includes('payroll_items') ? 'pass' : 'fail', 'Coach can load own payroll_items through RLS, not company expenses.', 'Keep payroll RLS scoped by current_coach_id.'),
-    checkRow('No service_role key in frontend', serviceRoleExposed ? 'fail' : 'pass', serviceRoleExposed ? 'A service role-looking env variable is visible to the browser.' : 'Only public Vite env variables are available to the frontend.', 'Remove service_role keys from .env.local and Vercel frontend env. Use only VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'),
-    checkRow('Approved lesson protection', 'warning', 'Protected by schema trigger prevent_coach_sensitive_lesson_update when schema.sql is applied.', 'Run schema.sql and test with demo Coach after a lesson is approved.'),
+    checkRow('Coach cannot see other coach payroll', visiblePayrollForOtherCoach ? 'fail' : 'pass', isCoach ? `${data.payroll_items.length} own payroll item(s) visible.` : 'Run this as Coach for a live RLS result.', 'Keep payroll RLS scoped by current_coach_id.'),
+    checkRow('Coach cannot approve lesson', 'warning', 'This requires a live denied RPC attempt.', 'Run QA_RUN_MUTATIONS=true npm run qa:check with demo data to confirm approve_lesson rejects Coach.'),
+    checkRow('Coach cannot edit approved lesson', 'warning', 'Protected by schema trigger prevent_coach_sensitive_lesson_update when schema.sql is applied.', 'Approve a demo lesson, log in as Coach, and confirm the lesson detail is read-only or run qa:check.'),
   ];
+  const rows = [...baseRows, ...(isAdmin ? adminRows : coachRows)];
   const counts = [
     ['Coaches', data.coaches.length],
     ['Customers', data.customers.length],
@@ -1418,7 +1443,7 @@ function LessonDetail({ profile, pathInfo, data, reload, toast }) {
           <Field label="Coach notes"><Textarea disabled={coachLocked} value={form.coach_notes || ''} onChange={(event) => setForm({ ...form, coach_notes: event.target.value })} /></Field>
           {isAdmin ? <Field label="Admin notes"><Textarea value={form.admin_notes || ''} onChange={(event) => setForm({ ...form, admin_notes: event.target.value })} /></Field> : null}
         </div>
-        <LessonPhotos lesson={lesson} data={data} reload={reload} toast={toast} />
+        <LessonPhotos lesson={lesson} data={data} reload={reload} toast={toast} canDelete />
       </Section>
       <LessonApprovalPanel isAdmin={isAdmin} lesson={lesson} onSave={saveLesson} onSubmit={submitReview} onApprove={approve} onReviewUpdate={reviewUpdate} disabled={coachLocked} />
       {isAdmin ? <AuditPanels lesson={lesson} data={data} /> : null}
@@ -1481,7 +1506,7 @@ function CoachLessonSubmission({ lesson, cls, customer, venue, data, form, setFo
   );
 }
 
-function LessonPhotos({ lesson, data, reload, toast, disabled = false }) {
+function LessonPhotos({ lesson, data, reload, toast, disabled = false, canDelete = false }) {
   const [type, setType] = useState('attendance_proof');
   const photos = data.lesson_photos?.filter((photo) => photo.lesson_id === lesson.id) || [];
   const upload = async (event) => {
@@ -1497,13 +1522,37 @@ function LessonPhotos({ lesson, data, reload, toast, disabled = false }) {
     toast('Photo uploaded');
     await reload();
   };
+  const remove = async (photo) => {
+    if (!window.confirm('Delete this lesson photo?')) return;
+    const storageResult = await supabase.storage.from('lesson-photos').remove([photo.storage_path]);
+    if (storageResult.error) {
+      toast(storageResult.error.message);
+      return;
+    }
+    const { error } = await supabase.from('lesson_photos').delete().eq('id', photo.id);
+    if (error) toast(error.message);
+    else {
+      toast('Photo deleted');
+      await reload();
+    }
+  };
   return (
     <div className="mt-4 rounded-lg border border-slate-200 p-3">
       <div className="flex flex-wrap items-center gap-3">
         <Select disabled={disabled} value={type} onChange={(event) => setType(event.target.value)}>{['attendance_proof', 'progress_record', 'pool_issue', 'marketing_candidate', 'other'].map((item) => <option key={item}>{item}</option>)}</Select>
         <Input disabled={disabled} type="file" accept="image/*" onChange={upload} />
       </div>
-      <div className="mt-3 grid gap-2 md:grid-cols-3">{photos.map((photo) => <div key={photo.id} className="rounded-lg bg-slate-50 p-3 text-sm">{photo.photo_type}<br /><span className="text-xs text-slate-500">{photo.storage_path}</span></div>)}</div>
+      <div className="mt-3 grid gap-2 md:grid-cols-3">
+        {photos.map((photo) => (
+          <div key={photo.id} className="rounded-lg bg-slate-50 p-3 text-sm">
+            <StoragePreview bucket="lesson-photos" path={photo.storage_path} image />
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <span className="font-medium text-slate-700">{photo.photo_type}</span>
+              {canDelete ? <Button variant="danger" onClick={() => remove(photo)}>Delete</Button> : null}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1680,7 +1729,7 @@ function PaymentsPage({ data, reload, toast }) {
         ['payment_date', 'Date'],
         ['payment_method', 'Method'],
         ['payment_status', 'Status', (row) => <StatusBadge value={row.payment_status}>{row.payment_status}</StatusBadge>],
-        ['proof_storage_path', 'Proof'],
+        ['proof_storage_path', 'Proof', (row) => <StoragePreview bucket="payment-proofs" path={row.proof_storage_path} />],
       ]}
     />
   );
@@ -1711,7 +1760,7 @@ function ExpensesPage({ data, reload, toast }) {
         ['category', 'Category'],
         ['amount', 'Amount', (row) => formatMoney(row.amount)],
         ['vendor', 'Vendor'],
-        ['receipt_storage_path', 'Receipt'],
+        ['receipt_storage_path', 'Receipt', (row) => <StoragePreview bucket="expense-receipts" path={row.receipt_storage_path} />],
       ]}
     />
   );
@@ -1970,6 +2019,7 @@ function RecordManager({ title, table, rows, fields, columns, canEdit, reload, t
 function RecordForm({ table, initial, fields, onSaved, normalize, uploadBucket }) {
   const [form, setForm] = useState(() => ({ ...initial }));
   const [saving, setSaving] = useState(false);
+  const storageField = fields.find(([key]) => key.includes('storage_path'))?.[0] || fields.find(([key]) => key.includes('proof') || key.includes('receipt'))?.[0];
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const save = async (event) => {
     event.preventDefault();
@@ -1989,6 +2039,13 @@ function RecordForm({ table, initial, fields, onSaved, normalize, uploadBucket }
     if (error) window.alert(error.message);
     else set(field, path);
   };
+  const removeUpload = async () => {
+    if (!uploadBucket || !storageField || !form[storageField]) return;
+    if (!window.confirm('Delete this private file? Save the record after deleting to clear the file path.')) return;
+    const { error } = await supabase.storage.from(uploadBucket).remove([form[storageField]]);
+    if (error) window.alert(error.message);
+    else set(storageField, '');
+  };
   return (
     <form className="grid gap-4" onSubmit={save}>
       <div className="grid gap-3 md:grid-cols-2">
@@ -1997,9 +2054,17 @@ function RecordForm({ table, initial, fields, onSaved, normalize, uploadBucket }
         ))}
       </div>
       {uploadBucket ? (
-        <Field label="Upload private file">
-          <Input type="file" onChange={(event) => upload(fields.find(([key]) => key.includes('storage_path'))?.[0] || fields.find(([key]) => key.includes('proof') || key.includes('receipt'))?.[0], event.target.files?.[0])} />
-        </Field>
+        <div className="grid gap-3 rounded-lg border border-slate-200 p-3">
+          <Field label="Upload private file">
+            <Input type="file" onChange={(event) => upload(storageField, event.target.files?.[0])} />
+          </Field>
+          {storageField && form[storageField] ? (
+            <div className="rounded-lg bg-slate-50 p-3">
+              <StoragePreview bucket={uploadBucket} path={form[storageField]} />
+              <div className="mt-3"><Button type="button" variant="danger" onClick={removeUpload}>Delete file</Button></div>
+            </div>
+          ) : null}
+        </div>
       ) : null}
       <div className="flex justify-end gap-2"><Button disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button></div>
     </form>
@@ -2021,6 +2086,38 @@ function RecordField({ fieldKey, label, type, options, value, set }) {
   }
   if (type === 'checkbox') return <label className="mt-7 flex items-center gap-2 text-sm font-medium text-slate-600"><input type="checkbox" checked={Boolean(value)} onChange={(event) => set(fieldKey, event.target.checked)} /> {label}</label>;
   return <Field label={label}><Input type={type} value={value || ''} onChange={(event) => set(fieldKey, type === 'number' ? Number(event.target.value) : event.target.value)} /></Field>;
+}
+
+function StoragePreview({ bucket, path, image = false }) {
+  const [url, setUrl] = useState('');
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setUrl('');
+      setError('');
+      if (!bucket || !path) return;
+      const { data, error: signedError } = await supabase.storage.from(bucket).createSignedUrl(path, 60 * 10);
+      if (cancelled) return;
+      if (signedError) setError(signedError.message);
+      else setUrl(data?.signedUrl || '');
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [bucket, path]);
+  if (!path) return <span className="text-slate-400">No file</span>;
+  return (
+    <div className="grid gap-2">
+      {image && url ? <img className="h-32 w-full rounded-lg object-cover ring-1 ring-slate-200" src={url} alt="Private lesson upload preview" /> : null}
+      <div className="flex flex-wrap items-center gap-2">
+        {url ? <a className="font-semibold text-sky-700 hover:text-sky-900" href={url} target="_blank" rel="noreferrer">Open signed preview</a> : <span className="text-xs text-slate-500">Creating signed preview...</span>}
+        {error ? <span className="text-xs font-medium text-rose-600">{error}</span> : null}
+      </div>
+      <span className="break-all text-xs text-slate-500">{path}</span>
+    </div>
+  );
 }
 
 function Info({ label, value }) {

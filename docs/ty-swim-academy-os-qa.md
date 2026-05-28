@@ -8,6 +8,7 @@ Date: 2026-05-28
 - [x] `npm run build` completed successfully after the QA/UI changes.
 - [x] Standalone Vite routes returned HTTP 200 for `/`, `/login`, and `/dashboard`.
 - [x] Added `npm run smoke:routes` for repeatable local route checks.
+- [x] Added `npm run qa:check` for live Supabase Admin/Coach RLS and workflow checks when test credentials are available.
 - [x] Missing Supabase env variables keep the app from crashing and show the setup screen.
 
 ## Schema And Frontend Consistency
@@ -64,6 +65,8 @@ Date: 2026-05-28
 - [x] Coach cannot upload photos after a lesson is approved.
 - [x] Coach cannot delete lesson photos; Admin can manage photos.
 - [x] Payment proof and expense receipt storage policies are Admin-only.
+- [x] Private lesson photos, payment proofs, and expense receipts now use signed preview links in the UI.
+- [x] Admin can delete lesson photos and uploaded private payment/expense files from the UI.
 
 ## Sensitive UI Exposure
 
@@ -72,6 +75,7 @@ Date: 2026-05-28
 - [x] Coach-facing screens do not show customer charged price, company income, payments, expenses, profit, or other coaches' payroll.
 - [x] Added Admin-only `/system-check` page under More.
 - [x] System Check shows env, session, profile, role, table, storage, demo data, coach profile, sensitive-module, payroll-scope, service-role, and data-count checks.
+- [x] Coach can open `/system-check` as a Coach Check to verify assigned records are visible and financial records stay hidden.
 
 ## UX QA
 

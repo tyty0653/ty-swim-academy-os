@@ -10,6 +10,7 @@ Run:
 npm install
 npm run build
 npm run smoke:routes
+npm run qa:check
 ```
 
 Expected:
@@ -17,6 +18,7 @@ Expected:
 - Install completes with 0 vulnerabilities.
 - Build completes without errors.
 - Smoke routes return `PASS 200` for core routes.
+- Live QA either runs against Supabase test credentials or clearly reports which `.env.local` values are missing.
 
 ## 2. Supabase Test Project
 
@@ -120,6 +122,8 @@ As Admin:
 - Confirm Admin can manage lesson photos, payment proofs, and expense receipts.
 
 ## 8. Vercel Later
+
+Before Vercel, complete the live Supabase checklist in `docs/ty-swim-academy-os-live-qa.md`.
 
 Do not deploy until local/test Supabase QA is stable. When ready, use only these frontend env variables:
 

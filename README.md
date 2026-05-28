@@ -29,6 +29,9 @@ Full setup notes are in `docs/ty-swim-academy-os.md`.
 ```bash
 npm run build
 npm run smoke:routes
+npm run qa:check
 ```
 
 Use `supabase/demo-seed.sql` with a Supabase test project for fake Admin/Coach workflow data. See `docs/ty-swim-academy-os-testing-guide.md`.
+
+For live Supabase RLS and workflow QA before Vercel, see `docs/ty-swim-academy-os-live-qa.md`.
