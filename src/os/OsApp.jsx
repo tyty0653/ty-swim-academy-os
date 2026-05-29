@@ -306,7 +306,7 @@ function activeNav(pathInfo, key) {
   if (key === 'schedule') return ['schedule', 'lessons'].includes(pathInfo.section);
   if (key === 'students') return ['students', 'customers', 'venues', 'classes', 'packages'].includes(pathInfo.section);
   if (key === 'money') return ['money', 'payments', 'payroll', 'expenses'].includes(pathInfo.section);
-  if (key === 'more') return ['more', 'import', 'data-cleanup', 'reports', 'settings'].includes(pathInfo.section);
+  if (key === 'more') return ['more', 'help', 'import', 'data-cleanup', 'reports', 'settings'].includes(pathInfo.section);
   return pathInfo.section === key;
 }
 
@@ -326,6 +326,7 @@ function pageTitle(pathInfo) {
     payroll: 'Payroll',
     payments: 'Payments',
     expenses: 'Expenses',
+    help: 'Help Guide',
     more: 'More',
     import: 'CSV Import',
     'data-cleanup': 'Data Cleanup',
@@ -348,6 +349,7 @@ function RoutePage(props) {
   if (pathInfo.section === 'lessons' || pathInfo.section === 'schedule') return <LessonsPage {...props} />;
   if (pathInfo.section === 'payroll') return <PayrollPage {...props} />;
   if (pathInfo.section === 'system-check') return <SystemCheckPage {...props} />;
+  if (pathInfo.section === 'help') return <HelpPage {...props} />;
   if (!isAdmin) return <NoAccess />;
   if (pathInfo.section === 'review') return <ReviewPage {...props} />;
   if (pathInfo.section === 'money') return <MoneyPage {...props} />;
@@ -738,7 +740,7 @@ function MoneyPage(props) {
 }
 
 function MorePage(props) {
-  const tools = legacyAdminRoutes.filter(([key]) => ['system-check', 'import', 'cleanup', 'reports', 'settings', 'customers', 'venues', 'classes', 'packages', 'lessons'].includes(key));
+  const tools = legacyAdminRoutes.filter(([key]) => ['help', 'system-check', 'import', 'cleanup', 'reports', 'settings', 'customers', 'venues', 'classes', 'packages', 'lessons'].includes(key));
   return (
     <div className="grid gap-5">
       <Section title="More">
@@ -762,6 +764,7 @@ function MorePage(props) {
 
 function moreToolDescription(key) {
   return {
+    help: 'Simple owner and coach guide for daily use.',
     'system-check': 'Run setup, access, bucket, and data checks.',
     import: 'Bring in old Google Sheet CSV data.',
     cleanup: 'Find missing names, address, age, consent, coach, and proof records.',
@@ -773,6 +776,62 @@ function moreToolDescription(key) {
     packages: 'Package list route.',
     lessons: 'Detailed lesson history route.',
   }[key] || 'Open tool';
+}
+
+function HelpPage({ profile }) {
+  const isAdmin = profile?.role === 'admin';
+  return (
+    <div className="grid gap-5">
+      <Section title="Help Guide">
+        <p className="text-sm leading-6 text-slate-500">Use this page when you are unsure where to start. The OS is designed around daily work first: lessons today, coach submissions, student setup, schedule, and money.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <Card title="1. Start Today" value={isAdmin ? 'Admin' : 'Coach'} note={isAdmin ? 'Check pending lessons, reschedules, renewals, and missing data.' : 'Check class time, WhatsApp, map, safety notes, and submit records.'} />
+          <Card title="2. Keep Records Current" value="Students" note={isAdmin ? 'Add the family, student, venue, class, package, then first lesson.' : 'Review your assigned students, contacts, venues, and health notes.'} />
+          <Card title="3. Review Before Money" value="Review" note="Lessons only affect package counts and payroll after Admin approval." tone="amber" />
+        </div>
+      </Section>
+      <Section title="Admin Daily Flow">
+        <div className="grid gap-3 md:grid-cols-2">
+          {[
+            ['Today', 'Open Today first. It shows lessons, pending review, reschedule alerts, renewal reminders, replacement lessons, and missing data.'],
+            ['Students', 'Use the guided setup steps for new families: family, student, venue, class, package, first lesson. Advanced tables are hidden until needed.'],
+            ['Schedule', 'Use Fixed Weekly for regular classes and Flexible Lesson for coach-arranged appointments. Rescheduling one lesson does not change the whole weekly pattern.'],
+            ['Review', 'Approve, request edit, or reject coach submissions. Approval is the moment package deduction and payroll creation happen.'],
+            ['Money', 'Admin-only area for payments, payroll, expenses, and exports. Coaches do not see prices, payments, company income, or expenses.'],
+            ['System Check', 'Run this after setup, demo seed, or any permission issue. It tells you what passed, what needs attention, and the next action.'],
+          ].map(([title, body]) => (
+            <div key={title} className="rounded-lg border border-slate-200 bg-white p-4">
+              <p className="font-semibold text-slate-950">{title}</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">{body}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
+      <Section title="Coach Daily Flow">
+        <div className="grid gap-3 md:grid-cols-2">
+          {[
+            ['Before class', 'Open Today. Check time, class, students, WhatsApp, map, venue, safety alert, and whether a photo is required.'],
+            ['After class', 'Tap Submit Record. Choose attendance, add a short progress note and next focus, upload optional photo, then submit completed or cancelled.'],
+            ['Approved lessons', 'Once Admin approves a lesson, it becomes read-only for Coach. Ask Admin if a correction is needed.'],
+            ['My Pay', 'Coach sees only their own expected payroll from approved payable lessons, never other coaches or company finance.'],
+          ].map(([title, body]) => (
+            <div key={title} className="rounded-lg border border-slate-200 bg-white p-4">
+              <p className="font-semibold text-slate-950">{title}</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">{body}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
+      <Section title="If You Are Stuck">
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => go('/dashboard')}>Open Today</Button>
+          {isAdmin ? <Button variant="soft" onClick={() => go('/students')}>Setup Student</Button> : null}
+          <Button variant="ghost" onClick={() => go('/system-check')}>Run System Check</Button>
+        </div>
+        <p className="mt-3 text-sm leading-6 text-slate-500">For a full explanation, open docs/ty-swim-academy-os-user-guide.md in the repository. For external UX feedback, share docs/ty-swim-academy-os-ux-review-pack.md.</p>
+      </Section>
+    </div>
+  );
 }
 
 function SystemCheckPage({ session, profile, data }) {
@@ -2063,7 +2122,7 @@ function RecordManager({ title, table, rows, fields, columns, canEdit, reload, t
   const tableColumns = columns.map(([key, label, render]) => ({ key, label, render }));
   if (canEdit) tableColumns.push({ key: 'actions', label: 'Actions', render: (row) => <div className="flex gap-2"><Button variant="ghost" onClick={(event) => { event.stopPropagation(); setModal(row); }}>Edit</Button>{extraAction?.(row)}</div> });
   return (
-    <Section title={title} action={<div className="flex flex-wrap gap-2"><Input placeholder="Search" value={query} onChange={(event) => setQuery(event.target.value)} />{canEdit ? <Button onClick={() => setModal({})}>New</Button> : null}<Button variant="ghost" onClick={() => downloadCsv(`ty-${table}-${todayISO()}.csv`, visible)}>Export CSV</Button></div>}>
+    <Section title={title} action={<div className="flex flex-wrap gap-2"><Input placeholder="Search" value={query} onChange={(event) => setQuery(event.target.value)} />{canEdit ? <Button onClick={() => setModal({})}>Add New</Button> : null}<Button variant="ghost" onClick={() => downloadCsv(`ty-${table}-${todayISO()}.csv`, visible)}>Export CSV</Button></div>}>
       <DataTable rows={visible} columns={tableColumns} onRowClick={onRowClick} />
       {modal ? (
         <Modal title={`${modal.id ? 'Edit' : 'New'} ${title}`} onClose={() => setModal(null)} wide>
