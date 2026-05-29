@@ -429,25 +429,35 @@ function AdminDashboard({ data }) {
   const expiredWithLessons = data.packages.filter((pkg) => daysUntil(pkg.expiry_date) < 0 && Number(pkg.remaining_lessons) > 0);
   const replacement = data.lessons.filter((lesson) => lesson.need_replacement);
   const cleanup = cleanupRows(data).length;
-  const controlCards = [
-    ["Today's lessons", lessonsToday.length, 'Lessons happening today.', '/schedule', 'sky'],
-    ['Pending review', pending.length, 'Coach submissions waiting for Admin.', '/review', 'amber'],
-    ['Coach reschedule alerts', reschedules.length, 'Date/time changes to acknowledge.', '/review', 'rose'],
-    ['Cancelled lessons', cancelled.length, 'Cancelled records waiting for review.', '/review', 'amber'],
-    ['Missing photos', missingPhotos.length, 'Required lesson photos not uploaded yet.', '/review', 'rose'],
-    ['1 lesson remaining', oneRemaining.length, 'Renewal reminders.', '/students', 'amber'],
-    ['Expiring soon', expiring.length, 'Packages expiring within 7 days.', '/students', 'rose'],
-    ['Replacement needed', replacement.length, 'Lessons marked for replacement.', '/schedule', 'slate'],
-    ['Missing important data', cleanup, 'Names, address, age, consent, proof, or coach gaps.', '/data-cleanup', 'slate'],
+  const primaryCards = [
+    ["Today's lessons", lessonsToday.length, 'Know what is happening today.', '/schedule', 'sky'],
+    ['Pending review', pending.length, 'Approve or request edits from coaches.', '/review', 'amber'],
+    ['Reschedule alerts', reschedules.length, 'Coach date/time changes to check.', '/review', 'rose'],
+    ['Renewals soon', oneRemaining.length + expiring.length, '1 lesson left or expiring in 7 days.', '/students', 'amber'],
+  ];
+  const nextActions = [
+    ['Review coach submissions', pending.length, '/review'],
+    ['Check reschedules', reschedules.length, '/review'],
+    ['Handle cancelled lessons', cancelled.length, '/review'],
+    ['Fix missing required photos', missingPhotos.length, '/review'],
+    ['Follow up renewal reminders', oneRemaining.length + zeroRemaining.length + expiring.length + expiredWithLessons.length, '/students'],
+    ['Plan replacement lessons', replacement.length, '/schedule'],
+    ['Clean missing data', cleanup, '/data-cleanup'],
+  ];
+  const quickActions = [
+    ['Add Family', '/students', 'primary'],
+    ['Schedule Lesson', '/schedule', 'soft'],
+    ['Review Lessons', '/review', 'ghost'],
+    ['System Check', '/system-check', 'ghost'],
   ];
 
   return (
     <div className="grid gap-5">
       <OnboardingChecklist data={data} />
-      <Section title="Today Control Centre" action={<div className="flex flex-wrap gap-2"><Button onClick={() => go('/students')}>Add Family</Button><Button variant="soft" onClick={() => go('/students')}>Add Student</Button><Button variant="soft" onClick={() => go('/students')}>Add Class</Button><Button variant="soft" onClick={() => go('/students')}>Add Package</Button><Button variant="ghost" onClick={() => go('/schedule')}>Schedule Lesson</Button><Button variant="ghost" onClick={() => go('/review')}>Review Lessons</Button><Button variant="ghost" onClick={() => go('/system-check')}>Open System Check</Button></div>}>
-        <p className="mb-4 text-sm leading-6 text-slate-500">Start here each day. These cards show what needs attention before lessons and payments become a problem.</p>
+      <Section title="Today" action={<div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">{quickActions.map(([label, href, variant]) => <Button key={label} variant={variant} onClick={() => go(href)}>{label}</Button>)}</div>}>
+        <p className="mb-4 text-sm leading-6 text-slate-500">A simple daily view for lessons, coach submissions, schedule changes, and renewal follow-ups.</p>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {controlCards.map(([title, value, note, href, tone]) => (
+          {primaryCards.map(([title, value, note, href, tone]) => (
             <button key={title} onClick={() => go(href)} className="text-left">
               <Card title={title} value={value} note={note} tone={tone} />
             </button>
@@ -456,13 +466,7 @@ function AdminDashboard({ data }) {
       </Section>
       <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
         <LessonList title="Today and This Week" rows={weekLessons} data={data} empty="No scheduled lessons in this view." />
-        <AttentionList rows={[
-          ['Packages with 1 lesson', oneRemaining.length, '/packages'],
-          ['Packages with 0 lessons', zeroRemaining.length, '/packages'],
-          ['Expiring within 7 days', expiring.length, '/packages'],
-          ['Expired with remaining lessons', expiredWithLessons.length, '/packages'],
-          ['Lessons needing replacement', replacement.length, '/lessons'],
-        ]} />
+        <NextActionList rows={nextActions} />
       </div>
     </div>
   );
@@ -483,9 +487,6 @@ function CoachDashboard({ profile, data }) {
         <Card title="Pending records" value={pending.length} tone="amber" />
         <Card title="Expected payroll" value={formatMoney(payroll.reduce((sum, item) => sum + Number(item.pay_amount || 0), 0))} tone="green" />
       </div>
-      <Section title="Coach Check" action={<Button variant="ghost" onClick={() => go('/system-check')}>Run Coach Check</Button>}>
-        <p className="text-sm leading-6 text-slate-500">Use this after demo setup to confirm assigned lessons, students, venues, and payroll are visible while payments and expenses stay hidden.</p>
-      </Section>
       <CoachTodayCards lessons={today.length ? today : ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 5)} data={data} />
       <LessonList title="My Schedule" rows={ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 10)} data={data} coachView empty="No upcoming assigned lessons." />
     </div>
@@ -494,7 +495,7 @@ function CoachDashboard({ profile, data }) {
 
 function CoachTodayCards({ lessons, data }) {
   return (
-    <Section title="Today">
+    <Section title="Today" action={<Button variant="ghost" onClick={() => go('/system-check')}>Coach Check</Button>}>
       {lessons.length === 0 ? (
         <EmptyState title="No lessons today" body="Assigned lessons will appear here with contact, map, safety alerts, and a fast submit button." />
       ) : (
@@ -521,10 +522,10 @@ function CoachTodayCards({ lessons, data }) {
                     {photoRequired ? <StatusBadge value="needs_edit">Photo required</StatusBadge> : null}
                   </div>
                 </div>
-                <p className="mt-3 rounded-lg bg-rose-50 p-3 text-sm font-medium text-rose-700">{studentAlerts(cls, data) || 'No health/safety alerts recorded.'}</p>
+                {studentAlerts(cls, data) ? <p className="mt-3 rounded-lg bg-rose-50 p-3 text-sm font-medium text-rose-700">{studentAlerts(cls, data)}</p> : null}
                 <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                  <a className="inline-flex min-h-10 items-center justify-center rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700" href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">WhatsApp</a>
-                  <a className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700" href={mapsLink || undefined} target="_blank" rel="noreferrer">Map</a>
+                  <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">WhatsApp</a>
+                  <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">Map</a>
                   <Button disabled={approved} onClick={() => go(`/lessons/${lesson.id}`)}>{approved ? 'Approved' : 'Submit Record'}</Button>
                 </div>
               </article>
@@ -536,11 +537,13 @@ function CoachTodayCards({ lessons, data }) {
   );
 }
 
-function AttentionList({ rows }) {
+function NextActionList({ rows }) {
+  const activeRows = rows.filter(([, value]) => Number(value) > 0);
   return (
-    <Section title="Admin Attention">
+    <Section title="Next Actions">
       <div className="grid gap-2">
-        {rows.map(([label, value, href]) => (
+        {activeRows.length === 0 ? <EmptyState title="Nothing urgent right now" body="No review, renewal, replacement, or missing data items need action." /> : null}
+        {activeRows.map(([label, value, href]) => (
           <button key={label} onClick={() => go(href)} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-left hover:border-sky-200 hover:bg-sky-50">
             <span className="font-medium text-slate-700">{label}</span>
             <span className="text-lg font-semibold text-slate-950">{value}</span>
@@ -554,7 +557,9 @@ function AttentionList({ rows }) {
 function LessonList({ title, rows, data, coachView = false, empty = 'No lessons yet.' }) {
   return (
     <Section title={title}>
+      {coachView ? <LessonCardList rows={rows} data={data} empty={empty} /> : null}
       <DataTable
+        className={coachView ? 'hidden md:block' : ''}
         rows={rows}
         empty={empty}
         onRowClick={(row) => go(`/lessons/${row.id}`)}
@@ -572,6 +577,31 @@ function LessonList({ title, rows, data, coachView = false, empty = 'No lessons 
         ]}
       />
     </Section>
+  );
+}
+
+function LessonCardList({ rows, data, empty }) {
+  if (rows.length === 0) return <EmptyState title="No lessons found" body={empty} />;
+  return (
+    <div className="grid gap-3 md:hidden">
+      {rows.map((lesson) => {
+        const cls = data.classes.find((item) => item.id === lesson.class_id);
+        const customer = data.customers.find((item) => item.id === cls?.customer_id);
+        const venue = data.venues.find((item) => item.id === lesson.venue_id);
+        return (
+          <button key={lesson.id} onClick={() => go(`/lessons/${lesson.id}`)} className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-sky-700">{formatDate(lesson.scheduled_date)} {lesson.start_time || ''}</p>
+                <p className="mt-1 font-semibold text-slate-950">{cls?.class_name || lesson.lesson_code}</p>
+                <p className="mt-1 text-sm text-slate-500">{venue?.area || venue?.venue_name || customer?.whatsapp || '-'}</p>
+              </div>
+              <StatusBadge value={lesson.status} />
+            </div>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -1156,6 +1186,7 @@ function LessonsPage({ profile, data, reload, toast }) {
   const isAdmin = profile.role === 'admin';
   const coach = data.coaches.find((item) => item.profile_id === profile.id);
   const [filters, setFilters] = useState({ dateFrom: todayISO().slice(0, 8) + '01', dateTo: '', coach: '', classId: '', status: '', mode: '', pending: false, replacement: false });
+  const [showFilters, setShowFilters] = useState(false);
   const [recurring, setRecurring] = useState(null);
   const [flexible, setFlexible] = useState(null);
   const rows = (isAdmin ? data.lessons : data.lessons.filter((lesson) => lesson.coach_id === coach?.id)).filter((lesson) => {
@@ -1175,20 +1206,20 @@ function LessonsPage({ profile, data, reload, toast }) {
 
   return (
     <div className="grid gap-5">
-      <Section title="Schedule Modes" action={<div className="flex gap-2">{isAdmin ? <Button variant="soft" onClick={() => setRecurring({})}>Create Fixed Weekly</Button> : null}<Button onClick={() => setFlexible({})}>Create Flexible Lesson</Button></div>}>
-        <p className="text-sm leading-6 text-slate-500">Fixed Weekly is for regular day/time classes. Flexible is for coach-arranged appointments after coordinating with the family.</p>
+      <Section title="Schedule" action={<div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">{isAdmin ? <Button variant="soft" onClick={() => setRecurring({})}>Fixed Weekly</Button> : null}<Button onClick={() => setFlexible({})}>Flexible Lesson</Button><Button variant="ghost" onClick={() => setShowFilters((value) => !value)}>{showFilters ? 'Hide Filters' : 'Filters'}</Button></div>}>
+        <p className="text-sm leading-6 text-slate-500">Fixed Weekly is the regular timetable. Flexible is for coach-arranged appointments. Changing one lesson does not change the weekly pattern.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <div className="rounded-lg border border-sky-100 bg-sky-50 p-4">
+          <button className="rounded-lg border border-sky-100 bg-sky-50 p-4 text-left" onClick={() => setFilters({ ...filters, mode: 'fixed_weekly' })}>
             <p className="font-semibold text-slate-950">Fixed Weekly</p>
             <p className="mt-1 text-sm text-slate-600">{fixedSchedules.length} recurring schedule(s), {fixedLessons.length} generated lesson(s) in this view.</p>
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
+          </button>
+          <button className="rounded-lg border border-slate-200 bg-white p-4 text-left hover:border-sky-200 hover:bg-sky-50" onClick={() => setFilters({ ...filters, mode: 'flexible' })}>
             <p className="font-semibold text-slate-950">Flexible / Coach-arranged</p>
             <p className="mt-1 text-sm text-slate-600">{flexibleClasses.length} flexible class(es), {flexibleLessons.length} lesson appointment(s) in this view.</p>
-          </div>
+          </button>
         </div>
       </Section>
-      <Section title="Filters">
+      {showFilters ? <Section title="Filters">
         <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-8">
           <Field label="From"><Input type="date" value={filters.dateFrom} onChange={(event) => setFilters({ ...filters, dateFrom: event.target.value })} /></Field>
           <Field label="To"><Input type="date" value={filters.dateTo} onChange={(event) => setFilters({ ...filters, dateTo: event.target.value })} /></Field>
@@ -1199,7 +1230,7 @@ function LessonsPage({ profile, data, reload, toast }) {
           <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={filters.pending} onChange={(event) => setFilters({ ...filters, pending: event.target.checked })} /> Pending review</label>
           <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={filters.replacement} onChange={(event) => setFilters({ ...filters, replacement: event.target.checked })} /> Replacement</label>
         </div>
-      </Section>
+      </Section> : null}
       {isAdmin ? (
         <Section title="Fixed Weekly Schedules">
           <DataTable rows={fixedSchedules} empty="No fixed weekly schedule yet." columns={[
@@ -1632,7 +1663,7 @@ function ReviewPage({ data, reload, toast }) {
   return (
     <div className="grid gap-5">
       <Section title="Review">
-        <p className="text-sm leading-6 text-slate-500">This is the Admin approval desk. Open a row for details, or use the quick actions when the record is straightforward.</p>
+        <p className="text-sm leading-6 text-slate-500">Approve straightforward records here. Open a lesson when you need to check attendance notes, photos, package counting, or payroll settings.</p>
         <div className="mt-4 flex flex-wrap gap-2">
           {[
             ['pending', 'Pending lesson records'],
@@ -1644,6 +1675,30 @@ function ReviewPage({ data, reload, toast }) {
         </div>
       </Section>
       <Section title="Review Queue">
+        {rows.length === 0 ? <EmptyState title="No review needed" body="This category is clear. New coach submissions and schedule changes will appear here." /> : (
+          <div className="mb-4 grid gap-3 lg:grid-cols-2">
+            {rows.slice(0, 4).map((lesson) => {
+              const cls = data.classes.find((item) => item.id === lesson.class_id);
+              return (
+                <article key={lesson.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-sky-700">{formatDate(lesson.scheduled_date)} {lesson.start_time || ''}</p>
+                      <h3 className="mt-1 font-semibold text-slate-950">{cls?.class_name || lesson.lesson_code}</h3>
+                      <p className="mt-1 text-sm text-slate-500">{lesson.lesson_code}</p>
+                    </div>
+                    <StatusBadge value={lesson.status} />
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                    <Button onClick={() => approve(lesson)}>Approve</Button>
+                    <Button variant="soft" onClick={() => updateStatus(lesson, 'needs_edit')}>Needs Edit</Button>
+                    <Button variant="ghost" onClick={() => go(`/lessons/${lesson.id}`)}>Open</Button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
         <DataTable rows={rows} empty="No pending review in this category." onRowClick={(row) => go(`/lessons/${row.id}`)} columns={[
           { key: 'lesson_code', label: 'Lesson' },
           { key: 'date', label: 'Date', render: (row) => `${row.scheduled_date} ${row.start_time || ''}` },
@@ -1667,6 +1722,8 @@ function PayrollPage({ profile, data, reload, toast }) {
   const items = isAdmin ? data.payroll_items : data.payroll_items.filter((item) => item.coach_id === coach?.id);
   const periods = isAdmin ? data.payroll_periods : data.payroll_periods.filter((period) => period.coach_id === coach?.id);
   const [month, setMonth] = useState(todayISO().slice(0, 7));
+  const unpaidItems = items.filter((item) => !['paid', 'void'].includes(item.status));
+  const paidItems = items.filter((item) => item.status === 'paid');
   const generate = async () => {
     const { error } = await supabase.rpc('generate_monthly_payroll', { p_period_month: `${month}-01` });
     if (error) toast(error.message);
@@ -1686,7 +1743,13 @@ function PayrollPage({ profile, data, reload, toast }) {
   };
   return (
     <div className="grid gap-5">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Card title={isAdmin ? 'Payable now' : 'Expected pay'} value={formatMoney(unpaidItems.reduce((sum, item) => sum + Number(item.pay_amount || 0), 0))} tone="amber" />
+        <Card title="Approved lessons" value={items.length} />
+        <Card title="Paid items" value={paidItems.length} tone="green" />
+      </div>
       <Section title={isAdmin ? 'Generate Payroll' : 'My Expected Payroll'} action={isAdmin ? <div className="flex gap-2"><Input type="month" value={month} onChange={(event) => setMonth(event.target.value)} /><Button onClick={generate}>Generate</Button><Button variant="ghost" onClick={() => downloadCsv(`ty-payroll-${month}.csv`, items)}>Export CSV</Button></div> : null}>
+        {!isAdmin ? <p className="mb-4 text-sm leading-6 text-slate-500">This shows approved lessons that count toward your pay. Payments marked paid will appear as paid here.</p> : null}
         <DataTable rows={periods} columns={[
           { key: 'coach', label: 'Coach', render: (row) => data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-' },
           { key: 'period_month', label: 'Month', render: (row) => formatDate(row.period_month).slice(0, 7) },

@@ -78,9 +78,9 @@ export function Section({ title, action, children, className = '' }) {
   );
 }
 
-export function DataTable({ columns, rows, empty = 'No records yet.', onRowClick }) {
+export function DataTable({ columns, rows, empty = 'No records yet.', onRowClick, className = '' }) {
   return (
-    <div className="overflow-auto rounded-lg border border-slate-200">
+    <div className={cn('overflow-auto rounded-lg border border-slate-200', className)}>
       <table className="min-w-full text-left text-sm">
         <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
           <tr>{columns.map((column) => <th key={column.key} className="whitespace-nowrap px-3 py-3">{column.label}</th>)}</tr>
