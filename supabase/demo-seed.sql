@@ -3,7 +3,8 @@
 --
 -- Before running:
 -- 1. Create one Admin user and one Coach user in Supabase Auth.
--- 2. Replace the two UUID values below with those Auth user IDs.
+-- 2. The default UUIDs below are the current test Auth user IDs.
+--    Replace them only if you create new Admin/Coach Auth users.
 -- 3. Run this after supabase/schema.sql.
 --
 -- Quick reset/delete demo data only:
@@ -12,9 +13,10 @@
 
 do $$
 declare
-  -- REPLACE THESE TWO VALUES WITH REAL auth.users.id VALUES.
-  v_admin_profile_id uuid := '00000000-0000-0000-0000-000000000001';
-  v_coach_profile_id uuid := '00000000-0000-0000-0000-000000000002';
+  -- Current test Supabase Auth user IDs.
+  -- These are not service_role keys or passwords.
+  v_admin_profile_id uuid := 'fe2a2b41-3bbe-4efe-bde1-5a3256a3b5fa';
+  v_coach_profile_id uuid := '352b3c16-62cb-4f08-8c2f-f85eae8ac542';
 
   v_coach_id uuid;
   v_customer_id uuid;
@@ -25,6 +27,7 @@ declare
   v_package_id uuid;
   v_schedule_id uuid;
 begin
+  -- This guard only rejects the original placeholder values, not real Auth IDs.
   if v_admin_profile_id::text = '00000000-0000-0000-0000-000000000001'
     or v_coach_profile_id::text = '00000000-0000-0000-0000-000000000002' then
     raise exception 'Replace v_admin_profile_id and v_coach_profile_id with real Supabase Auth user IDs before running demo-seed.sql';
