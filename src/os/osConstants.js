@@ -16,6 +16,7 @@ export const coachNav = [
 
 export const legacyAdminRoutes = [
   ['help', '/help', 'Help Guide'],
+  ['skill-levels', '/skill-levels', 'Levels & Progress'],
   ['system-check', '/system-check', 'Setup Check'],
   ['customers', '/customers', 'Customers / Families'],
   ['venues', '/venues', 'Venues'],
@@ -62,6 +63,10 @@ export const statusTones = {
   expired: 'rose',
   completed: 'green',
   paused: 'amber',
+  not_started: 'slate',
+  learning: 'sky',
+  almost: 'amber',
+  almost_ready: 'amber',
 };
 
 export const packageValidityMonths = {

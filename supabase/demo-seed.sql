@@ -107,6 +107,9 @@ begin
      or notes like 'DEMO_SEED%';
 
   delete from public.lesson_change_logs where lesson_id = any(v_demo_lesson_ids);
+  delete from public.lesson_skill_assessments
+  where lesson_id = any(v_demo_lesson_ids)
+     or student_id = any(v_demo_student_ids);
   delete from public.lesson_participants where lesson_id = any(v_demo_lesson_ids);
   delete from public.lesson_photos where lesson_id = any(v_demo_lesson_ids);
   delete from public.payroll_items
@@ -144,6 +147,10 @@ begin
   where customer_id = any(v_demo_customer_ids)
      or student_id = any(v_demo_student_ids)
      or notes like 'DEMO_SEED%';
+  delete from public.student_skill_progress
+  where student_id = any(v_demo_student_ids);
+  delete from public.student_skill_profiles
+  where student_id = any(v_demo_student_ids);
   delete from public.venues
   where id = any(v_demo_venue_ids)
      or venue_notes like 'DEMO_SEED%';
@@ -207,6 +214,32 @@ begin
 
   select id into v_student_a_id from public.students where student_code = 'DEMO-STU-0001';
   select id into v_student_b_id from public.students where student_code = 'DEMO-STU-0002';
+
+  insert into public.student_skill_profiles (student_id, current_level, level_status, current_focus, last_assessed_at, assessment_note, suggested_level_up, updated_by)
+  values
+    (v_student_a_id, 1, 'learning', 'Float to stand recovery and push & glide.', now(), 'DEMO_SEED Level 1 water safety tracking.', false, v_coach_profile_id),
+    (v_student_b_id, 1, 'learning', 'Breath control and relaxed floating.', now(), 'DEMO_SEED Level 1 confidence tracking.', false, v_coach_profile_id)
+  on conflict (student_id) do update set
+    current_level = excluded.current_level,
+    level_status = excluded.level_status,
+    current_focus = excluded.current_focus,
+    last_assessed_at = excluded.last_assessed_at,
+    assessment_note = excluded.assessment_note,
+    suggested_level_up = excluded.suggested_level_up,
+    updated_by = excluded.updated_by;
+
+  insert into public.student_skill_progress (student_id, level_number, criterion_id, status, note, last_assessed_at, assessed_by)
+  values
+    (v_student_a_id, 1, 'safe_entry_exit', 'passed', 'DEMO_SEED confident entry and exit.', now(), v_coach_profile_id),
+    (v_student_a_id, 1, 'bubble_breathing', 'almost', 'DEMO_SEED improving breath control.', now(), v_coach_profile_id),
+    (v_student_a_id, 1, 'front_star_float_5s', 'learning', 'DEMO_SEED needs calmer body line.', now(), v_coach_profile_id),
+    (v_student_b_id, 1, 'safe_entry_exit', 'learning', 'DEMO_SEED needs gentle support.', now(), v_coach_profile_id),
+    (v_student_b_id, 1, 'bubble_breathing', 'learning', 'DEMO_SEED short bubbles only.', now(), v_coach_profile_id)
+  on conflict (student_id, level_number, criterion_id) do update set
+    status = excluded.status,
+    note = excluded.note,
+    last_assessed_at = excluded.last_assessed_at,
+    assessed_by = excluded.assessed_by;
 
   insert into public.venues (customer_id, venue_name, full_address, area, pool_type, google_maps_link, parking_note, access_instruction, pool_depth_note, active, venue_notes)
   values (v_customer_id, 'Demo Condo Pool', 'Demo Residence, Jalan Example, Johor Bahru', 'Demo Area', 'condo', 'https://maps.google.com/?q=Johor+Bahru', 'Visitor parking at guard house.', 'Register as visitor.', 'Shallow end available.', true, 'DEMO_SEED')

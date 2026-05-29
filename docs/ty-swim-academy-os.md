@@ -41,6 +41,8 @@ Coach sees:
 
 Advanced routes such as `/customers`, `/venues`, `/classes`, `/packages`, `/payments`, `/expenses`, `/import`, `/data-cleanup`, `/reports`, and `/settings` still exist, but they are grouped under the simplified daily navigation.
 
+Student progress is available at `/skill-levels` and from Students/My Students/lesson detail. It tracks TY Swim Academy Level 1-6 criteria without exposing financial data.
+
 ## First Admin
 
 1. In Supabase Auth, create an email/password user for the owner/Admin.
@@ -68,9 +70,11 @@ Coach lesson changes are limited to their own unapproved lessons. Approved lesso
 
 The schema includes:
 
-`profiles`, `coaches`, `coach_rates`, `customers`, `students`, `venues`, `classes`, `class_students`, `packages`, `package_financials`, `recurring_schedules`, `lessons`, `lesson_participants`, `lesson_photos`, `lesson_change_logs`, `payroll_periods`, `payroll_items`, `expenses`, `consents`, `import_batches`, `audit_logs`, and `settings`.
+`profiles`, `coaches`, `coach_rates`, `customers`, `students`, `venues`, `classes`, `class_students`, `packages`, `package_financials`, `recurring_schedules`, `lessons`, `lesson_participants`, `lesson_photos`, `lesson_change_logs`, `payroll_periods`, `payroll_items`, `expenses`, `consents`, `student_skill_profiles`, `student_skill_progress`, `lesson_skill_assessments`, `import_batches`, `audit_logs`, and `settings`.
 
 Financial data is intentionally separated from packages in `package_financials`, which is Admin-only.
+
+For an existing Supabase test project that already has an older schema, run `supabase/skill-progress-migration.sql` to add the student progress tables and RLS policies.
 
 ## Approval Rules
 

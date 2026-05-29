@@ -41,6 +41,7 @@ Important routes:
 - `/login`
 - `/dashboard`
 - `/students`
+- `/skill-levels`
 - `/schedule`
 - `/review`
 - `/money`
@@ -57,6 +58,7 @@ Main workflows:
 - Add venue/address
 - Create class/group
 - Add package
+- Track TY Swim Level 1-6 progress
 - Schedule fixed weekly lesson
 - Schedule flexible coach-arranged lesson
 - Coach submits lesson record
@@ -68,6 +70,7 @@ Main workflows:
 - Admin records payments and uploads payment proof
 - Admin records expenses and uploads receipts
 - Admin/Coach use Setup Check to verify setup and permissions
+- Coach can optionally update student skill progress during lesson submission
 
 Role boundaries:
 
@@ -86,6 +89,7 @@ Design intent:
 - Coach Today is mobile-first with lesson cards
 - advanced tools are hidden under More
 - students setup is guided through steps
+- student progress uses compact cards and current-level checklist updates
 - Review is grouped by action type
 - Money is available but not the main dashboard focus
 - Setup Check explains setup and permission problems in beginner-friendly language
@@ -102,6 +106,8 @@ Tone:
 - Admin has a clear Today page with daily counts and next actions.
 - Coach Today uses mobile-friendly cards with WhatsApp, map, safety alert, photo badge, and Submit Record.
 - Students page starts with a guided setup wizard instead of showing tables immediately.
+- Levels & Progress adds TY Swim Academy's Level 1-6 syllabus with clear goals, cue words, and checklist criteria.
+- Coach progress updates show only the current level checklist by default, which reduces lesson-time overload.
 - Schedule page separates Fixed Weekly and Flexible / Coach-arranged modes.
 - Review page groups Pending, Rescheduled, Cancelled, Needs edit, and Missing photos.
 - Money page groups Payments, Payroll, Expenses, and Summary.
@@ -148,27 +154,35 @@ Coach submission now shows normal completion fields first and hides date/time un
 
 Payments, Expenses, Payroll, Estimated net, and Export CSV are accurate but may need owner-friendly helper text or month filters.
 
-9. Setup Check still contains technical concepts in advanced details.
+9. Skill progress is new and needs real coach testing.
+
+The current approach is intentionally simple: student cards, current level, focus, checklist status buttons, and notes. Reviewers should check whether Coaches understand Learning / Almost / Passed quickly on phone.
+
+10. Full syllabus may be too dense if opened during class.
+
+The normal Coach path hides the full syllabus behind View Syllabus, but the `/skill-levels` page has a lot of teaching content. It may need search, collapse-all, or level filters later.
+
+11. Setup Check still contains technical concepts in advanced details.
 
 It now has a beginner summary at the top, but terms such as storage buckets, RLS, service_role, and env variables still appear in advanced details.
 
-10. Mobile navigation is simple but not fully app-like.
+12. Mobile navigation is simple but not fully app-like.
 
 The app uses compact responsive navigation. A bottom-tab style may feel more native for coaches, but this has not been implemented.
 
-11. Settings is powerful but technical.
+13. Settings is powerful but technical.
 
 Profiles, coaches, and coach rates are table-based. First Admin creation still depends on Supabase setup documentation.
 
-12. Import page may show old sheet encoding issues.
+14. Import page may show old sheet encoding issues.
 
 The import mapper supports Chinese headers, but some current source code strings appear encoded in a hard-to-read way. The import may work, but the code/readability should be reviewed before relying on large legacy imports.
 
-13. No parent portal.
+15. No parent portal.
 
 This is intentional for now. The OS is internal only.
 
-14. No drag-and-drop calendar.
+16. No drag-and-drop calendar.
 
 This is intentional. Schedule is list/table based to keep the system simple and stable first.
 
@@ -201,6 +215,9 @@ Use these questions to guide feedback:
 23. Are export/import actions too prominent or safely tucked away?
 24. What would make this feel more like a daily app and less like a database?
 25. What should be improved before giving Coach accounts to real coaches?
+26. Is the Level 1-6 progress update simple enough for a Coach to use after class on phone?
+27. Should Admin confirm level-up inside Review, or is the current Students / Levels & Progress page enough?
+28. Are the skill criteria wording and cue words understandable for part-time coaches?
 
 ## F. Suggested Next Optimisation Directions
 
@@ -226,6 +243,8 @@ Use these questions to guide feedback:
 - Rename generic buttons to context-specific labels inside each table.
 - Add clearer helper text to Fixed Weekly schedule creation.
 - Add an Admin review confirmation that explains package/payroll impact.
+- Test Level 1-6 progress with one real coach and shorten any unclear criteria labels.
+- Decide whether level-up suggestions should appear on Admin Today or Review later.
 
 ### Priority 3: Nice To Have Later
 

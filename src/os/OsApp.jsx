@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { hasSupabaseConfig, supabase } from '../lib/supabaseClient.js';
 import { Button, Card, DataTable, EmptySetup, Field, Input, Modal, Section, Select, StatusBadge, Textarea, Toasts } from './OsComponents.jsx';
 import { adminNav, classTypes, coachNav, expenseCategories, legacyAdminRoutes, packageTypes, paymentMethods } from './osConstants.js';
+import { bonusSkills, getSkillLevel, levelStatusLabels, levelStatuses, progressStatusLabels, progressStatuses, skillLevels } from './skillLevels.js';
 import { derivePackageExpiry, downloadCsv, formatDate, formatMoney, getMapped, parseCsv, placeholder, todayISO } from './osUtils.js';
 
 const allTableNames = [
@@ -24,6 +25,9 @@ const allTableNames = [
   'expenses',
   'consents',
   'coach_rates',
+  'student_skill_profiles',
+  'student_skill_progress',
+  'lesson_skill_assessments',
   'import_batches',
   'audit_logs',
 ];
@@ -168,6 +172,7 @@ function ProtectedOs({ pathInfo }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [data, setData] = useState(initialData);
+  const [tableErrors, setTableErrors] = useState({});
   const [loading, setLoading] = useState(true);
   const [accessIssue, setAccessIssue] = useState(null);
   const [toasts, setToasts] = useState([]);
@@ -181,6 +186,7 @@ function ProtectedOs({ pathInfo }) {
   async function reload() {
     setLoading(true);
     setAccessIssue(null);
+    setTableErrors({});
     try {
       const { data: auth } = await withTimeout(supabase.auth.getSession(), 'Session check');
       if (!auth.session) {
@@ -205,10 +211,13 @@ function ProtectedOs({ pathInfo }) {
         18000
       );
       const next = { ...initialData };
+      const nextTableErrors = {};
       tableResults.forEach((result, index) => {
         if (!result.error) next[tablesToLoad[index]] = result.data || [];
+        else nextTableErrors[tablesToLoad[index]] = result.error.message;
       });
       setData(next);
+      setTableErrors(nextTableErrors);
     } catch (error) {
       setAccessIssue({
         title: 'TY Swim Academy OS could not finish loading',
@@ -232,7 +241,7 @@ function ProtectedOs({ pathInfo }) {
   if (!session || !profile) return <LoginPage />;
 
   return (
-    <OsShell session={session} profile={profile} pathInfo={pathInfo} data={data} reload={reload} toast={toast}>
+    <OsShell session={session} profile={profile} pathInfo={pathInfo} data={data} tableErrors={tableErrors} reload={reload} toast={toast}>
       <Toasts toasts={toasts} />
     </OsShell>
   );
@@ -254,7 +263,7 @@ function StaffAccessIssue({ issue }) {
   );
 }
 
-function OsShell({ session, profile, pathInfo, data, reload, toast, children }) {
+function OsShell({ session, profile, pathInfo, data, tableErrors, reload, toast, children }) {
   const isAdmin = profile.role === 'admin';
   const nav = isAdmin ? adminNav : coachNav;
   const mobileNav = isAdmin
@@ -301,7 +310,7 @@ function OsShell({ session, profile, pathInfo, data, reload, toast, children }) 
           </div>
         </header>
         <main className="mx-auto max-w-7xl p-3 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:p-4 sm:pb-[calc(6rem+env(safe-area-inset-bottom))] lg:p-6">
-          <RoutePage session={session} profile={profile} pathInfo={pathInfo} data={data} reload={reload} toast={toast} signOut={signOut} />
+          <RoutePage session={session} profile={profile} pathInfo={pathInfo} data={data} tableErrors={tableErrors} reload={reload} toast={toast} signOut={signOut} />
         </main>
         <MobileBottomNav nav={mobileNav} pathInfo={pathInfo} />
       </div>
@@ -330,7 +339,7 @@ function MobileBottomNav({ nav, pathInfo }) {
 function activeNav(pathInfo, key) {
   if (key === 'dashboard') return pathInfo.path === '/dashboard';
   if (key === 'schedule') return ['schedule', 'lessons'].includes(pathInfo.section);
-  if (key === 'students') return ['students', 'customers', 'venues', 'classes', 'packages'].includes(pathInfo.section);
+  if (key === 'students') return ['students', 'customers', 'venues', 'classes', 'packages', 'skill-levels'].includes(pathInfo.section);
   if (key === 'money') return ['money', 'payments', 'payroll', 'expenses'].includes(pathInfo.section);
   if (key === 'more') return ['more', 'help', 'system-check', 'import', 'data-cleanup', 'reports', 'settings'].includes(pathInfo.section);
   return pathInfo.section === key;
@@ -341,6 +350,7 @@ function pageTitle(pathInfo) {
   return {
     customers: 'Customers',
     students: 'Students',
+    'skill-levels': 'Levels & Progress',
     schedule: 'Schedule',
     venues: 'Venues',
     classes: 'Classes',
@@ -369,6 +379,7 @@ function RoutePage(props) {
   if (pathInfo.section === 'lessons' && pathInfo.id) return <LessonDetail {...props} />;
   if (pathInfo.section === 'customers') return <CustomersPage {...props} />;
   if (pathInfo.section === 'students') return isAdmin ? <StudentsHub {...props} /> : <StudentsPage {...props} />;
+  if (pathInfo.section === 'skill-levels') return <SkillLevelsPage {...props} />;
   if (pathInfo.section === 'venues') return <VenuesPage {...props} />;
   if (pathInfo.section === 'classes') return <ClassesPage {...props} />;
   if (pathInfo.section === 'packages') return <PackagesPage {...props} />;
@@ -376,12 +387,12 @@ function RoutePage(props) {
   if (pathInfo.section === 'payroll') return <PayrollPage {...props} />;
   if (pathInfo.section === 'system-check') return <SystemCheckPage {...props} />;
   if (pathInfo.section === 'help') return <HelpPage {...props} />;
+  if (pathInfo.section === 'more') return <MorePage {...props} />;
   if (!isAdmin) return <NoAccess />;
   if (pathInfo.section === 'review') return <ReviewPage {...props} />;
   if (pathInfo.section === 'money') return <MoneyPage {...props} />;
   if (pathInfo.section === 'payments') return <PaymentsPage {...props} />;
   if (pathInfo.section === 'expenses') return <ExpensesPage {...props} />;
-  if (pathInfo.section === 'more') return <MorePage {...props} />;
   if (pathInfo.section === 'import') return <ImportPage {...props} />;
   if (pathInfo.section === 'data-cleanup') return <CleanupPage {...props} />;
   if (pathInfo.section === 'reports') return <ReportsPage {...props} />;
@@ -652,6 +663,7 @@ function StudentsHub(props) {
   const { data, reload, toast, profile } = props;
   const [active, setActive] = useState('customers');
   const [advanced, setAdvanced] = useState(false);
+  const [progressStudent, setProgressStudent] = useState(null);
   const tabs = [
     ['customers', 'Families'],
     ['students', 'Students'],
@@ -662,6 +674,11 @@ function StudentsHub(props) {
   return (
     <div className="grid gap-5">
       <StudentSetupWizard data={data} reload={reload} toast={toast} profile={profile} onOpenAdvanced={(key) => { setActive(key); setAdvanced(true); }} />
+      <Section title="Levels & Progress" action={<Button variant="ghost" onClick={() => go('/skill-levels')}>Open full syllabus</Button>}>
+        <p className="mb-4 text-sm leading-6 text-slate-500">Track each student's TY Swim level, focus, safety confidence, and passed skills. Coaches can update assigned students from phone after lessons.</p>
+        <StudentProgressCards students={data.students.slice(0, 6)} data={data} onUpdate={setProgressStudent} />
+        {data.students.length > 6 ? <p className="mt-3 text-sm text-slate-500">Showing the first 6 students. Open Levels & Progress for the full list.</p> : null}
+      </Section>
       <Section title="Advanced records" action={<Button variant="ghost" onClick={() => setAdvanced((value) => !value)}>{advanced ? 'Hide advanced records' : 'Show advanced records'}</Button>}>
         <p className="text-sm leading-6 text-slate-500">Use these tables for search, editing, CSV export, and unusual corrections. The guided setup above is the easiest way to add a new family.</p>
       </Section>
@@ -681,6 +698,7 @@ function StudentsHub(props) {
           {active === 'packages' ? <PackagesPage {...props} /> : null}
         </>
       ) : null}
+      {progressStudent ? <StudentProgressModal student={progressStudent} data={data} profile={profile} reload={reload} toast={toast} onClose={() => setProgressStudent(null)} /> : null}
     </div>
   );
 }
@@ -999,10 +1017,13 @@ function MoneyPage(props) {
 }
 
 function MorePage(props) {
-  const { signOut } = props;
+  const { signOut, profile } = props;
+  const isAdmin = profile.role === 'admin';
   const tools = [
-    ['money', '/money', 'Money'],
-    ...legacyAdminRoutes.filter(([key]) => ['help', 'system-check', 'customers', 'venues', 'classes', 'packages', 'lessons', 'import', 'cleanup', 'reports', 'settings'].includes(key)),
+    ...(isAdmin ? [['money', '/money', 'Money']] : []),
+    ...legacyAdminRoutes.filter(([key]) => (isAdmin
+      ? ['help', 'skill-levels', 'system-check', 'customers', 'venues', 'classes', 'packages', 'lessons', 'import', 'cleanup', 'reports', 'settings'].includes(key)
+      : ['help', 'skill-levels', 'system-check'].includes(key))),
   ];
   return (
     <div className="grid gap-5">
@@ -1034,6 +1055,7 @@ function moreToolDescription(key) {
   return {
     money: 'Payments, payroll, expenses, and accounting summary.',
     help: 'Simple owner and coach guide for daily use.',
+    'skill-levels': 'TY Swim Level 1-6 syllabus and student progress.',
     'system-check': 'Check whether the OS is ready and see what to fix first.',
     import: 'Bring in old Google Sheet CSV data.',
     cleanup: 'Find missing names, address, age, consent, coach, and proof records.',
@@ -1103,7 +1125,58 @@ function HelpPage({ profile }) {
   );
 }
 
-function SystemCheckPage({ session, profile, data }) {
+function SkillLevelsPage({ profile, data, reload, toast }) {
+  const isAdmin = profile.role === 'admin';
+  const coach = data.coaches.find((item) => item.profile_id === profile.id);
+  const assignedClassIds = new Set(data.classes.filter((cls) => cls.assigned_coach_id === coach?.id).map((cls) => cls.id));
+  const assignedStudentIds = new Set(data.class_students.filter((item) => assignedClassIds.has(item.class_id)).map((item) => item.student_id));
+  const students = isAdmin ? data.students : data.students.filter((student) => assignedStudentIds.has(student.id));
+  const [progressStudent, setProgressStudent] = useState(null);
+  return (
+    <div className="grid gap-5">
+      <Section title="Levels & Progress">
+        <p className="text-sm leading-6 text-slate-500">TY Swim Academy Level 1-6 syllabus. All students start with Level 1 water safety first. Adult learners may begin with breaststroke confidence work when mobility, fear, or stiffness makes freestyle too difficult at first.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {skillLevels.map((level) => (
+            <article key={level.level} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-sky-700">Level {level.level}</p>
+                  <h3 className="mt-1 font-semibold text-slate-950">{level.title}</h3>
+                </div>
+                <span className="rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white">{level.criteria.length} skills</span>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600">{level.goal}</p>
+              <details className="mt-3 rounded-lg bg-slate-50 p-3">
+                <summary className="cursor-pointer text-sm font-semibold text-slate-800">Teaching notes and checklist</summary>
+                <div className="mt-3 grid gap-3 text-sm leading-6 text-slate-600">
+                  <div><span className="font-semibold text-slate-800">Teaching focus:</span> {level.teachingFocus}</div>
+                  <div><span className="font-semibold text-slate-800">Cue words:</span> {level.cues.join(' / ')}</div>
+                  <div><span className="font-semibold text-slate-800">Common mistakes:</span> {level.commonMistakes.join(' / ')}</div>
+                  <ul className="grid gap-1">
+                    {level.criteria.map(([id, label]) => <li key={id}>- {label}</li>)}
+                  </ul>
+                </div>
+              </details>
+            </article>
+          ))}
+        </div>
+      </Section>
+      <Section title="Bonus / Optional Skills">
+        <p className="mb-4 text-sm leading-6 text-slate-500">These are useful teaching tools but do not block the main level progression unless Admin decides.</p>
+        <div className="grid gap-3 md:grid-cols-2">
+          {bonusSkills.map((item) => <div key={item.id} className="rounded-lg border border-slate-200 bg-white p-4"><p className="font-semibold text-slate-950">{item.title}</p><p className="mt-2 text-sm leading-6 text-slate-600">{item.notes}</p></div>)}
+        </div>
+      </Section>
+      <Section title={isAdmin ? 'Student Progress' : 'My Student Progress'}>
+        <StudentProgressCards students={students} data={data} onUpdate={setProgressStudent} />
+      </Section>
+      {progressStudent ? <StudentProgressModal student={progressStudent} data={data} profile={profile} reload={reload} toast={toast} onClose={() => setProgressStudent(null)} /> : null}
+    </div>
+  );
+}
+
+function SystemCheckPage({ session, profile, data, tableErrors = {} }) {
   const [bucketState, setBucketState] = useState({ loading: true, checks: [], error: '' });
   const [showDetails, setShowDetails] = useState(false);
   useEffect(() => {
@@ -1126,7 +1199,7 @@ function SystemCheckPage({ session, profile, data }) {
     };
   }, []);
 
-  const requiredTables = ['profiles', 'coaches', 'customers', 'students', 'venues', 'classes', 'packages', 'lessons', 'payroll_items'];
+  const requiredTables = ['profiles', 'coaches', 'customers', 'students', 'venues', 'classes', 'packages', 'lessons', 'payroll_items', 'student_skill_profiles', 'student_skill_progress', 'lesson_skill_assessments'];
   const isAdmin = profile?.role === 'admin';
   const isCoach = profile?.role === 'coach';
   const ownCoach = data.coaches.find((coach) => coach.profile_id === profile?.id);
@@ -1142,13 +1215,17 @@ function SystemCheckPage({ session, profile, data }) {
   const coachProfileExists = data.coaches.some((coach) => coach.profile_id);
   const frontendEnvKeys = Object.keys(import.meta.env || {});
   const serviceRoleExposed = frontendEnvKeys.some((key) => key.toLowerCase().includes('service_role'));
+  const tableErrorSummary = Object.entries(tableErrors).map(([name, message]) => `${name}: ${message}`).join(' | ');
+  const coreTablesOk = requiredTables.every((name) => Array.isArray(data[name]) && !tableErrors[name]);
+  const skillTablesOk = ['student_skill_profiles', 'student_skill_progress', 'lesson_skill_assessments'].every((name) => Array.isArray(data[name]) && !tableErrors[name]);
   const baseRows = [
     checkRow('Supabase env loaded', hasSupabaseConfig ? 'pass' : 'fail', 'The app has the public Supabase URL and anon key.', 'Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local.'),
     checkRow('Current session exists', session?.user?.id ? 'pass' : 'fail', session?.user?.email || 'No signed-in user session found.', 'Sign in again at /login.'),
     checkRow('Current profile exists', profile?.id ? 'pass' : 'fail', profile?.email || 'No profile row loaded.', 'Create a profiles row matching this Auth user ID.'),
     checkRow('Current role detected', ['admin', 'coach'].includes(profile?.role) ? 'pass' : 'fail', `Role: ${profile?.role || 'missing'}`, 'Set profile role to admin or coach.'),
     checkRow('Admin / Coach role logic', ['admin', 'coach'].includes(profile?.role) ? 'pass' : 'fail', `You are viewing ${profile?.role || 'unknown'} checks.`, 'Use Admin login for Admin checks and Coach login for Coach restriction checks.'),
-    checkRow('Core tables accessible', requiredTables.every((name) => Array.isArray(data[name])) ? 'pass' : 'fail', 'Core operational tables should load as lists.', 'Run supabase/schema.sql in the test Supabase project.'),
+    checkRow('Core tables accessible', coreTablesOk ? 'pass' : 'fail', tableErrorSummary || 'Core operational tables loaded.', 'Run supabase/schema.sql in the test Supabase project.'),
+    checkRow('Skill progress ready', skillTablesOk ? 'pass' : 'fail', skillTablesOk ? 'Student Level 1-6 progress tables are available.' : tableErrorSummary || 'Skill progress tables could not be verified.', 'Run supabase/skill-progress-migration.sql, then refresh and rerun Setup Check.'),
     checkRow('Required storage buckets reachable', isAdmin ? (!bucketState.loading && bucketState.checks.every((item) => item.ok) ? 'pass' : 'fail') : 'warning', isAdmin ? (bucketState.loading ? 'Checking buckets...' : bucketState.checks.map((item) => `${item.name}: ${item.detail}`).join(' | ')) : 'Bucket reachability is checked from Admin because payment proofs and expense receipts are Admin-only.', 'If Admin sees a bucket failure, rerun supabase/schema.sql and confirm the private buckets exist: lesson-photos, payment-proofs, expense-receipts.'),
     checkRow('Demo data present', demoDataPresent ? 'pass' : 'warning', demoDataPresent ? 'DEMO customer, students, class, package, and lessons found.' : 'Demo rows not found yet.', 'Run supabase/demo-seed.sql after replacing the Admin and Coach Auth user IDs.'),
     checkRow('Pending review lesson exists', pendingReviewLesson ? 'pass' : 'warning', pendingReviewLesson ? 'A lesson is waiting for Admin review.' : 'No completed_pending_review lesson is visible.', 'Run demo-seed.sql or submit a lesson as Coach.'),
@@ -1257,9 +1334,21 @@ function CustomerDetail({ profile, pathInfo, data, reload, toast }) {
         <DataTable rows={students} columns={[
           { key: 'student_code', label: 'Code' },
           { key: 'display_name', label: 'Name' },
+          { key: 'skill_level', label: 'Skill Level', render: (row) => <StudentLevelBadge student={row} data={data} /> },
           { key: 'age', label: 'Age' },
-          { key: 'level', label: 'Level' },
+          { key: 'legacy_level', label: 'Legacy Level', render: (row) => row.level || '-' },
           { key: 'alert', label: 'Health / Safety', render: (row) => row.safety_alert || row.health_notes || row.special_needs || '-' },
+        ]} />
+      </Section>
+      <Section title="Skill Progress">
+        <StudentProgressCards students={students} data={data} />
+        <DataTable className="mt-4 hidden md:block" rows={data.lesson_skill_assessments.filter((row) => students.some((student) => student.id === row.student_id))} empty="No lesson skill assessments yet." columns={[
+          { key: 'student', label: 'Student', render: (row) => data.students.find((student) => student.id === row.student_id)?.display_name || '-' },
+          { key: 'level_number', label: 'Level' },
+          { key: 'criterion_id', label: 'Skill' },
+          { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status}>{progressStatusLabels[row.status] || row.status}</StatusBadge> },
+          { key: 'note', label: 'Note' },
+          { key: 'created_at', label: 'When', render: (row) => formatDate(row.created_at) },
         ]} />
       </Section>
       <Section title="Venues / Address">
@@ -1332,42 +1421,245 @@ function ConsentQuickEdit({ customer, students, data, reload, toast }) {
 function StudentsPage({ profile, data, reload, toast }) {
   const isAdmin = profile.role === 'admin';
   const coach = data.coaches.find((item) => item.profile_id === profile.id);
+  const [progressStudent, setProgressStudent] = useState(null);
   const assignedClassIds = new Set(data.classes.filter((cls) => cls.assigned_coach_id === coach?.id).map((cls) => cls.id));
   const assignedStudentIds = new Set(data.class_students.filter((item) => assignedClassIds.has(item.class_id)).map((item) => item.student_id));
   const rows = isAdmin ? data.students : data.students.filter((student) => assignedStudentIds.has(student.id));
   return (
-    <RecordManager
-      title="Students"
-      table="students"
-      rows={rows}
-      canEdit={isAdmin}
-      addLabel="Add Student"
-      reload={reload}
-      toast={toast}
-      fields={[
-        ['student_code', 'Student code'],
-        ['customer_id', 'Customer', 'select', data.customers.map((item) => [item.id, item.display_name || item.customer_code])],
-        ['display_name', 'Display name'],
-        ['age', 'Age', 'number'],
-        ['gender', 'Gender', 'select', ['male', 'female', 'other']],
-        ['level', 'Level'],
-        ['learning_goal', 'Learning goal', 'textarea'],
-        ['health_notes', 'Health notes', 'textarea'],
-        ['special_needs', 'Special needs', 'textarea'],
-        ['safety_alert', 'Safety alert', 'textarea'],
-        ['preferred_language', 'Preferred language'],
-        ['status', 'Status', 'select', ['active', 'paused', 'completed', 'inactive']],
-      ]}
-      columns={[
-        ['student_code', 'Code'],
-        ['display_name', 'Name'],
-        ['customer', 'Customer', (row) => data.customers.find((item) => item.id === row.customer_id)?.display_name || '-'],
-        ['age', 'Age'],
-        ['level', 'Level'],
-        ['health', 'Health / Safety', (row) => row.safety_alert || row.health_notes || row.special_needs || '-'],
-        ['status', 'Status', (row) => <StatusBadge value={row.status}>{row.status}</StatusBadge>],
-      ]}
-    />
+    <div className="grid gap-5">
+      <Section title={isAdmin ? 'Student Level Progress' : 'My Students'}>
+        <p className="mb-4 text-sm leading-6 text-slate-500">{isAdmin ? 'Current TY Swim levels, focus, and assessment status for each student.' : 'Tap Update Progress after class to record the current level checklist.'}</p>
+        <StudentProgressCards students={rows} data={data} onUpdate={setProgressStudent} />
+      </Section>
+      {isAdmin ? (
+        <RecordManager
+          title="Students"
+          table="students"
+          rows={rows}
+          canEdit={isAdmin}
+          addLabel="Add Student"
+          reload={reload}
+          toast={toast}
+          fields={[
+            ['student_code', 'Student code'],
+            ['customer_id', 'Customer', 'select', data.customers.map((item) => [item.id, item.display_name || item.customer_code])],
+            ['display_name', 'Display name'],
+            ['age', 'Age', 'number'],
+            ['gender', 'Gender', 'select', ['male', 'female', 'other']],
+            ['level', 'Level'],
+            ['learning_goal', 'Learning goal', 'textarea'],
+            ['health_notes', 'Health notes', 'textarea'],
+            ['special_needs', 'Special needs', 'textarea'],
+            ['safety_alert', 'Safety alert', 'textarea'],
+            ['preferred_language', 'Preferred language'],
+            ['status', 'Status', 'select', ['active', 'paused', 'completed', 'inactive']],
+          ]}
+          columns={[
+            ['student_code', 'Code'],
+            ['display_name', 'Name'],
+            ['customer', 'Customer', (row) => data.customers.find((item) => item.id === row.customer_id)?.display_name || '-'],
+            ['level_progress', 'Level', (row) => <StudentLevelBadge student={row} data={data} />],
+            ['focus', 'Focus', (row) => getStudentSkillProfile(row, data).current_focus || row.learning_goal || '-'],
+            ['health', 'Health / Safety', (row) => row.safety_alert || row.health_notes || row.special_needs || '-'],
+            ['status', 'Status', (row) => <StatusBadge value={row.status}>{row.status}</StatusBadge>],
+          ]}
+        />
+      ) : null}
+      {progressStudent ? <StudentProgressModal student={progressStudent} data={data} profile={profile} reload={reload} toast={toast} onClose={() => setProgressStudent(null)} /> : null}
+    </div>
+  );
+}
+
+function StudentProgressCards({ students, data, onUpdate, lesson }) {
+  if (students.length === 0) return <EmptyState title="No students yet" body="Assigned students will appear here with their current level and focus." />;
+  return (
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {students.map((student) => {
+        const profile = getStudentSkillProfile(student, data);
+        const level = getSkillLevel(profile.current_level);
+        const progress = getLevelProgress(student, data, level.level);
+        return (
+          <article key={student.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-slate-950">{student.display_name}</h3>
+                <p className="mt-1 text-sm text-slate-500">{data.customers.find((item) => item.id === student.customer_id)?.display_name || 'Family not set'}</p>
+              </div>
+              <StudentLevelBadge student={student} data={data} />
+            </div>
+            <p className="mt-3 text-sm font-medium text-slate-700">Focus: {profile.current_focus || level.title}</p>
+            <p className="mt-1 text-xs text-slate-500">Last assessed: {formatDate(profile.last_assessed_at)}</p>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-sky-500" style={{ width: `${progress.percent}%` }} />
+            </div>
+            <p className="mt-1 text-xs font-semibold text-sky-700">{progress.passed}/{progress.total} criteria passed</p>
+            {student.safety_alert ? <p className="mt-3 rounded-lg bg-rose-50 p-2 text-sm font-medium text-rose-700">{student.safety_alert}</p> : null}
+            <div className={`mt-4 grid gap-2 ${onUpdate ? 'sm:grid-cols-2' : ''}`}>
+              {onUpdate ? <Button onClick={() => onUpdate(student)}>{lesson ? 'Update Progress' : 'Update Progress'}</Button> : null}
+              <Button variant="ghost" onClick={() => go('/skill-levels')}>View Syllabus</Button>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function StudentLevelBadge({ student, data }) {
+  const profile = getStudentSkillProfile(student, data);
+  return (
+    <div className="grid justify-items-end gap-1">
+      <span className="rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white">Level {profile.current_level}</span>
+      <StatusBadge value={profile.level_status}>{levelStatusLabels[profile.level_status] || profile.level_status}</StatusBadge>
+    </div>
+  );
+}
+
+function getStudentSkillProfile(student, data) {
+  return data.student_skill_profiles.find((item) => item.student_id === student.id) || {
+    student_id: student.id,
+    current_level: Number(student.level || 1) || 1,
+    level_status: 'not_started',
+    current_focus: student.learning_goal || '',
+    last_assessed_at: null,
+    assessment_note: '',
+    suggested_level_up: false,
+  };
+}
+
+function getLevelProgress(student, data, levelNumber) {
+  const level = getSkillLevel(levelNumber);
+  const rows = data.student_skill_progress.filter((item) => item.student_id === student.id && Number(item.level_number) === Number(levelNumber));
+  const passed = level.criteria.filter(([criterionId]) => rows.find((row) => row.criterion_id === criterionId)?.status === 'passed').length;
+  const total = level.criteria.length;
+  return { passed, total, percent: total ? Math.round((passed / total) * 100) : 0 };
+}
+
+function StudentProgressModal({ student, data, profile, reload, toast, onClose, lesson }) {
+  const existingProfile = getStudentSkillProfile(student, data);
+  const [levelNumber, setLevelNumber] = useState(Number(existingProfile.current_level || 1));
+  const level = getSkillLevel(levelNumber);
+  const existingRows = data.student_skill_progress.filter((item) => item.student_id === student.id && Number(item.level_number) === Number(levelNumber));
+  const [statuses, setStatuses] = useState(() => Object.fromEntries(level.criteria.map(([criterionId]) => [criterionId, existingRows.find((row) => row.criterion_id === criterionId)?.status || 'not_started'])));
+  const [notes, setNotes] = useState(() => Object.fromEntries(level.criteria.map(([criterionId]) => [criterionId, existingRows.find((row) => row.criterion_id === criterionId)?.note || ''])));
+  const [levelStatus, setLevelStatus] = useState(existingProfile.level_status || 'learning');
+  const [currentFocus, setCurrentFocus] = useState(existingProfile.current_focus || level.title);
+  const [assessmentNote, setAssessmentNote] = useState(existingProfile.assessment_note || '');
+  const [suggestLevelUp, setSuggestLevelUp] = useState(existingProfile.suggested_level_up || false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const rows = data.student_skill_progress.filter((item) => item.student_id === student.id && Number(item.level_number) === Number(levelNumber));
+    const nextLevel = getSkillLevel(levelNumber);
+    setStatuses(Object.fromEntries(nextLevel.criteria.map(([criterionId]) => [criterionId, rows.find((row) => row.criterion_id === criterionId)?.status || 'not_started'])));
+    setNotes(Object.fromEntries(nextLevel.criteria.map(([criterionId]) => [criterionId, rows.find((row) => row.criterion_id === criterionId)?.note || ''])));
+    setCurrentFocus((value) => value || nextLevel.title);
+  }, [levelNumber, student.id]);
+
+  const passedCount = level.criteria.filter(([criterionId]) => statuses[criterionId] === 'passed').length;
+  const readyForNext = passedCount === level.criteria.length;
+
+  const save = async () => {
+    setSaving(true);
+    const now = new Date().toISOString();
+    const profilePayload = {
+      student_id: student.id,
+      current_level: levelNumber,
+      level_status: readyForNext ? 'passed' : levelStatus,
+      current_focus: currentFocus,
+      last_assessed_at: now,
+      assessment_note: assessmentNote,
+      suggested_level_up: suggestLevelUp || readyForNext,
+      updated_by: profile.id,
+    };
+    const { error: profileError } = await supabase.from('student_skill_profiles').upsert(profilePayload, { onConflict: 'student_id' });
+    if (profileError) {
+      setSaving(false);
+      toast(profileError.message);
+      return;
+    }
+    const progressPayload = level.criteria.map(([criterionId]) => ({
+      student_id: student.id,
+      level_number: levelNumber,
+      criterion_id: criterionId,
+      status: statuses[criterionId] || 'not_started',
+      note: notes[criterionId] || null,
+      last_assessed_at: now,
+      assessed_by: profile.id,
+      lesson_id: lesson?.id || null,
+    }));
+    const { error: progressError } = await supabase.from('student_skill_progress').upsert(progressPayload, { onConflict: 'student_id,level_number,criterion_id' });
+    if (progressError) {
+      setSaving(false);
+      toast(progressError.message);
+      return;
+    }
+    if (lesson?.id) {
+      const changed = progressPayload.filter((item) => item.status !== 'not_started' || item.note);
+      if (changed.length) {
+        const { error: assessmentError } = await supabase.from('lesson_skill_assessments').insert(changed.map((item) => ({
+          lesson_id: lesson.id,
+          student_id: student.id,
+          level_number: levelNumber,
+          criterion_id: item.criterion_id,
+          status: item.status,
+          note: item.note,
+          next_focus: currentFocus,
+          suggest_level_up: suggestLevelUp || readyForNext,
+          assessed_by: profile.id,
+        })));
+        if (assessmentError) {
+          setSaving(false);
+          toast(assessmentError.message);
+          return;
+        }
+      }
+    }
+    setSaving(false);
+    toast('Student progress saved.');
+    await reload();
+    onClose();
+  };
+
+  return (
+    <Modal title={`Update Progress - ${student.display_name}`} onClose={onClose} wide>
+      <div className="grid gap-4">
+        <div className="grid gap-3 md:grid-cols-[160px_1fr_180px]">
+          <Field label="Current level"><Select value={levelNumber} onChange={(event) => setLevelNumber(Number(event.target.value))}>{skillLevels.map((item) => <option key={item.level} value={item.level}>Level {item.level}</option>)}</Select></Field>
+          <Field label="Current focus"><Input value={currentFocus} onChange={(event) => setCurrentFocus(event.target.value)} /></Field>
+          <Field label="Level status"><Select value={levelStatus} onChange={(event) => setLevelStatus(event.target.value)}>{levelStatuses.map((item) => <option key={item} value={item}>{levelStatusLabels[item]}</option>)}</Select></Field>
+        </div>
+        <div className="rounded-lg border border-sky-100 bg-sky-50 p-3">
+          <p className="font-semibold text-slate-950">Level {level.level}: {level.title}</p>
+          <p className="mt-1 text-sm leading-6 text-slate-600">{level.goal}</p>
+          <p className="mt-2 text-xs font-semibold text-sky-700">{passedCount}/{level.criteria.length} passed</p>
+          {readyForNext ? <p className="mt-2 rounded-lg bg-emerald-50 p-2 text-sm font-semibold text-emerald-700">Ready for next level. Admin should confirm level up before changing the student level.</p> : null}
+        </div>
+        <div className="grid gap-3">
+          {level.criteria.map(([criterionId, label]) => (
+            <div key={criterionId} className="rounded-lg border border-slate-200 bg-white p-3">
+              <p className="font-semibold text-slate-950">{label}</p>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {progressStatuses.map((status) => (
+                  <button key={status} type="button" onClick={() => setStatuses((current) => ({ ...current, [criterionId]: status }))} className={`min-h-10 rounded-lg border px-2 text-sm font-semibold ${statuses[criterionId] === status ? 'border-sky-500 bg-sky-600 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>
+                    {progressStatusLabels[status]}
+                  </button>
+                ))}
+              </div>
+              <Textarea className="mt-3 min-h-16" placeholder="Short note for this skill" value={notes[criterionId] || ''} onChange={(event) => setNotes((current) => ({ ...current, [criterionId]: event.target.value }))} />
+            </div>
+          ))}
+        </div>
+        <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+          <Field label="Assessment note"><Textarea value={assessmentNote} onChange={(event) => setAssessmentNote(event.target.value)} placeholder="Overall progress note. Chinese/English mixed notes are okay." /></Field>
+          <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700"><input type="checkbox" checked={suggestLevelUp || readyForNext} onChange={(event) => setSuggestLevelUp(event.target.checked)} /> Suggest level up</label>
+        </div>
+        <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] grid gap-2 rounded-lg border border-slate-200 bg-white/95 p-3 shadow-lg lg:bottom-3 sm:flex sm:justify-end">
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save Progress'}</Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -1817,6 +2109,7 @@ function LessonDetail({ profile, pathInfo, data, reload, toast }) {
     return (
       <CoachLessonSubmission
         lesson={lesson}
+        profile={profile}
         cls={cls}
         customer={customer}
         venue={venue}
@@ -1892,11 +2185,13 @@ function LessonDetail({ profile, pathInfo, data, reload, toast }) {
   );
 }
 
-function CoachLessonSubmission({ lesson, cls, customer, venue, data, form, setForm, participants, setParticipants, rescheduleReason, setRescheduleReason, coachLocked, saveLesson, submitReview, reload, toast }) {
+function CoachLessonSubmission({ lesson, profile, cls, customer, venue, data, form, setForm, participants, setParticipants, rescheduleReason, setRescheduleReason, coachLocked, saveLesson, submitReview, reload, toast }) {
   const photoRequired = Boolean(cls?.photo_required || lesson.photo_required);
   const [showScheduleChange, setShowScheduleChange] = useState(false);
   const [outcome, setOutcome] = useState(lesson.status === 'cancelled_pending_review' ? 'cancelled' : 'completed');
+  const [progressStudent, setProgressStudent] = useState(null);
   const submitted = ['completed_pending_review', 'cancelled_pending_review'].includes(lesson.status);
+  const lessonStudents = participants.map((item) => data.students.find((student) => student.id === item.student_id)).filter(Boolean);
   return (
     <div className="grid gap-5">
       <Section title={cls?.class_name || lesson.lesson_code} action={<Button variant="ghost" onClick={() => go('/schedule')}>Back</Button>}>
@@ -1954,11 +2249,32 @@ function CoachLessonSubmission({ lesson, cls, customer, venue, data, form, setFo
         </div>
         <Field label="Coach note"><Textarea disabled={coachLocked} value={form.coach_notes || ''} onChange={(event) => setForm({ ...form, coach_notes: event.target.value })} placeholder="Optional note for Admin" /></Field>
         <LessonPhotos lesson={lesson} data={data} reload={reload} toast={toast} disabled={coachLocked} />
+        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-semibold text-slate-950">Update student progress</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">Optional. Record the current level checklist without affecting package count or payroll.</p>
+            </div>
+            <Button variant="ghost" onClick={() => go('/skill-levels')}>View full syllabus</Button>
+          </div>
+          <div className="mt-3 grid gap-2">
+            {lessonStudents.map((student) => (
+              <button key={student.id} type="button" disabled={coachLocked} onClick={() => setProgressStudent(student)} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left disabled:opacity-60">
+                <div>
+                  <p className="font-semibold text-slate-950">{student.display_name}</p>
+                  <p className="text-sm text-slate-500">{getStudentSkillProfile(student, data).current_focus || getSkillLevel(getStudentSkillProfile(student, data).current_level).title}</p>
+                </div>
+                <StudentLevelBadge student={student} data={data} />
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] mt-4 flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white/95 p-3 shadow-lg shadow-slate-200/70 backdrop-blur lg:bottom-3">
           <Button variant="ghost" onClick={saveLesson} disabled={coachLocked}>Save draft</Button>
           <Button className="min-h-12 flex-1 text-base sm:flex-none" onClick={() => submitReview(outcome === 'cancelled' ? 'cancelled_pending_review' : 'completed_pending_review')} disabled={coachLocked}>Submit Record</Button>
         </div>
       </Section>
+      {progressStudent ? <StudentProgressModal student={progressStudent} data={data} profile={profile} lesson={lesson} reload={reload} toast={toast} onClose={() => setProgressStudent(null)} /> : null}
     </div>
   );
 }

@@ -293,6 +293,7 @@ Tools:
 
 - Help Guide: simple in-app usage summary
 - Setup Check: setup, permission, storage, and demo-data checks
+- Levels & Progress: TY Swim Academy Level 1-6 syllabus and student progress tracking
 - CSV Import: import old Google Sheet CSV data
 - Data Cleanup: find missing important data
 - Reports: lesson, payment, expense, payroll, and renewal exports
@@ -393,6 +394,7 @@ Coach can see:
 - assigned customer/family contact
 - WhatsApp
 - student name, age, gender, level, goal
+- current TY Swim skill level, current focus, passed skills, and assessment notes
 - health notes, safety alert, special needs
 - assigned venue/address and access notes
 - assigned class/group details
@@ -665,6 +667,9 @@ Do not mix demo data with real customer data in production.
 | Add Class | Students workflow / classes table | Admin | Creates class/group | Must assign coach and schedule mode carefully |
 | Add Package | Students workflow / packages table | Admin | Creates package | Package count must match paid package |
 | Schedule Lesson | Today / Schedule | Admin | Opens Schedule | Scheduling alone does not deduct package |
+| Open full syllabus | Students / More / lesson detail | Admin / Coach | Opens Level 1-6 syllabus and student progress page | Coach only sees assigned students |
+| Update Progress | Students / My Students / lesson detail | Admin / Coach | Opens the current level checklist for one student | Does not affect package deduction, payroll, payment, or expense |
+| Save Progress | Progress modal | Admin / Coach | Saves skill status, notes, current focus, last assessed date, and optional level-up suggestion | Coach can update assigned students only |
 | Fixed Weekly | Schedule | Admin | Creates recurring weekly schedule | Generated lessons can be individually rescheduled |
 | Flexible Lesson | Schedule | Admin / Coach | Creates flexible appointment | Coach-created appointment creates Admin change log |
 | Create appointment | Schedule | Admin / Coach | Starts flexible lesson creation | Final completion still needs review |
@@ -710,6 +715,11 @@ Do not mix demo data with real customer data in production.
 | `paused` | Temporarily stopped |
 | `draft` | Payroll or record is being prepared |
 | `ready` | Payroll or record is ready for next step |
+| `not_started` | Skill or level has not been worked on yet |
+| `learning` | Student is learning the skill but not consistent yet |
+| `almost` | Skill is close to passing, but still needs polish |
+| `almost_ready` | Level is close to passing |
+| `passed` | Skill or level has been passed |
 
 ## 8. Safety Rules
 
@@ -762,4 +772,85 @@ Coach daily routine:
 2. Check time, WhatsApp, map, safety notes, and photo requirement.
 3. Teach lesson.
 4. Submit lesson record after class.
-5. Check My Pay for approved payable lessons.
+5. Optionally update each student's current level progress.
+6. Check My Pay for approved payable lessons.
+
+## 10. Skill Levels And Student Progress
+
+TY Swim Academy OS includes a Level 1-6 progress system for daily coaching and Admin review.
+
+### Level Meaning
+
+| Level | Name | Goal |
+| --- | --- | --- |
+| 1 | Water Safety / Floating / Survival Jump | Safe entry/exit, breathing, floats, recovery, push & glide, kicking, survival jump, and finding pool edge |
+| 2 | Freestyle | Standard freestyle 15 m |
+| 3 | Backstroke | Standard backstroke 15 m |
+| 4 | Breaststroke | Standard breaststroke 15 m |
+| 5 | Butterfly | Standard butterfly 15 m |
+| 6 | Master Squad / Competition Skills / IM | 100 m IM, 25 m each stroke, and competition-style starts/turns/finishes |
+
+All students should begin with Level 1 water safety assessment. Adult learners may start with breaststroke confidence work if they are stiff, nervous, or have weak mobility, but the student profile still tracks the official current TY Swim level.
+
+### What Is Stored For Each Student
+
+Each student can have:
+
+- current level from 1 to 6
+- level status: Not Started, Learning, Almost Ready, Passed
+- current focus
+- last assessed date
+- assessment note
+- checklist progress for each level criterion
+- optional level-up suggestion
+
+### How Admin Uses It
+
+Admin can open Students or More -> Levels & Progress.
+
+Admin can:
+
+- see level badges and progress cards
+- update any student's current level, status, focus, and checklist
+- review passed and incomplete criteria
+- see progress from lesson submissions
+- decide when a student should move to the next level
+
+The system does not force automatic level-up. If all criteria are passed, it shows the student as ready for the next level and Admin should confirm.
+
+### How Coach Uses It On Mobile
+
+Coach can open My Students or the lesson detail / Submit Record screen.
+
+Coach should:
+
+1. Tap Update Progress for the assigned student.
+2. Review the current level checklist only.
+3. Tap Learning, Almost, or Passed for skills worked on today.
+4. Add short notes if useful. Chinese/English mixed notes are okay.
+5. Update Next Focus / Current Focus.
+6. Save Progress.
+
+The full syllabus is available through View Syllabus, but it is secondary so Coach does not need to read all six levels during every lesson.
+
+### Lesson Submission Integration
+
+During Coach lesson submission, Update student progress is optional. It does not affect package deduction or payroll. Package deduction and coach payroll still only happen after Admin approves the lesson.
+
+### Bonus Skills
+
+Bonus skills are useful teaching tools and do not block main level progression unless Admin decides:
+
+- Reverse Breaststroke: back floating breaststroke kick for breaststroke leg correction
+- Head-up Breaststroke: safety, visibility, open water, and play; useful after Level 4 or safety-theme lessons
+
+### SQL Setup For Existing Supabase Projects
+
+For a new Supabase project, run `supabase/schema.sql`.
+
+For an existing test project that already has the OS schema, run:
+
+1. `supabase/skill-progress-migration.sql`
+2. then rerun `supabase/demo-seed.sql` if you want demo progress data
+
+Do not put the Supabase service role key in the frontend or Vercel. Coaches are protected by RLS and can update progress only for assigned students.

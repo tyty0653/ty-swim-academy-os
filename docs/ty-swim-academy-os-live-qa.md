@@ -16,6 +16,8 @@ Run:
 1. `supabase/schema.sql`
 2. `supabase/demo-seed.sql`
 
+If this is an existing test project with an older OS schema, run `supabase/skill-progress-migration.sql` before rerunning `demo-seed.sql`.
+
 Before running `demo-seed.sql`, replace:
 
 - `00000000-0000-0000-0000-000000000001` with the Admin Auth user ID.
@@ -29,6 +31,7 @@ After a successful seed, these records should exist:
 - `DEMO-LES-0001` with status `scheduled`
 - `DEMO-LES-0002` with status `scheduled`
 - `DEMO-LES-0003` with status `completed_pending_review`
+- fake Level 1 progress for the two demo students
 
 If `npm run qa:check` says demo lessons are missing, rerun the latest `supabase/demo-seed.sql`. The seed now raises an error if it cannot create `DEMO-LES-0003` as pending review.
 
@@ -90,6 +93,8 @@ Admin:
 - Demo package and lessons exist.
 - Pending review demo lesson exists.
 - Payment, expense, and payroll data are accessible to Admin.
+- Student skill progress data is accessible.
+- `/skill-levels` shows the Level 1-6 syllabus and demo student progress.
 - Admin can approve the demo pending lesson.
 - Package remaining lessons deducts exactly once.
 - Payroll item is created exactly once.
