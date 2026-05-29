@@ -67,7 +67,7 @@ Main workflows:
 - Mark payroll paid creates coach salary expense once
 - Admin records payments and uploads payment proof
 - Admin records expenses and uploads receipts
-- Admin/Coach use System Check to verify setup and permissions
+- Admin/Coach use Setup Check to verify setup and permissions
 
 Role boundaries:
 
@@ -88,7 +88,7 @@ Design intent:
 - students setup is guided through steps
 - Review is grouped by action type
 - Money is available but not the main dashboard focus
-- System Check explains setup and permission problems in beginner-friendly language
+- Setup Check explains setup and permission problems in beginner-friendly language
 
 Tone:
 
@@ -101,11 +101,11 @@ Tone:
 - Navigation is much simpler than a full database admin panel.
 - Admin has a clear Today page with daily counts and next actions.
 - Coach Today uses mobile-friendly cards with WhatsApp, map, safety alert, photo badge, and Submit Record.
-- Students page starts with a guided setup flow instead of showing tables immediately.
+- Students page starts with a guided setup wizard instead of showing tables immediately.
 - Schedule page separates Fixed Weekly and Flexible / Coach-arranged modes.
 - Review page groups Pending, Rescheduled, Cancelled, Needs edit, and Missing photos.
 - Money page groups Payments, Payroll, Expenses, and Summary.
-- System Check gives pass/warning/fail results plus next actions.
+- Setup Check gives a beginner summary first, with pass/warning/fail details available below.
 - Demo seed and QA scripts exist for safer testing.
 - Approved lessons are read-only for Coach.
 - Package deduction and payroll creation happen through approval functions designed to avoid duplicates.
@@ -120,17 +120,17 @@ These are based on the current code/UI structure and should be reviewed carefull
 
 The app hides advanced tables, but once opened, customers/students/venues/classes/packages/payments/expenses/settings are still generic table + modal screens. Non-technical users may need clearer form grouping.
 
-2. Students setup is a guided step list, not a true wizard.
+2. Students setup is now a wizard, but still needs real-user testing.
 
-The six setup steps help, but clicking most steps opens advanced tables. A beginner might still wonder exactly where to click next after creating one record.
+The six setup steps now have focused forms for family, student, venue, class, package, and first lesson. A reviewer should still check whether the flow feels obvious with real academy data.
 
-3. "Add New" is generic.
+3. Advanced record labels are improved, but still worth testing.
 
-The app now says `Add New`, but users may prefer context labels such as `Add Family`, `Add Student`, `Add Venue`, `Add Class`, or `Add Package` inside each table.
+Advanced records now use more context labels such as `Add Family`, `Add Student`, `Add Venue`, `Add Class`, and `Add Package`. Reviewers should check whether any remaining generic labels still feel unclear.
 
-4. Schedule can still feel busy.
+4. Schedule is cleaner, but can still feel busy with real data.
 
-Schedule includes mode cards, filters, fixed weekly schedules table, fixed lessons, flexible classes, and flexible lessons. This is complete, but may be a lot on one page.
+Schedule now uses Fixed Weekly and Flexible / Coach-arranged modes, with filters hidden under Advanced filters. With many classes, the lists may still need better grouping.
 
 5. Fixed Weekly generation may need more explanation in the modal.
 
@@ -140,17 +140,17 @@ The page explains that one rescheduled lesson does not change the weekly pattern
 
 This helps quick approval and detailed scanning, but with many records it may feel duplicated. Reviewers should decide whether cards or table should be primary.
 
-7. Lesson detail for Coach still shows scheduling fields.
+7. Lesson detail for Coach now hides scheduling fields by default.
 
-Coach submission includes date, start, end, and reschedule reason before attendance/progress. This is useful, but it may distract coaches who only need to submit a normal completed lesson.
+Coach submission now shows normal completion fields first and hides date/time under `Change date/time`. Reviewers should test whether the large Submit Record action is clear enough.
 
 8. Money terms may be too accounting-like.
 
 Payments, Expenses, Payroll, Estimated net, and Export CSV are accurate but may need owner-friendly helper text or month filters.
 
-9. System Check contains technical concepts.
+9. Setup Check still contains technical concepts in advanced details.
 
-It explains pass/warning/fail, but terms such as storage buckets, RLS, service_role, and env variables may still be technical for a non-technical owner.
+It now has a beginner summary at the top, but terms such as storage buckets, RLS, service_role, and env variables still appear in advanced details.
 
 10. Mobile navigation is simple but not fully app-like.
 
@@ -196,8 +196,8 @@ Use these questions to guide feedback:
 18. Are empty states friendly and helpful?
 19. Which advanced tables should stay hidden under More or Advanced?
 20. What should be turned into a wizard before real staff use?
-21. Is System Check understandable for a non-technical owner?
-22. Should System Check have a simpler "What to fix first" summary at the top?
+21. Is Setup Check understandable for a non-technical owner?
+22. Is the "what to fix first" summary clear enough?
 23. Are export/import actions too prominent or safely tucked away?
 24. What would make this feel more like a daily app and less like a database?
 25. What should be improved before giving Coach accounts to real coaches?
@@ -212,13 +212,13 @@ Use these questions to guide feedback:
 - Confirm approving the same lesson cannot deduct package twice.
 - Confirm approving the same lesson cannot create duplicate payroll item.
 - Confirm marking payroll paid cannot create duplicate expense.
-- Verify demo seed and System Check are reliable in the real test Supabase project.
+- Verify demo seed and Setup Check are reliable in the real test Supabase project.
 - Review the CSV import header encoding before using legacy sheet imports heavily.
 - Add a clearer first-time setup path for linking Auth users to profiles and coaches.
 
 ### Priority 2: Should Improve Before Giving To Coaches
 
-- Make Coach lesson submission shorter by hiding reschedule fields unless "Change date/time" is tapped.
+- Test the shorter Coach lesson submission with real coaches and tune the wording if needed.
 - Add clearer success messages after Coach submits a lesson.
 - Add a Coach "today done" state after all lessons are submitted.
 - Make photo-required lessons more obvious.
@@ -248,4 +248,3 @@ You are reviewing the UX of TY Swim Academy OS, an internal swim academy operati
 Here is the current system summary and UX review pack:
 [paste this document]
 ```
-

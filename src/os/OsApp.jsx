@@ -306,7 +306,7 @@ function activeNav(pathInfo, key) {
   if (key === 'schedule') return ['schedule', 'lessons'].includes(pathInfo.section);
   if (key === 'students') return ['students', 'customers', 'venues', 'classes', 'packages'].includes(pathInfo.section);
   if (key === 'money') return ['money', 'payments', 'payroll', 'expenses'].includes(pathInfo.section);
-  if (key === 'more') return ['more', 'help', 'import', 'data-cleanup', 'reports', 'settings'].includes(pathInfo.section);
+  if (key === 'more') return ['more', 'help', 'system-check', 'import', 'data-cleanup', 'reports', 'settings'].includes(pathInfo.section);
   return pathInfo.section === key;
 }
 
@@ -322,7 +322,7 @@ function pageTitle(pathInfo) {
     lessons: 'Schedule / Lessons',
     review: 'Review Queue',
     money: 'Money',
-    'system-check': 'System Check',
+    'system-check': 'Setup Check',
     payroll: 'Payroll',
     payments: 'Payments',
     expenses: 'Expenses',
@@ -450,7 +450,7 @@ function AdminDashboard({ data }) {
     ['Add Family', '/students', 'primary'],
     ['Schedule Lesson', '/schedule', 'soft'],
     ['Review Lessons', '/review', 'ghost'],
-    ['System Check', '/system-check', 'ghost'],
+    ['Setup Check', '/system-check', 'ghost'],
   ];
 
   return (
@@ -480,6 +480,7 @@ function CoachDashboard({ profile, data }) {
   const today = ownLessons.filter((lesson) => lesson.scheduled_date === todayISO());
   const pending = ownLessons.filter((lesson) => ['scheduled', 'rescheduled', 'needs_edit'].includes(lesson.status));
   const payroll = data.payroll_items.filter((item) => item.coach_id === coach?.id && item.status !== 'void');
+  const todayDone = today.length > 0 && today.every((lesson) => ['completed_pending_review', 'cancelled_pending_review', 'approved', 'rejected', 'archived'].includes(lesson.status));
 
   return (
     <div className="grid gap-5">
@@ -489,6 +490,7 @@ function CoachDashboard({ profile, data }) {
         <Card title="Pending records" value={pending.length} tone="amber" />
         <Card title="Expected payroll" value={formatMoney(payroll.reduce((sum, item) => sum + Number(item.pay_amount || 0), 0))} tone="green" />
       </div>
+      {todayDone ? <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">All today's lesson records submitted.</div> : null}
       <CoachTodayCards lessons={today.length ? today : ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 5)} data={data} />
       <LessonList title="My Schedule" rows={ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 10)} data={data} coachView empty="No upcoming assigned lessons." />
     </div>
@@ -497,7 +499,7 @@ function CoachDashboard({ profile, data }) {
 
 function CoachTodayCards({ lessons, data }) {
   return (
-    <Section title="Today" action={<Button variant="ghost" onClick={() => go('/system-check')}>Coach Check</Button>}>
+    <Section title="Today" action={<Button variant="ghost" onClick={() => go('/system-check')}>Setup Check</Button>}>
       {lessons.length === 0 ? (
         <EmptyState title="No lessons today" body="Assigned lessons will appear here with contact, map, safety alerts, and a fast submit button." />
       ) : (
@@ -521,13 +523,13 @@ function CoachTodayCards({ lessons, data }) {
                   </div>
                   <div className="grid justify-items-end gap-2">
                     <StatusBadge value={lesson.status} />
-                    {photoRequired ? <StatusBadge value="needs_edit">Photo required</StatusBadge> : null}
+                    {photoRequired ? <StatusBadge value="needs_edit">Photo required today</StatusBadge> : null}
                   </div>
                 </div>
                 {studentAlerts(cls, data) ? <p className="mt-3 rounded-lg bg-rose-50 p-3 text-sm font-medium text-rose-700">{studentAlerts(cls, data)}</p> : null}
                 <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                  <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">WhatsApp</a>
-                  <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">Map</a>
+                  <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? 'WhatsApp' : 'No WhatsApp'}</a>
+                  <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? 'Map' : 'No map'}</a>
                   <Button disabled={approved} onClick={() => go(`/lessons/${lesson.id}`)}>{approved ? 'Approved' : 'Submit Record'}</Button>
                 </div>
               </article>
@@ -608,6 +610,7 @@ function LessonCardList({ rows, data, empty }) {
 }
 
 function StudentsHub(props) {
+  const { data, reload, toast, profile } = props;
   const [active, setActive] = useState('customers');
   const [advanced, setAdvanced] = useState(false);
   const tabs = [
@@ -619,30 +622,13 @@ function StudentsHub(props) {
   ];
   return (
     <div className="grid gap-5">
-      <Section title="Student Workflow">
-        <p className="text-sm leading-6 text-slate-500">Use this guided flow when adding a new family. It keeps the daily work in one place while the advanced tables stay available below.</p>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {[
-            ['1', 'Add Family / Customer', 'Parent name and WhatsApp.', 'customers'],
-            ['2', 'Add Student(s)', 'Age, level, health and safety notes.', 'students'],
-            ['3', 'Add Venue / Address', 'Pool address, map, access notes.', 'venues'],
-            ['4', 'Create Class / Group', '1-1 to 1-4, coach, schedule mode.', 'classes'],
-            ['5', 'Add Package', 'Lessons, expiry, remaining count.', 'packages'],
-            ['6', 'Schedule First Lesson', 'Fixed weekly or flexible appointment.', 'schedule'],
-          ].map(([number, title, body, target]) => (
-            <button key={title} onClick={() => target === 'schedule' ? go('/schedule') : (setActive(target), setAdvanced(true))} className="rounded-lg border border-slate-200 bg-white p-4 text-left hover:border-sky-200 hover:bg-sky-50">
-              <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Step {number}</p>
-              <p className="mt-1 font-semibold text-slate-950">{title}</p>
-              <p className="mt-1 text-sm leading-6 text-slate-500">{body}</p>
-            </button>
-          ))}
-        </div>
-        <div className="mt-4"><Button variant="ghost" onClick={() => setAdvanced((value) => !value)}>{advanced ? 'Hide advanced tables' : 'Show advanced tables'}</Button></div>
+      <StudentSetupWizard data={data} reload={reload} toast={toast} profile={profile} onOpenAdvanced={(key) => { setActive(key); setAdvanced(true); }} />
+      <Section title="Advanced records" action={<Button variant="ghost" onClick={() => setAdvanced((value) => !value)}>{advanced ? 'Hide advanced records' : 'Show advanced records'}</Button>}>
+        <p className="text-sm leading-6 text-slate-500">Use these tables for search, editing, CSV export, and unusual corrections. The guided setup above is the easiest way to add a new family.</p>
       </Section>
-      {!advanced ? <EmptyState title="No students yet? Start by adding a family." body="Open the guided steps above. Add the family first, then add students, venue, class, package, and first lesson." action={<Button onClick={() => setAdvanced(true)}>Open advanced tables</Button>} /> : null}
       {advanced ? (
         <>
-          <Section title="Advanced Student Tables">
+          <Section title="Advanced Records">
             <div className="flex flex-wrap gap-2">
               {tabs.map(([key, label]) => (
                 <Button key={key} variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{label}</Button>
@@ -660,6 +646,220 @@ function StudentsHub(props) {
   );
 }
 
+function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
+  const [step, setStep] = useState(0);
+  const [context, setContext] = useState({ customerId: '', studentIds: [], venueId: '', classId: '', packageId: '' });
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+  const [family, setFamily] = useState({ display_name: '', parent_name: '', whatsapp: '', status: 'active' });
+  const [student, setStudent] = useState({ display_name: '', age: '', level: '', safety_alert: '', status: 'active' });
+  const [venue, setVenue] = useState({ venue_name: '', full_address: '', area: '', pool_type: 'condo', google_maps_link: '', active: true });
+  const [clsForm, setClsForm] = useState({ class_name: '', class_type: '1-2', scheduling_mode: 'fixed_weekly', assigned_coach_id: data.coaches[0]?.id || '', default_duration_minutes: 60, photo_required: false, status: 'active' });
+  const [pkgForm, setPkgForm] = useState({ package_type: '8_lessons', total_lessons: 8, used_lessons: 0, remaining_lessons: 8, validity_months: 4, start_date: todayISO(), payment_date: todayISO(), status: 'active' });
+  const [lessonForm, setLessonForm] = useState({ scheduled_date: todayISO(), start_time: '17:00', end_time: '18:00' });
+  const customerId = context.customerId || data.customers[0]?.id || '';
+  const customerStudents = data.students.filter((item) => item.customer_id === customerId);
+  const selectedClass = data.classes.find((item) => item.id === context.classId);
+  const steps = [
+    ['Family', 'Add Family / Customer', 'Parent name and WhatsApp.'],
+    ['Student', 'Add Student(s)', 'Student details, level, and safety notes.'],
+    ['Venue', 'Add Venue / Address', 'Pool address, map, and access notes.'],
+    ['Class', 'Create Class / Group', 'Choose coach, class type, students, and schedule mode.'],
+    ['Package', 'Add Package', 'Set lessons, remaining count, and expiry.'],
+    ['Schedule', 'Schedule First Lesson', 'Create the first lesson appointment.'],
+  ];
+  const saveFamily = async (event) => {
+    event.preventDefault();
+    const { data: saved, error } = await supabase.from('customers').insert({ ...family, parent_name: family.parent_name || family.display_name }).select('*').single();
+    if (error) return toast(error.message);
+    setContext((current) => ({ ...current, customerId: saved.id }));
+    setFamily({ display_name: '', parent_name: '', whatsapp: '', status: 'active' });
+    toast('Family saved. Next: add student details.');
+    await reload();
+    setStep(1);
+  };
+  const saveStudent = async (event) => {
+    event.preventDefault();
+    if (!customerId) return toast('Add or select a family first.');
+    const { data: saved, error } = await supabase.from('students').insert({ ...student, customer_id: customerId, age: student.age ? Number(student.age) : null }).select('*').single();
+    if (error) return toast(error.message);
+    setContext((current) => ({ ...current, studentIds: [...new Set([...current.studentIds, saved.id])] }));
+    setSelectedStudentIds((current) => [...new Set([...current, saved.id])]);
+    setStudent({ display_name: '', age: '', level: '', safety_alert: '', status: 'active' });
+    toast('Student saved. Add another student or continue to venue.');
+    await reload();
+  };
+  const saveVenue = async (event) => {
+    event.preventDefault();
+    const { data: saved, error } = await supabase.from('venues').insert({ ...venue, customer_id: customerId || null }).select('*').single();
+    if (error) return toast(error.message);
+    setContext((current) => ({ ...current, venueId: saved.id }));
+    setVenue({ venue_name: '', full_address: '', area: '', pool_type: 'condo', google_maps_link: '', active: true });
+    toast('Venue saved. Next: create the class/group.');
+    await reload();
+    setStep(3);
+  };
+  const saveClass = async (event) => {
+    event.preventDefault();
+    if (!customerId) return toast('Select a family before creating a class.');
+    const studentIds = selectedStudentIds.length ? selectedStudentIds : customerStudents.map((item) => item.id);
+    const payload = { ...clsForm, customer_id: customerId, assigned_coach_id: clsForm.assigned_coach_id || null, default_venue_id: context.venueId || null, class_name: clsForm.class_name || `${data.customers.find((item) => item.id === customerId)?.display_name || 'Family'} Group` };
+    const { data: saved, error } = await supabase.from('classes').insert(payload).select('*').single();
+    if (error) return toast(error.message);
+    if (studentIds.length) {
+      await supabase.from('class_students').insert(studentIds.map((studentId) => ({ class_id: saved.id, student_id: studentId, active: true })));
+    }
+    setContext((current) => ({ ...current, classId: saved.id }));
+    toast('Class saved. Next: add the package.');
+    await reload();
+    setStep(4);
+  };
+  const savePackage = async (event) => {
+    event.preventDefault();
+    if (!customerId || !context.classId) return toast('Create the family and class before adding a package.');
+    const payload = { ...pkgForm, customer_id: customerId, class_id: context.classId, total_lessons: Number(pkgForm.total_lessons), used_lessons: Number(pkgForm.used_lessons), remaining_lessons: Number(pkgForm.remaining_lessons), validity_months: Number(pkgForm.validity_months) };
+    payload.expiry_date = derivePackageExpiry(payload);
+    const { data: saved, error } = await supabase.from('packages').insert(payload).select('*').single();
+    if (error) return toast(error.message);
+    setContext((current) => ({ ...current, packageId: saved.id }));
+    toast('Package saved. Next: schedule the first lesson.');
+    await reload();
+    setStep(5);
+  };
+  const saveLesson = async (event) => {
+    event.preventDefault();
+    if (!context.classId) return toast('Create a class before scheduling a lesson.');
+    const cls = selectedClass || data.classes.find((item) => item.id === context.classId);
+    const payload = { ...lessonForm, class_id: context.classId, package_id: context.packageId || data.packages.find((item) => item.class_id === context.classId)?.id || null, coach_id: cls?.assigned_coach_id || null, venue_id: cls?.default_venue_id || context.venueId || null, scheduling_mode: cls?.scheduling_mode || 'flexible', duration_minutes: cls?.default_duration_minutes || 60, status: 'scheduled', created_by: profile.id, updated_by: profile.id };
+    const { error } = await supabase.from('lessons').insert(payload);
+    if (error) return toast(error.message);
+    toast('First lesson scheduled.');
+    await reload();
+    go('/schedule');
+  };
+  return (
+    <Section title="New Family Setup">
+      <p className="text-sm leading-6 text-slate-500">Follow these steps from left to right. Each saved step unlocks the next practical action, while full records stay available under Advanced records.</p>
+      <div className="mt-4 grid gap-2 md:grid-cols-6">
+        {steps.map(([short, title, body], index) => (
+          <button key={title} onClick={() => setStep(index)} className={`rounded-lg border p-3 text-left ${step === index ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200'}`}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Step {index + 1}</p>
+            <p className="font-semibold text-slate-950">{short}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">{body}</p>
+          </button>
+        ))}
+      </div>
+      <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+        {step === 0 ? (
+          <form className="grid gap-3" onSubmit={saveFamily}>
+            <WizardHeader title="Step 1: Add Family / Customer" body="Create the parent/customer record first. WhatsApp is kept as text so leading zeroes stay safe." />
+            <div className="grid gap-3 md:grid-cols-3">
+              <Field label="Family display name"><Input required value={family.display_name} onChange={(event) => setFamily({ ...family, display_name: event.target.value })} placeholder="Tan Family" /></Field>
+              <Field label="Parent name"><Input value={family.parent_name} onChange={(event) => setFamily({ ...family, parent_name: event.target.value })} /></Field>
+              <Field label="WhatsApp"><Input value={family.whatsapp} onChange={(event) => setFamily({ ...family, whatsapp: event.target.value })} placeholder="0123456789" /></Field>
+            </div>
+            <WizardActions primary="Save Family" secondary="Open family records" onSecondary={() => onOpenAdvanced('customers')} />
+          </form>
+        ) : null}
+        {step === 1 ? (
+          <form className="grid gap-3" onSubmit={saveStudent}>
+            <WizardHeader title="Step 2: Add Student(s)" body="Add one student at a time. After saving, you can add another student or continue to the venue." />
+            <CustomerPicker data={data} value={customerId} onChange={(value) => setContext((current) => ({ ...current, customerId: value }))} />
+            <div className="grid gap-3 md:grid-cols-4">
+              <Field label="Student name"><Input required value={student.display_name} onChange={(event) => setStudent({ ...student, display_name: event.target.value })} /></Field>
+              <Field label="Age"><Input type="number" value={student.age} onChange={(event) => setStudent({ ...student, age: event.target.value })} /></Field>
+              <Field label="Level"><Input value={student.level} onChange={(event) => setStudent({ ...student, level: event.target.value })} /></Field>
+              <Field label="Safety alert"><Input value={student.safety_alert} onChange={(event) => setStudent({ ...student, safety_alert: event.target.value })} placeholder="Optional" /></Field>
+            </div>
+            <div className="rounded-lg bg-white p-3 text-sm text-slate-600">Students for this family: {customerStudents.map((item) => item.display_name).join(', ') || 'None yet'}</div>
+            <div className="flex flex-wrap gap-2"><Button>Save Student</Button><Button type="button" variant="soft" onClick={() => setStep(2)}>Continue to Venue</Button><Button type="button" variant="ghost" onClick={() => onOpenAdvanced('students')}>Open student records</Button></div>
+          </form>
+        ) : null}
+        {step === 2 ? (
+          <form className="grid gap-3" onSubmit={saveVenue}>
+            <WizardHeader title="Step 3: Add Venue / Address" body="Save where lessons happen. Coaches use this for maps, access notes, and lesson coordination." />
+            <CustomerPicker data={data} value={customerId} onChange={(value) => setContext((current) => ({ ...current, customerId: value }))} />
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="Venue name"><Input value={venue.venue_name} onChange={(event) => setVenue({ ...venue, venue_name: event.target.value })} placeholder="Home pool / Condo pool" /></Field>
+              <Field label="Area"><Input value={venue.area} onChange={(event) => setVenue({ ...venue, area: event.target.value })} /></Field>
+              <Field label="Full address"><Textarea value={venue.full_address} onChange={(event) => setVenue({ ...venue, full_address: event.target.value })} /></Field>
+              <Field label="Google Maps link"><Input value={venue.google_maps_link} onChange={(event) => setVenue({ ...venue, google_maps_link: event.target.value })} /></Field>
+            </div>
+            <WizardActions primary="Save Venue" secondary="Open venue records" onSecondary={() => onOpenAdvanced('venues')} />
+          </form>
+        ) : null}
+        {step === 3 ? (
+          <form className="grid gap-3" onSubmit={saveClass}>
+            <WizardHeader title="Step 4: Create Class / Group" body="Choose the class type, coach, students, and whether the timing is fixed weekly or flexible." />
+            <CustomerPicker data={data} value={customerId} onChange={(value) => setContext((current) => ({ ...current, customerId: value }))} />
+            <div className="grid gap-3 md:grid-cols-3">
+              <Field label="Class / group name"><Input value={clsForm.class_name} onChange={(event) => setClsForm({ ...clsForm, class_name: event.target.value })} /></Field>
+              <Field label="Class type"><Select value={clsForm.class_type} onChange={(event) => setClsForm({ ...clsForm, class_type: event.target.value })}>{classTypes.map((item) => <option key={item}>{item}</option>)}</Select></Field>
+              <Field label="Scheduling mode"><Select value={clsForm.scheduling_mode} onChange={(event) => setClsForm({ ...clsForm, scheduling_mode: event.target.value })}><option value="fixed_weekly">Fixed weekly</option><option value="flexible">Flexible / Coach-arranged</option></Select></Field>
+              <Field label="Assigned coach"><Select value={clsForm.assigned_coach_id || ''} onChange={(event) => setClsForm({ ...clsForm, assigned_coach_id: event.target.value || null })}><option value="">Choose later</option>{data.coaches.map((item) => <option key={item.id} value={item.id}>{item.display_name || item.coach_code}</option>)}</Select></Field>
+              <Field label="Default venue"><Select value={context.venueId || ''} onChange={(event) => setContext((current) => ({ ...current, venueId: event.target.value }))}><option value="">Choose later</option>{data.venues.filter((item) => !customerId || item.customer_id === customerId).map((item) => <option key={item.id} value={item.id}>{item.venue_name || item.area || item.full_address}</option>)}</Select></Field>
+              <label className="mt-7 flex items-center gap-2 text-sm font-medium text-slate-600"><input type="checkbox" checked={clsForm.photo_required} onChange={(event) => setClsForm({ ...clsForm, photo_required: event.target.checked })} /> Photo required</label>
+            </div>
+            <div className="rounded-lg bg-white p-3">
+              <p className="text-sm font-semibold text-slate-700">Students in this class</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {customerStudents.length === 0 ? <span className="text-sm text-slate-500">No students for this family yet.</span> : customerStudents.map((item) => (
+                  <label key={item.id} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"><input type="checkbox" checked={selectedStudentIds.includes(item.id)} onChange={(event) => setSelectedStudentIds((current) => event.target.checked ? [...new Set([...current, item.id])] : current.filter((id) => id !== item.id))} /> {item.display_name}</label>
+                ))}
+              </div>
+            </div>
+            <WizardActions primary="Save Class" secondary="Open class records" onSecondary={() => onOpenAdvanced('classes')} />
+          </form>
+        ) : null}
+        {step === 4 ? (
+          <form className="grid gap-3" onSubmit={savePackage}>
+            <WizardHeader title="Step 5: Add Package" body="Set the shared package for this family/group. Group lessons deduct one lesson per completed group lesson after Admin approval." />
+            <div className="grid gap-3 md:grid-cols-4">
+              <Field label="Package type"><Select value={pkgForm.package_type} onChange={(event) => {
+                const total = event.target.value === 'single' ? 1 : Number(event.target.value.split('_')[0]) || 8;
+                setPkgForm({ ...pkgForm, package_type: event.target.value, total_lessons: total, remaining_lessons: total });
+              }}>{packageTypes.map((item) => <option key={item}>{item}</option>)}</Select></Field>
+              <Field label="Total lessons"><Input type="number" value={pkgForm.total_lessons} onChange={(event) => setPkgForm({ ...pkgForm, total_lessons: Number(event.target.value), remaining_lessons: Number(event.target.value) })} /></Field>
+              <Field label="Start date"><Input type="date" value={pkgForm.start_date} onChange={(event) => setPkgForm({ ...pkgForm, start_date: event.target.value, payment_date: event.target.value })} /></Field>
+              <Field label="Validity months"><Input type="number" value={pkgForm.validity_months} onChange={(event) => setPkgForm({ ...pkgForm, validity_months: Number(event.target.value) })} /></Field>
+            </div>
+            <WizardActions primary="Save Package" secondary="Open package records" onSecondary={() => onOpenAdvanced('packages')} />
+          </form>
+        ) : null}
+        {step === 5 ? (
+          <form className="grid gap-3" onSubmit={saveLesson}>
+            <WizardHeader title="Step 6: Schedule First Lesson" body="Create the first lesson appointment. Use Schedule later for recurring weekly generation or coach-arranged flexible lessons." />
+            <div className="grid gap-3 md:grid-cols-3">
+              <Field label="Lesson date"><Input type="date" value={lessonForm.scheduled_date} onChange={(event) => setLessonForm({ ...lessonForm, scheduled_date: event.target.value })} /></Field>
+              <Field label="Start time"><Input type="time" value={lessonForm.start_time} onChange={(event) => setLessonForm({ ...lessonForm, start_time: event.target.value })} /></Field>
+              <Field label="End time"><Input type="time" value={lessonForm.end_time} onChange={(event) => setLessonForm({ ...lessonForm, end_time: event.target.value })} /></Field>
+            </div>
+            <div className="flex flex-wrap gap-2"><Button>Schedule Lesson</Button><Button type="button" variant="ghost" onClick={() => go('/schedule')}>Open full Schedule</Button></div>
+          </form>
+        ) : null}
+      </div>
+    </Section>
+  );
+}
+
+function WizardHeader({ title, body }) {
+  return <div><h3 className="font-semibold text-slate-950">{title}</h3><p className="mt-1 text-sm leading-6 text-slate-500">{body}</p></div>;
+}
+
+function WizardActions({ primary, secondary, onSecondary }) {
+  return <div className="flex flex-wrap gap-2"><Button>{primary}</Button><Button type="button" variant="ghost" onClick={onSecondary}>{secondary}</Button></div>;
+}
+
+function CustomerPicker({ data, value, onChange }) {
+  return (
+    <Field label="Family / customer">
+      <Select value={value || ''} onChange={(event) => onChange(event.target.value)}>
+        <option value="">Choose family</option>
+        {data.customers.map((item) => <option key={item.id} value={item.id}>{item.display_name || item.customer_code}</option>)}
+      </Select>
+    </Field>
+  );
+}
+
 function CustomersPage({ profile, data, reload, toast }) {
   const isAdmin = profile.role === 'admin';
   const coach = data.coaches.find((item) => item.profile_id === profile.id);
@@ -671,6 +871,7 @@ function CustomersPage({ profile, data, reload, toast }) {
       table="customers"
       rows={rows}
       canEdit={isAdmin}
+      addLabel="Add Family"
       reload={reload}
       toast={toast}
       onRowClick={(row) => go(`/customers/${row.id}`)}
@@ -712,7 +913,13 @@ function MoneyPage(props) {
   return (
     <div className="grid gap-5">
       <Section title="Money">
-        <p className="text-sm leading-6 text-slate-500">Admin-only finance workspace for payments, payroll, expenses, and export/accounting checks.</p>
+        <p className="text-sm leading-6 text-slate-500">Admin-only monthly records. Payments are money received from customers, Payroll is coach salary to pay, Expenses are business costs, and Summary is the simple monthly view for records/accounting.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-4">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950">Summary</p><p className="mt-1 text-sm text-slate-500">Quick monthly picture.</p></div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950">Payments</p><p className="mt-1 text-sm text-slate-500">Money received from customers.</p></div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950">Payroll</p><p className="mt-1 text-sm text-slate-500">Coach salary to pay.</p></div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950">Expenses</p><p className="mt-1 text-sm text-slate-500">Business costs and receipts.</p></div>
+        </div>
         <div className="mt-4 flex flex-wrap gap-2">
           {tabs.map(([key, label]) => <Button key={key} variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{label}</Button>)}
         </div>
@@ -765,7 +972,7 @@ function MorePage(props) {
 function moreToolDescription(key) {
   return {
     help: 'Simple owner and coach guide for daily use.',
-    'system-check': 'Run setup, access, bucket, and data checks.',
+    'system-check': 'Check whether the OS is ready and see what to fix first.',
     import: 'Bring in old Google Sheet CSV data.',
     cleanup: 'Find missing names, address, age, consent, coach, and proof records.',
     reports: 'Monthly lesson, renewal, payment, expense, and payroll exports.',
@@ -798,7 +1005,7 @@ function HelpPage({ profile }) {
             ['Schedule', 'Use Fixed Weekly for regular classes and Flexible Lesson for coach-arranged appointments. Rescheduling one lesson does not change the whole weekly pattern.'],
             ['Review', 'Approve, request edit, or reject coach submissions. Approval is the moment package deduction and payroll creation happen.'],
             ['Money', 'Admin-only area for payments, payroll, expenses, and exports. Coaches do not see prices, payments, company income, or expenses.'],
-            ['System Check', 'Run this after setup, demo seed, or any permission issue. It tells you what passed, what needs attention, and the next action.'],
+            ['Setup Check', 'Run this after setup, demo seed, or any permission issue. It tells you what passed, what needs attention, and the next action.'],
           ].map(([title, body]) => (
             <div key={title} className="rounded-lg border border-slate-200 bg-white p-4">
               <p className="font-semibold text-slate-950">{title}</p>
@@ -826,7 +1033,7 @@ function HelpPage({ profile }) {
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => go('/dashboard')}>Open Today</Button>
           {isAdmin ? <Button variant="soft" onClick={() => go('/students')}>Setup Student</Button> : null}
-          <Button variant="ghost" onClick={() => go('/system-check')}>Run System Check</Button>
+          <Button variant="ghost" onClick={() => go('/system-check')}>Run Setup Check</Button>
         </div>
         <p className="mt-3 text-sm leading-6 text-slate-500">For a full explanation, open docs/ty-swim-academy-os-user-guide.md in the repository. For external UX feedback, share docs/ty-swim-academy-os-ux-review-pack.md.</p>
       </Section>
@@ -836,6 +1043,7 @@ function HelpPage({ profile }) {
 
 function SystemCheckPage({ session, profile, data }) {
   const [bucketState, setBucketState] = useState({ loading: true, checks: [], error: '' });
+  const [showDetails, setShowDetails] = useState(false);
   useEffect(() => {
     let cancelled = false;
     async function run() {
@@ -904,6 +1112,12 @@ function SystemCheckPage({ session, profile, data }) {
     checkRow('Coach cannot edit approved lesson', 'warning', 'Protected by schema trigger prevent_coach_sensitive_lesson_update when schema.sql is applied.', 'Approve a demo lesson, log in as Coach, and confirm the lesson detail is read-only or run qa:check.'),
   ];
   const rows = [...baseRows, ...(isAdmin ? adminRows : coachRows)];
+  const failCount = rows.filter((row) => row.status === 'fail').length;
+  const warningCount = rows.filter((row) => row.status === 'warning').length;
+  const setupTitle = failCount === 0 && warningCount === 0 ? 'Ready to use' : failCount > 0 ? `${failCount} thing${failCount === 1 ? '' : 's'} need fixing` : `${warningCount} thing${warningCount === 1 ? '' : 's'} need attention`;
+  const setupBody = failCount === 0 && warningCount === 0
+    ? 'Your OS is connected and ready for testing.'
+    : rows.find((row) => row.status === 'fail')?.nextAction || rows.find((row) => row.status === 'warning')?.nextAction || 'Review the details below.';
   const counts = [
     ['Coaches', data.coaches.length],
     ['Customers', data.customers.length],
@@ -914,18 +1128,28 @@ function SystemCheckPage({ session, profile, data }) {
   ];
   return (
     <div className="grid gap-5">
-      <Section title="System Check">
-        <p className="text-sm leading-6 text-slate-500">Run this after setting up Supabase or loading demo data. Each row explains what is wrong and the next practical action.</p>
-        <DataTable rows={rows} columns={[
-          { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status}>{row.label}</StatusBadge> },
-          { key: 'check', label: 'Check' },
-          { key: 'detail', label: 'Result' },
-          { key: 'nextAction', label: 'Next action' },
-        ]} />
+      <Section title="Setup Check" action={<Button variant="ghost" onClick={() => setShowDetails((value) => !value)}>{showDetails ? 'Hide advanced details' : 'Show advanced details'}</Button>}>
+        <div className={`rounded-lg border p-4 ${failCount ? 'border-rose-100 bg-rose-50' : warningCount ? 'border-amber-100 bg-amber-50' : 'border-emerald-100 bg-emerald-50'}`}>
+          <p className="text-lg font-semibold text-slate-950">{setupTitle}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-700">{setupBody}</p>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <Card title="Passed" value={rows.filter((row) => row.status === 'pass').length} tone="green" />
+          <Card title="Needs attention" value={warningCount} tone="amber" />
+          <Card title="Needs fixing" value={failCount} tone="rose" />
+        </div>
       </Section>
-      <Section title="Recommended Next Action">
-        <p className="text-sm leading-6 text-slate-600">{rows.find((row) => row.status === 'fail')?.nextAction || rows.find((row) => row.status === 'warning')?.nextAction || 'Looks good. Try the Admin and Coach demo flow next.'}</p>
-      </Section>
+      {showDetails ? (
+        <Section title="Advanced Details">
+          <p className="mb-4 text-sm leading-6 text-slate-500">These details are useful for setup and support. They include connection settings, role checks, private storage, table access, demo data, and security checks.</p>
+          <DataTable rows={rows} columns={[
+            { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status}>{row.label}</StatusBadge> },
+            { key: 'check', label: 'Check' },
+            { key: 'detail', label: 'Result' },
+            { key: 'nextAction', label: 'Next action' },
+          ]} />
+        </Section>
+      ) : null}
       <Section title="Basic Data Counts">
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
           {counts.map(([label, value]) => <Card key={label} title={label} value={value} tone={value > 0 ? 'sky' : 'amber'} />)}
@@ -1055,6 +1279,7 @@ function StudentsPage({ profile, data, reload, toast }) {
       table="students"
       rows={rows}
       canEdit={isAdmin}
+      addLabel="Add Student"
       reload={reload}
       toast={toast}
       fields={[
@@ -1095,6 +1320,7 @@ function VenuesPage({ profile, data, reload, toast }) {
       table="venues"
       rows={rows}
       canEdit={isAdmin}
+      addLabel="Add Venue"
       reload={reload}
       toast={toast}
       fields={[
@@ -1134,6 +1360,7 @@ function ClassesPage({ profile, data, reload, toast }) {
         table="classes"
         rows={rows}
         canEdit={isAdmin}
+        addLabel="Add Class"
         reload={reload}
         toast={toast}
         extraAction={isAdmin ? (row) => <Button variant="soft" onClick={(event) => { event.stopPropagation(); setStudentModal(row); }}>Students</Button> : null}
@@ -1209,6 +1436,7 @@ function PackagesPage({ profile, data, reload, toast }) {
       table="packages"
       rows={rows}
       canEdit={isAdmin}
+      addLabel="Add Package"
       reload={reload}
       toast={toast}
       normalize={(form) => ({ ...form, expiry_date: form.expiry_date || derivePackageExpiry(form) })}
@@ -1244,7 +1472,8 @@ function PackagesPage({ profile, data, reload, toast }) {
 function LessonsPage({ profile, data, reload, toast }) {
   const isAdmin = profile.role === 'admin';
   const coach = data.coaches.find((item) => item.profile_id === profile.id);
-  const [filters, setFilters] = useState({ dateFrom: todayISO().slice(0, 8) + '01', dateTo: '', coach: '', classId: '', status: '', mode: '', pending: false, replacement: false });
+  const [activeMode, setActiveMode] = useState('fixed_weekly');
+  const [filters, setFilters] = useState({ dateFrom: todayISO().slice(0, 8) + '01', dateTo: '', coach: '', classId: '', status: '', pending: false, replacement: false });
   const [showFilters, setShowFilters] = useState(false);
   const [recurring, setRecurring] = useState(null);
   const [flexible, setFlexible] = useState(null);
@@ -1254,7 +1483,6 @@ function LessonsPage({ profile, data, reload, toast }) {
       && (!filters.coach || lesson.coach_id === filters.coach)
       && (!filters.classId || lesson.class_id === filters.classId)
       && (!filters.status || lesson.status === filters.status)
-      && (!filters.mode || lesson.scheduling_mode === filters.mode)
       && (!filters.pending || ['completed_pending_review', 'cancelled_pending_review'].includes(lesson.status))
       && (!filters.replacement || lesson.need_replacement);
   });
@@ -1265,53 +1493,62 @@ function LessonsPage({ profile, data, reload, toast }) {
 
   return (
     <div className="grid gap-5">
-      <Section title="Schedule" action={<div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">{isAdmin ? <Button variant="soft" onClick={() => setRecurring({})}>Fixed Weekly</Button> : null}<Button onClick={() => setFlexible({})}>Flexible Lesson</Button><Button variant="ghost" onClick={() => setShowFilters((value) => !value)}>{showFilters ? 'Hide Filters' : 'Filters'}</Button></div>}>
-        <p className="text-sm leading-6 text-slate-500">Fixed Weekly is the regular timetable. Flexible is for coach-arranged appointments. Changing one lesson does not change the weekly pattern.</p>
+      <Section title="Schedule" action={<div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">{activeMode === 'fixed_weekly' && isAdmin ? <Button onClick={() => setRecurring({})}>Generate Upcoming Lessons</Button> : null}{activeMode === 'flexible' ? <Button onClick={() => setFlexible({})}>Create Flexible Lesson</Button> : null}<Button variant="ghost" onClick={() => setShowFilters((value) => !value)}>{showFilters ? 'Hide advanced filters' : 'Advanced filters'}</Button></div>}>
+        <p className="text-sm leading-6 text-slate-500">Choose one mode at a time. Fixed Weekly is for regular weekly classes. Flexible is for lessons arranged by coach and customer.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <button className="rounded-lg border border-sky-100 bg-sky-50 p-4 text-left" onClick={() => setFilters({ ...filters, mode: 'fixed_weekly' })}>
+          <button className={`rounded-lg border p-4 text-left ${activeMode === 'fixed_weekly' ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50'}`} onClick={() => setActiveMode('fixed_weekly')}>
             <p className="font-semibold text-slate-950">Fixed Weekly</p>
-            <p className="mt-1 text-sm text-slate-600">{fixedSchedules.length} recurring schedule(s), {fixedLessons.length} generated lesson(s) in this view.</p>
+            <p className="mt-1 text-sm text-slate-600">Regular weekly classes. Rescheduling one lesson does not change the weekly pattern.</p>
+            <p className="mt-2 text-xs font-semibold text-sky-700">{fixedSchedules.length} schedule(s), {fixedLessons.length} lesson(s)</p>
           </button>
-          <button className="rounded-lg border border-slate-200 bg-white p-4 text-left hover:border-sky-200 hover:bg-sky-50" onClick={() => setFilters({ ...filters, mode: 'flexible' })}>
+          <button className={`rounded-lg border p-4 text-left ${activeMode === 'flexible' ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50'}`} onClick={() => setActiveMode('flexible')}>
             <p className="font-semibold text-slate-950">Flexible / Coach-arranged</p>
-            <p className="mt-1 text-sm text-slate-600">{flexibleClasses.length} flexible class(es), {flexibleLessons.length} lesson appointment(s) in this view.</p>
+            <p className="mt-1 text-sm text-slate-600">Appointment-style lessons arranged with the customer in WhatsApp.</p>
+            <p className="mt-2 text-xs font-semibold text-sky-700">{flexibleClasses.length} class(es), {flexibleLessons.length} appointment(s)</p>
           </button>
         </div>
       </Section>
-      {showFilters ? <Section title="Filters">
-        <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-8">
+      {showFilters ? <Section title="Advanced Filters">
+        <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-7">
           <Field label="From"><Input type="date" value={filters.dateFrom} onChange={(event) => setFilters({ ...filters, dateFrom: event.target.value })} /></Field>
           <Field label="To"><Input type="date" value={filters.dateTo} onChange={(event) => setFilters({ ...filters, dateTo: event.target.value })} /></Field>
           <Field label="Coach"><Select value={filters.coach} onChange={(event) => setFilters({ ...filters, coach: event.target.value })}><option value="">All</option>{data.coaches.map((item) => <option key={item.id} value={item.id}>{item.display_name}</option>)}</Select></Field>
           <Field label="Class"><Select value={filters.classId} onChange={(event) => setFilters({ ...filters, classId: event.target.value })}><option value="">All</option>{data.classes.map((item) => <option key={item.id} value={item.id}>{item.class_name}</option>)}</Select></Field>
           <Field label="Status"><Select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option value="">All</option>{['scheduled', 'rescheduled', 'completed_pending_review', 'cancelled_pending_review', 'needs_edit', 'approved', 'rejected', 'archived'].map((item) => <option key={item} value={item}>{item}</option>)}</Select></Field>
-          <Field label="Mode"><Select value={filters.mode} onChange={(event) => setFilters({ ...filters, mode: event.target.value })}><option value="">All</option><option value="fixed_weekly">Fixed weekly</option><option value="flexible">Flexible</option></Select></Field>
           <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={filters.pending} onChange={(event) => setFilters({ ...filters, pending: event.target.checked })} /> Pending review</label>
           <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={filters.replacement} onChange={(event) => setFilters({ ...filters, replacement: event.target.checked })} /> Replacement</label>
         </div>
       </Section> : null}
-      {isAdmin ? (
-        <Section title="Fixed Weekly Schedules">
-          <DataTable rows={fixedSchedules} empty="No fixed weekly schedule yet." columns={[
-            { key: 'class', label: 'Class', render: (row) => data.classes.find((cls) => cls.id === row.class_id)?.class_name || '-' },
-            { key: 'day', label: 'Day', render: (row) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][row.day_of_week] || '-' },
-            { key: 'time', label: 'Time', render: (row) => `${row.start_time || ''} - ${row.end_time || ''}` },
-            { key: 'coach', label: 'Coach', render: (row) => data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-' },
-            { key: 'venue', label: 'Venue', render: (row) => data.venues.find((item) => item.id === row.venue_id)?.venue_name || data.venues.find((item) => item.id === row.venue_id)?.area || '-' },
-            { key: 'next', label: 'Next lesson', render: (row) => data.lessons.filter((lesson) => lesson.recurring_schedule_id === row.id && lesson.scheduled_date >= todayISO()).sort((a, b) => String(a.scheduled_date).localeCompare(String(b.scheduled_date)))[0]?.scheduled_date || '-' },
-          ]} />
-        </Section>
+      {activeMode === 'fixed_weekly' ? (
+        <>
+          <Section title="Fixed Weekly Schedules" action={isAdmin ? <Button onClick={() => setRecurring({})}>Generate Upcoming Lessons</Button> : null}>
+            <p className="mb-4 text-sm leading-6 text-slate-500">Use this for families/classes with the same usual day and time every week. Generated lesson occurrences can still be rescheduled one by one.</p>
+            <DataTable rows={fixedSchedules} empty="No fixed weekly schedule yet." columns={[
+              { key: 'class', label: 'Class', render: (row) => data.classes.find((cls) => cls.id === row.class_id)?.class_name || '-' },
+              { key: 'day', label: 'Day', render: (row) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][row.day_of_week] || '-' },
+              { key: 'time', label: 'Time', render: (row) => `${row.start_time || ''} - ${row.end_time || ''}` },
+              { key: 'coach', label: 'Coach', render: (row) => data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-' },
+              { key: 'venue', label: 'Venue', render: (row) => data.venues.find((item) => item.id === row.venue_id)?.venue_name || data.venues.find((item) => item.id === row.venue_id)?.area || '-' },
+              { key: 'next', label: 'Next lesson', render: (row) => data.lessons.filter((lesson) => lesson.recurring_schedule_id === row.id && lesson.scheduled_date >= todayISO()).sort((a, b) => String(a.scheduled_date).localeCompare(String(b.scheduled_date)))[0]?.scheduled_date || '-' },
+            ]} />
+          </Section>
+          <LessonList title="Upcoming Fixed Weekly Lessons" rows={fixedLessons} data={data} coachView={!isAdmin} empty="No fixed weekly lessons in this view." />
+        </>
       ) : null}
-      <LessonList title="Fixed Weekly Lessons" rows={fixedLessons} data={data} coachView={!isAdmin} empty="No fixed weekly lessons in this view." />
-      <Section title="Flexible Classes Needing Arrangement">
-        <DataTable rows={flexibleClasses} empty="No flexible classes." columns={[
-          { key: 'class_name', label: 'Class / Group' },
-          { key: 'coach', label: 'Coach', render: (row) => data.coaches.find((item) => item.id === row.assigned_coach_id)?.display_name || '-' },
-          { key: 'students', label: 'Students', render: (row) => classStudentNames(row.id, data) },
-          { key: 'action', label: 'Action', render: () => <Button onClick={(event) => { event.stopPropagation(); setFlexible({}); }}>Create appointment</Button> },
-        ]} />
-      </Section>
-      <LessonList title="Flexible Lessons" rows={flexibleLessons} data={data} coachView={!isAdmin} empty="No flexible lessons in this view." />
+      {activeMode === 'flexible' ? (
+        <>
+          <Section title="Flexible Classes Needing Appointment" action={<Button onClick={() => setFlexible({})}>Create Flexible Lesson</Button>}>
+            <p className="mb-4 text-sm leading-6 text-slate-500">Use this for classes where coach and customer arrange each lesson time directly. Coach-created or rescheduled appointments appear for Admin attention.</p>
+            <DataTable rows={flexibleClasses} empty="No flexible classes." columns={[
+              { key: 'class_name', label: 'Class / Group' },
+              { key: 'coach', label: 'Coach', render: (row) => data.coaches.find((item) => item.id === row.assigned_coach_id)?.display_name || '-' },
+              { key: 'students', label: 'Students', render: (row) => classStudentNames(row.id, data) },
+              { key: 'action', label: 'Action', render: () => <Button onClick={(event) => { event.stopPropagation(); setFlexible({}); }}>Create appointment</Button> },
+            ]} />
+          </Section>
+          <LessonList title="Upcoming Flexible Lessons" rows={flexibleLessons} data={data} coachView={!isAdmin} empty="No flexible lessons in this view." />
+        </>
+      ) : null}
       {recurring ? <RecurringModal data={data} reload={reload} toast={toast} onClose={() => setRecurring(null)} /> : null}
       {flexible ? <FlexibleLessonModal profile={profile} data={data} reload={reload} toast={toast} onClose={() => setFlexible(null)} /> : null}
     </div>
@@ -1337,6 +1574,7 @@ function RecurringModal({ data, reload, toast, onClose }) {
   return (
     <Modal title="Create Fixed Weekly Schedule" onClose={onClose}>
       <form className="grid gap-3" onSubmit={save}>
+        <p className="rounded-lg bg-sky-50 p-3 text-sm leading-6 text-sky-800">Generate weeks means how many upcoming weekly lesson appointments to create now. For example, 8 creates the next 8 weekly lessons. Rescheduling one generated lesson later will not change this weekly pattern.</p>
         <Field label="Class"><Select value={schedule.class_id} onChange={(event) => setSchedule({ ...schedule, class_id: event.target.value })}>{data.classes.map((item) => <option key={item.id} value={item.id}>{item.class_name}</option>)}</Select></Field>
         <Field label="Coach"><Select value={schedule.coach_id} onChange={(event) => setSchedule({ ...schedule, coach_id: event.target.value })}>{data.coaches.map((item) => <option key={item.id} value={item.id}>{item.display_name}</option>)}</Select></Field>
         <Field label="Venue"><Select value={schedule.venue_id} onChange={(event) => setSchedule({ ...schedule, venue_id: event.target.value })}>{data.venues.map((item) => <option key={item.id} value={item.id}>{item.venue_name || item.area}</option>)}</Select></Field>
@@ -1355,7 +1593,7 @@ function RecurringModal({ data, reload, toast, onClose }) {
 
 function FlexibleLessonModal({ profile, data, reload, toast, onClose }) {
   const coach = data.coaches.find((item) => item.profile_id === profile.id);
-  const classOptions = profile.role === 'admin' ? data.classes : data.classes.filter((item) => item.assigned_coach_id === coach?.id && item.scheduling_mode === 'flexible');
+  const classOptions = profile.role === 'admin' ? data.classes.filter((item) => item.scheduling_mode === 'flexible') : data.classes.filter((item) => item.assigned_coach_id === coach?.id && item.scheduling_mode === 'flexible');
   const selectedClass = classOptions[0];
   const [lesson, setLesson] = useState({ class_id: selectedClass?.id || '', package_id: data.packages.find((pkg) => pkg.class_id === selectedClass?.id)?.id || '', coach_id: coach?.id || selectedClass?.assigned_coach_id || '', venue_id: selectedClass?.default_venue_id || '', scheduling_mode: 'flexible', scheduled_date: todayISO(), start_time: '17:00', end_time: '18:00', duration_minutes: 60, status: 'scheduled', count_package_lesson: true, coach_payable: true });
   const save = async (event) => {
@@ -1445,7 +1683,7 @@ function LessonDetail({ profile, pathInfo, data, reload, toast }) {
     const { error } = await supabase.from('lessons').update({ status, coach_submitted_at: new Date().toISOString(), updated_by: profile.id }).eq('id', lesson.id);
     if (error) toast(error.message);
     else {
-      toast('Lesson submitted for Admin review');
+      toast('Record submitted for Admin review.');
       await reload();
     }
   };
@@ -1549,6 +1787,9 @@ function LessonDetail({ profile, pathInfo, data, reload, toast }) {
 
 function CoachLessonSubmission({ lesson, cls, customer, venue, data, form, setForm, participants, setParticipants, rescheduleReason, setRescheduleReason, coachLocked, saveLesson, submitReview, reload, toast }) {
   const photoRequired = Boolean(cls?.photo_required || lesson.photo_required);
+  const [showScheduleChange, setShowScheduleChange] = useState(false);
+  const [outcome, setOutcome] = useState(lesson.status === 'cancelled_pending_review' ? 'cancelled' : 'completed');
+  const submitted = ['completed_pending_review', 'cancelled_pending_review'].includes(lesson.status);
   return (
     <div className="grid gap-5">
       <Section title={cls?.class_name || lesson.lesson_code} action={<Button variant="ghost" onClick={() => go('/schedule')}>Back</Button>}>
@@ -1560,17 +1801,31 @@ function CoachLessonSubmission({ lesson, cls, customer, venue, data, form, setFo
           <Info label="Venue" value={venue?.full_address || venue?.venue_name || '-'} />
           <Info label="Photo" value={photoRequired ? <StatusBadge value="needs_edit">Required</StatusBadge> : 'Optional'} />
         </div>
-        <p className="mt-4 rounded-lg bg-rose-50 p-3 text-sm font-medium text-rose-700">{studentAlerts(cls, data) || 'No health/safety alerts recorded.'}</p>
+        {studentAlerts(cls, data) ? <p className="mt-4 rounded-lg border border-rose-100 bg-rose-50 p-3 text-sm font-semibold text-rose-700">Safety alert: {studentAlerts(cls, data)}</p> : <p className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm font-medium text-emerald-700">No health/safety alerts recorded.</p>}
       </Section>
       <Section title={coachLocked ? 'Approved Lesson Record' : 'Submit Lesson Record'}>
-        {coachLocked ? <p className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm font-medium text-emerald-700">This lesson is approved and read-only.</p> : null}
-        <div className="grid gap-3 md:grid-cols-4">
-          <Field label="Lesson date"><Input disabled={coachLocked} type="date" value={form.scheduled_date || ''} onChange={(event) => setForm({ ...form, scheduled_date: event.target.value })} /></Field>
-          <Field label="Start"><Input disabled={coachLocked} type="time" value={form.start_time || ''} onChange={(event) => setForm({ ...form, start_time: event.target.value })} /></Field>
-          <Field label="End"><Input disabled={coachLocked} type="time" value={form.end_time || ''} onChange={(event) => setForm({ ...form, end_time: event.target.value })} /></Field>
-          <Field label="Reschedule reason"><Input disabled={coachLocked} value={rescheduleReason} onChange={(event) => setRescheduleReason(event.target.value)} placeholder="Only if time changed" /></Field>
-        </div>
-        <div className="mt-4 grid gap-3">
+        {coachLocked ? <p className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">Approved - no further action needed. This lesson is read-only.</p> : null}
+        {submitted && !coachLocked ? <p className="mb-4 rounded-lg bg-sky-50 p-3 text-sm font-semibold text-sky-700">Record submitted for Admin review.</p> : null}
+        {!coachLocked ? (
+          <div className="mb-4 grid gap-3 rounded-lg border border-sky-100 bg-sky-50 p-3 sm:grid-cols-[1fr_auto] sm:items-end">
+            <Field label="Lesson result">
+              <Select value={outcome} onChange={(event) => setOutcome(event.target.value)}>
+                <option value="completed">Lesson completed</option>
+                <option value="cancelled">Lesson cancelled</option>
+              </Select>
+            </Field>
+            <Button type="button" variant="ghost" onClick={() => setShowScheduleChange((value) => !value)}>{showScheduleChange ? 'Hide date/time change' : 'Change date/time'}</Button>
+          </div>
+        ) : null}
+        {showScheduleChange ? (
+          <div className="mb-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-4">
+            <Field label="Lesson date"><Input disabled={coachLocked} type="date" value={form.scheduled_date || ''} onChange={(event) => setForm({ ...form, scheduled_date: event.target.value })} /></Field>
+            <Field label="Start time"><Input disabled={coachLocked} type="time" value={form.start_time || ''} onChange={(event) => setForm({ ...form, start_time: event.target.value })} /></Field>
+            <Field label="End time"><Input disabled={coachLocked} type="time" value={form.end_time || ''} onChange={(event) => setForm({ ...form, end_time: event.target.value })} /></Field>
+            <Field label="Reschedule reason"><Input disabled={coachLocked} value={rescheduleReason} onChange={(event) => setRescheduleReason(event.target.value)} placeholder="Required if time changed" /></Field>
+          </div>
+        ) : null}
+        <div className="grid gap-3">
           {participants.map((item, index) => {
             const student = data.students.find((row) => row.id === item.student_id);
             return (
@@ -1592,10 +1847,9 @@ function CoachLessonSubmission({ lesson, cls, customer, venue, data, form, setFo
         </div>
         <Field label="Coach note"><Textarea disabled={coachLocked} value={form.coach_notes || ''} onChange={(event) => setForm({ ...form, coach_notes: event.target.value })} placeholder="Optional note for Admin" /></Field>
         <LessonPhotos lesson={lesson} data={data} reload={reload} toast={toast} disabled={coachLocked} />
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="sticky bottom-3 mt-4 flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white/95 p-3 shadow-lg shadow-slate-200/70 backdrop-blur">
           <Button variant="ghost" onClick={saveLesson} disabled={coachLocked}>Save draft</Button>
-          <Button onClick={() => submitReview('completed_pending_review')} disabled={coachLocked}>Lesson completed</Button>
-          <Button variant="soft" onClick={() => submitReview('cancelled_pending_review')} disabled={coachLocked}>Lesson cancelled</Button>
+          <Button className="min-h-12 flex-1 text-base sm:flex-none" onClick={() => submitReview(outcome === 'cancelled' ? 'cancelled_pending_review' : 'completed_pending_review')} disabled={coachLocked}>Submit Record</Button>
         </div>
       </Section>
     </div>
@@ -1692,6 +1946,7 @@ function AuditPanels({ lesson, data }) {
 
 function ReviewPage({ data, reload, toast }) {
   const [active, setActive] = useState('pending');
+  const [showTable, setShowTable] = useState(false);
   const groups = {
     pending: data.lessons.filter((lesson) => lesson.status === 'completed_pending_review'),
     rescheduled: data.lessons.filter((lesson) => data.lesson_change_logs.some((log) => log.lesson_id === lesson.id && !log.admin_seen)),
@@ -1722,7 +1977,7 @@ function ReviewPage({ data, reload, toast }) {
   return (
     <div className="grid gap-5">
       <Section title="Review">
-        <p className="text-sm leading-6 text-slate-500">Approve straightforward records here. Open a lesson when you need to check attendance notes, photos, package counting, or payroll settings.</p>
+        <p className="text-sm leading-6 text-slate-500">Use this like an approval inbox. Each card shows what Admin needs before approving, requesting an edit, or rejecting.</p>
         <div className="mt-4 flex flex-wrap gap-2">
           {[
             ['pending', 'Pending lesson records'],
@@ -1733,24 +1988,36 @@ function ReviewPage({ data, reload, toast }) {
           ].map(([key, label]) => <Button key={key} variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{label} ({groups[key].length})</Button>)}
         </div>
       </Section>
-      <Section title="Review Queue">
+      <Section title="Approval Inbox" action={<Button variant="ghost" onClick={() => setShowTable((value) => !value)}>{showTable ? 'Hide detailed records' : 'Show detailed records'}</Button>}>
         {rows.length === 0 ? <EmptyState title="No review needed" body="This category is clear. New coach submissions and schedule changes will appear here." /> : (
-          <div className="mb-4 grid gap-3 lg:grid-cols-2">
-            {rows.slice(0, 4).map((lesson) => {
+          <div className="grid gap-3 lg:grid-cols-2">
+            {rows.map((lesson) => {
               const cls = data.classes.find((item) => item.id === lesson.class_id);
+              const coach = data.coaches.find((item) => item.id === lesson.coach_id);
+              const pkg = data.packages.find((item) => item.id === lesson.package_id);
+              const photoCount = (data.lesson_photos || []).filter((photo) => photo.lesson_id === lesson.id).length;
+              const photoRequired = cls?.photo_required && photoCount === 0;
               return (
-                <article key={lesson.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <article key={lesson.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-sky-700">{formatDate(lesson.scheduled_date)} {lesson.start_time || ''}</p>
                       <h3 className="mt-1 font-semibold text-slate-950">{cls?.class_name || lesson.lesson_code}</h3>
-                      <p className="mt-1 text-sm text-slate-500">{lesson.lesson_code}</p>
+                      <p className="mt-1 text-sm text-slate-500">{classStudentNames(cls?.id, data)}</p>
                     </div>
                     <StatusBadge value={lesson.status} />
                   </div>
+                  <div className="mt-4 grid gap-2 text-sm text-slate-600">
+                    <p><span className="font-semibold text-slate-800">Coach:</span> {coach?.display_name || '-'}</p>
+                    <p><span className="font-semibold text-slate-800">Package:</span> {pkg?.package_code || 'No linked package'}{pkg ? `, ${pkg.remaining_lessons} lesson(s) left` : ''}</p>
+                    <p><span className="font-semibold text-slate-800">Notes:</span> {lesson.coach_notes || 'No coach note'}</p>
+                    <p><span className="font-semibold text-slate-800">Photos:</span> {photoRequired ? <StatusBadge value="needs_edit">Missing required photo</StatusBadge> : `${photoCount} uploaded`}</p>
+                  </div>
+                  <p className={`mt-4 rounded-lg p-3 text-sm font-medium ${lesson.status === 'cancelled_pending_review' ? 'bg-amber-50 text-amber-800' : 'bg-sky-50 text-sky-800'}`}>{approvalImpactText(lesson)}</p>
                   <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                     <Button onClick={() => approve(lesson)}>Approve</Button>
-                    <Button variant="soft" onClick={() => updateStatus(lesson, 'needs_edit')}>Needs Edit</Button>
+                    <Button variant="soft" onClick={() => updateStatus(lesson, 'needs_edit')}>Request edit</Button>
+                    <Button variant="danger" onClick={() => updateStatus(lesson, 'rejected')}>Reject</Button>
                     <Button variant="ghost" onClick={() => go(`/lessons/${lesson.id}`)}>Open</Button>
                   </div>
                 </article>
@@ -1758,21 +2025,32 @@ function ReviewPage({ data, reload, toast }) {
             })}
           </div>
         )}
-        <DataTable rows={rows} empty="No pending review in this category." onRowClick={(row) => go(`/lessons/${row.id}`)} columns={[
-          { key: 'lesson_code', label: 'Lesson' },
-          { key: 'date', label: 'Date', render: (row) => `${row.scheduled_date} ${row.start_time || ''}` },
-          { key: 'class', label: 'Class', render: (row) => data.classes.find((cls) => cls.id === row.class_id)?.class_name || '-' },
-          { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status} /> },
-          { key: 'photo', label: 'Photo', render: (row) => {
-            const cls = data.classes.find((item) => item.id === row.class_id);
-            const count = (data.lesson_photos || []).filter((photo) => photo.lesson_id === row.id).length;
-            return cls?.photo_required && count === 0 ? <StatusBadge value="needs_edit">Missing required</StatusBadge> : count;
-          } },
-          { key: 'action', label: 'Actions', render: (row) => <div className="flex flex-wrap gap-2"><Button onClick={(event) => { event.stopPropagation(); approve(row); }}>Approve</Button><Button variant="soft" onClick={(event) => { event.stopPropagation(); updateStatus(row, 'needs_edit'); }}>Request edit</Button><Button variant="danger" onClick={(event) => { event.stopPropagation(); updateStatus(row, 'rejected'); }}>Reject</Button></div> },
-        ]} />
+        {showTable ? (
+          <div className="mt-4">
+            <DataTable rows={rows} empty="No pending review in this category." onRowClick={(row) => go(`/lessons/${row.id}`)} columns={[
+              { key: 'lesson_code', label: 'Lesson' },
+              { key: 'date', label: 'Date', render: (row) => `${row.scheduled_date} ${row.start_time || ''}` },
+              { key: 'class', label: 'Class', render: (row) => data.classes.find((cls) => cls.id === row.class_id)?.class_name || '-' },
+              { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status} /> },
+              { key: 'photo', label: 'Photo', render: (row) => {
+                const cls = data.classes.find((item) => item.id === row.class_id);
+                const count = (data.lesson_photos || []).filter((photo) => photo.lesson_id === row.id).length;
+                return cls?.photo_required && count === 0 ? <StatusBadge value="needs_edit">Missing required</StatusBadge> : count;
+              } },
+              { key: 'action', label: 'Actions', render: (row) => <div className="flex flex-wrap gap-2"><Button onClick={(event) => { event.stopPropagation(); approve(row); }}>Approve</Button><Button variant="soft" onClick={(event) => { event.stopPropagation(); updateStatus(row, 'needs_edit'); }}>Request edit</Button><Button variant="danger" onClick={(event) => { event.stopPropagation(); updateStatus(row, 'rejected'); }}>Reject</Button></div> },
+            ]} />
+          </div>
+        ) : null}
       </Section>
     </div>
   );
+}
+
+function approvalImpactText(lesson) {
+  const packageText = lesson.count_package_lesson ? 'deduct 1 lesson from the package' : 'not deduct a package lesson';
+  const payrollText = lesson.coach_payable ? 'create one coach payroll item' : 'not create a coach payroll item';
+  if (lesson.status === 'cancelled_pending_review') return `Approving this cancellation will ${packageText} and ${payrollText}, based on the current lesson flags.`;
+  return `Approving this lesson will ${packageText} and ${payrollText}.`;
 }
 
 function PayrollPage({ profile, data, reload, toast }) {
@@ -1838,6 +2116,7 @@ function PaymentsPage({ data, reload, toast }) {
       table="package_financials"
       rows={data.package_financials}
       canEdit
+      addLabel="Add Payment"
       reload={reload}
       toast={toast}
       uploadBucket="payment-proofs"
@@ -1870,6 +2149,7 @@ function ExpensesPage({ data, reload, toast }) {
       table="expenses"
       rows={data.expenses}
       canEdit
+      addLabel="Add Expense"
       reload={reload}
       toast={toast}
       uploadBucket="expense-receipts"
@@ -2049,6 +2329,7 @@ function SettingsPage({ data, reload, toast }) {
         table="profiles"
         rows={data.profiles}
         canEdit
+        addLabel="Add User"
         reload={reload}
         toast={toast}
         fields={[
@@ -2069,6 +2350,7 @@ function SettingsPage({ data, reload, toast }) {
         table="coaches"
         rows={data.coaches}
         canEdit
+        addLabel="Add Coach"
         reload={reload}
         toast={toast}
         fields={[
@@ -2093,6 +2375,7 @@ function SettingsPage({ data, reload, toast }) {
         table="coach_rates"
         rows={data.coach_rates || []}
         canEdit
+        addLabel="Add Rate"
         reload={reload}
         toast={toast}
         fields={[
@@ -2115,14 +2398,14 @@ function SettingsPage({ data, reload, toast }) {
   );
 }
 
-function RecordManager({ title, table, rows, fields, columns, canEdit, reload, toast, onRowClick, normalize, extraAction, uploadBucket }) {
+function RecordManager({ title, table, rows, fields, columns, canEdit, addLabel = 'Add New', reload, toast, onRowClick, normalize, extraAction, uploadBucket }) {
   const [query, setQuery] = useState('');
   const [modal, setModal] = useState(null);
   const visible = rows.filter((row) => JSON.stringify(row).toLowerCase().includes(query.toLowerCase()));
   const tableColumns = columns.map(([key, label, render]) => ({ key, label, render }));
   if (canEdit) tableColumns.push({ key: 'actions', label: 'Actions', render: (row) => <div className="flex gap-2"><Button variant="ghost" onClick={(event) => { event.stopPropagation(); setModal(row); }}>Edit</Button>{extraAction?.(row)}</div> });
   return (
-    <Section title={title} action={<div className="flex flex-wrap gap-2"><Input placeholder="Search" value={query} onChange={(event) => setQuery(event.target.value)} />{canEdit ? <Button onClick={() => setModal({})}>Add New</Button> : null}<Button variant="ghost" onClick={() => downloadCsv(`ty-${table}-${todayISO()}.csv`, visible)}>Export CSV</Button></div>}>
+    <Section title={title} action={<div className="flex flex-wrap gap-2"><Input placeholder="Search" value={query} onChange={(event) => setQuery(event.target.value)} />{canEdit ? <Button onClick={() => setModal({})}>{addLabel}</Button> : null}<Button variant="ghost" onClick={() => downloadCsv(`ty-${table}-${todayISO()}.csv`, visible)}>Export CSV</Button></div>}>
       <DataTable rows={visible} columns={tableColumns} onRowClick={onRowClick} />
       {modal ? (
         <Modal title={`${modal.id ? 'Edit' : 'New'} ${title}`} onClose={() => setModal(null)} wide>

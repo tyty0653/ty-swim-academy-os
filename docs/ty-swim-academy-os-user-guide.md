@@ -132,7 +132,7 @@ Coach cannot see:
 
 ## 3. Admin Navigation
 
-Admin navigation has six main items: Today, Students, Schedule, Review, Money, and More. System Check is available from Today and More.
+Admin navigation has six main items: Today, Students, Schedule, Review, Money, and More. Setup Check is available from Today and More.
 
 ### Today
 
@@ -155,7 +155,7 @@ Important buttons:
 - Add Family: opens the guided Students workflow
 - Schedule Lesson: opens Schedule
 - Review Lessons: opens Review
-- System Check: opens setup and permission checks
+- Setup Check: opens setup and permission checks
 
 Data updated: Today itself mostly reads data. Buttons take you to pages that create or update records.
 
@@ -163,9 +163,9 @@ Warning: Pending review should be checked before assuming packages or payroll ar
 
 ### Students
 
-Purpose: beginner-friendly setup flow for customer/family records.
+Purpose: beginner-friendly setup wizard for customer/family records.
 
-Use this page when adding a new family. The default screen shows six steps:
+Use this page when adding a new family. The default screen shows a real six-step setup wizard:
 
 1. Add Family / Customer
 2. Add Student(s)
@@ -174,7 +174,7 @@ Use this page when adding a new family. The default screen shows six steps:
 5. Add Package
 6. Schedule First Lesson
 
-The advanced tables are hidden until you click `Show advanced tables`.
+Each step has a focused form and guides you to the next step after saving. The advanced tables are hidden under `Advanced records`.
 
 Advanced tables:
 
@@ -292,7 +292,7 @@ Purpose: advanced and occasional tools so the daily menu stays simple.
 Tools:
 
 - Help Guide: simple in-app usage summary
-- System Check: setup, permission, storage, and demo-data checks
+- Setup Check: setup, permission, storage, and demo-data checks
 - CSV Import: import old Google Sheet CSV data
 - Data Cleanup: find missing important data
 - Reports: lesson, payment, expense, payroll, and renewal exports
@@ -301,7 +301,7 @@ Tools:
 
 Use More when setup, troubleshooting, import, reports, or advanced data management is needed.
 
-### System Check
+### Setup Check
 
 Purpose: beginner-friendly setup and permission check page.
 
@@ -333,7 +333,7 @@ If a check fails, read the Next action column.
 
 ## 4. Coach Navigation
 
-Coach navigation has four main items: Today, My Schedule, My Students, and My Pay. Coach can also open System Check directly.
+Coach navigation has four main items: Today, My Schedule, My Students, and My Pay. Coach can also open Setup Check directly.
 
 ### Today
 
@@ -423,9 +423,9 @@ Coach does not see:
 - company expenses
 - customer payments
 
-### Coach System Check
+### Coach Setup Check
 
-Coach can open System Check directly, usually from the Coach Check button on Today or by going to `/system-check`.
+Coach can open Setup Check directly, usually from the Setup Check button on Today or by going to `/system-check`.
 
 This helps confirm:
 
@@ -444,7 +444,7 @@ Admin:
 1. Open Students.
 2. Click Step 1 Add Family / Customer.
 3. Open advanced table if needed.
-4. Click Add New in Customers / Families.
+4. Click Add Family in Customers / Families if using advanced records.
 5. Enter display name, parent name, WhatsApp, secondary contact, source, status, and optional internal notes.
 6. Save.
 
@@ -456,7 +456,7 @@ Admin:
 
 1. Open Students.
 2. Click Step 2 Add Student(s).
-3. Click Add New in Students.
+3. Click Add Student in Students if using advanced records.
 4. Choose the family/customer.
 5. Enter display name, age, gender, level, learning goal, health notes, special needs, safety alert, preferred language, and status.
 6. Save.
@@ -469,7 +469,7 @@ Admin:
 
 1. Open Students.
 2. Click Step 3 Add Venue / Address.
-3. Click Add New in Venues.
+3. Click Add Venue in Venues if using advanced records.
 4. Choose customer if the venue belongs to a family.
 5. Enter venue name, address, area, pool type, map link, parking/access/entry/depth notes.
 6. Save.
@@ -482,7 +482,7 @@ Admin:
 
 1. Open Students.
 2. Click Step 4 Create Class / Group.
-3. Click Add New in Classes / Groups.
+3. Click Add Class in Classes / Groups if using advanced records.
 4. Choose customer, class type, scheduling mode, assigned coach, default venue, duration, photo required, and status.
 5. Save.
 6. In the Classes / Groups table, use the Students action to add the student(s) into the class/group.
@@ -495,7 +495,7 @@ Admin:
 
 1. Open Students.
 2. Click Step 5 Add Package.
-3. Click Add New in Packages.
+3. Click Add Package in Packages if using advanced records.
 4. Choose customer and class.
 5. Select package type and enter total lessons.
 6. Enter used/remaining lessons if needed.
@@ -623,19 +623,19 @@ Admin:
 
 Coach cannot access expense receipts.
 
-### 16. System Check Usage
+### 16. Setup Check Usage
 
 Admin:
 
 1. Open More.
-2. Open System Check.
+2. Open Setup Check.
 3. Read pass/warning/fail rows.
 4. Follow the Next action text.
 5. Check Basic Data Counts.
 
 Coach:
 
-1. Open Coach Check from Today or go to `/system-check`.
+1. Open Setup Check from Today or go to `/system-check`.
 2. Confirm assigned lessons/students are visible.
 3. Confirm finance is hidden.
 
@@ -648,8 +648,8 @@ Use demo seed only in a test Supabase project.
 3. Open `supabase/demo-seed.sql`.
 4. Replace the Admin and Coach Auth ID variables where the file instructs you.
 5. Run the SQL in Supabase SQL Editor.
-6. Log in as Admin and open System Check.
-7. Log in as Coach and open System Check.
+6. Log in as Admin and open Setup Check.
+7. Log in as Coach and open Setup Check.
 
 Demo rows use `DEMO-*` codes so they can be reset without deleting future real records.
 
@@ -660,7 +660,7 @@ Do not mix demo data with real customer data in production.
 | Button / Action | Page | Role | What it does | Side effect / warning |
 | --- | --- | --- | --- | --- |
 | Add Family | Today / Students | Admin | Opens Students guided workflow | Creates customer data when saved |
-| Add New | Advanced tables | Admin | Opens a modal to create a new row | The row depends on the table currently open |
+| Add Family / Add Student / Add Venue / Add Class / Add Package | Advanced records | Admin | Opens a modal to create the matching record type | Use the setup wizard first for normal new families |
 | Add Student | Students workflow | Admin | Opens student setup area | Student should be linked to a family |
 | Add Class | Students workflow / classes table | Admin | Creates class/group | Must assign coach and schedule mode carefully |
 | Add Package | Students workflow / packages table | Admin | Creates package | Package count must match paid package |
@@ -684,7 +684,7 @@ Do not mix demo data with real customer data in production.
 | Upload Expense Receipt | Expenses | Admin | Uploads receipt | Admin-only private bucket |
 | Export CSV | Tables / Money / Reports | Admin mostly, Coach where allowed | Downloads visible rows | Be careful not to share exported sensitive data |
 | Import preview rows | CSV Import | Admin | Imports mapped CSV rows | Use test data first; phone numbers are text |
-| Run System Check | Today / More / direct | Admin / Coach | Checks setup and access | Coach check proves coach-scoped view only |
+| Run Setup Check | Today / More / direct | Admin / Coach | Checks setup and access | Coach check proves coach-scoped view only |
 | Open | Review / cleanup | Admin | Opens detailed record | Use for records needing inspection |
 | Delete lesson photo | Lesson detail | Admin | Deletes photo from storage and row | Confirm before deleting |
 
