@@ -80,8 +80,8 @@ export function Section({ title, action, children, className = '' }) {
 
 export function DataTable({ columns, rows, empty = 'No records yet.', onRowClick, className = '' }) {
   return (
-    <div className={cn('overflow-auto rounded-lg border border-slate-200', className)}>
-      <table className="min-w-full text-left text-sm">
+    <div className={cn('max-w-full overflow-x-auto rounded-lg border border-slate-200', className)}>
+      <table className="min-w-[680px] text-left text-sm md:min-w-full">
         <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
           <tr>{columns.map((column) => <th key={column.key} className="whitespace-nowrap px-3 py-3">{column.label}</th>)}</tr>
         </thead>

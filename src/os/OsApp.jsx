@@ -257,6 +257,9 @@ function StaffAccessIssue({ issue }) {
 function OsShell({ session, profile, pathInfo, data, reload, toast, children }) {
   const isAdmin = profile.role === 'admin';
   const nav = isAdmin ? adminNav : coachNav;
+  const mobileNav = isAdmin
+    ? adminNav.filter(([key]) => ['dashboard', 'students', 'schedule', 'review', 'more'].includes(key))
+    : coachNav;
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -279,25 +282,48 @@ function OsShell({ session, profile, pathInfo, data, reload, toast, children }) 
       </aside>
       <div className="lg:pl-64">
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:px-6">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center justify-between gap-3 lg:hidden">
+            <div>
+              <p className="text-xs font-semibold text-sky-700">TY Swim OS · {isAdmin ? 'Admin' : 'Coach'}</p>
+              <h2 className="text-lg font-semibold leading-tight text-slate-950">{pageTitle(pathInfo)}</h2>
+            </div>
+            <Button variant="ghost" onClick={() => go('/more')}>More</Button>
+          </div>
+          <div className="hidden items-center justify-between gap-3 lg:flex">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">{profile.role}</p>
               <h2 className="text-xl font-semibold text-slate-950">{pageTitle(pathInfo)}</h2>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <select className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm lg:hidden" value={nav.find(([, href]) => href === pathInfo.path)?.[1] || `/${pathInfo.section}`} onChange={(event) => go(event.target.value)}>
-                {nav.map(([key, href, label]) => <option key={key} value={href}>{label}</option>)}
-              </select>
+            <div className="flex items-center gap-2">
               <Button variant="ghost" onClick={() => go('/dashboard')}>Dashboard</Button>
               <Button variant="ghost" onClick={signOut}>Sign out</Button>
             </div>
           </div>
         </header>
-        <main className="mx-auto max-w-7xl p-4 lg:p-6">
-          <RoutePage session={session} profile={profile} pathInfo={pathInfo} data={data} reload={reload} toast={toast} />
+        <main className="mx-auto max-w-7xl p-3 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:p-4 sm:pb-[calc(6rem+env(safe-area-inset-bottom))] lg:p-6">
+          <RoutePage session={session} profile={profile} pathInfo={pathInfo} data={data} reload={reload} toast={toast} signOut={signOut} />
         </main>
+        <MobileBottomNav nav={mobileNav} pathInfo={pathInfo} />
       </div>
     </div>
+  );
+}
+
+function MobileBottomNav({ nav, pathInfo }) {
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-2 pb-[calc(0.35rem+env(safe-area-inset-bottom))] pt-2 shadow-xl shadow-slate-300/40 backdrop-blur lg:hidden">
+      <div className="mx-auto grid max-w-md gap-1" style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0, 1fr))` }}>
+        {nav.map(([key, href, label]) => {
+          const active = activeNav(pathInfo, key) || (key === 'more' && ['money', 'payments', 'expenses'].includes(pathInfo.section));
+          const shortLabel = label.replace('My ', '');
+          return (
+            <button key={key} onClick={() => go(href)} className={`min-h-12 rounded-xl px-1 text-xs font-semibold ${active ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-sky-50 hover:text-sky-700'}`}>
+              {shortLabel}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
@@ -561,9 +587,9 @@ function NextActionList({ rows }) {
 function LessonList({ title, rows, data, coachView = false, empty = 'No lessons yet.' }) {
   return (
     <Section title={title}>
-      {coachView ? <LessonCardList rows={rows} data={data} empty={empty} /> : null}
+      <LessonCardList rows={rows} data={data} empty={empty} coachView={coachView} />
       <DataTable
-        className={coachView ? 'hidden md:block' : ''}
+        className="hidden md:block"
         rows={rows}
         empty={empty}
         onRowClick={(row) => go(`/lessons/${row.id}`)}
@@ -584,7 +610,7 @@ function LessonList({ title, rows, data, coachView = false, empty = 'No lessons 
   );
 }
 
-function LessonCardList({ rows, data, empty }) {
+function LessonCardList({ rows, data, empty, coachView = false }) {
   if (rows.length === 0) return <EmptyState title="No lessons found" body={empty} />;
   return (
     <div className="grid gap-3 md:hidden">
@@ -592,17 +618,30 @@ function LessonCardList({ rows, data, empty }) {
         const cls = data.classes.find((item) => item.id === lesson.class_id);
         const customer = data.customers.find((item) => item.id === cls?.customer_id);
         const venue = data.venues.find((item) => item.id === lesson.venue_id);
+        const whatsapp = customer?.whatsapp || '';
+        const mapsLink = venue?.google_maps_link || '';
+        const approved = lesson.status === 'approved';
         return (
-          <button key={lesson.id} onClick={() => go(`/lessons/${lesson.id}`)} className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm">
+          <article key={lesson.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-sky-700">{formatDate(lesson.scheduled_date)} {lesson.start_time || ''}</p>
                 <p className="mt-1 font-semibold text-slate-950">{cls?.class_name || lesson.lesson_code}</p>
+                <p className="mt-1 text-sm text-slate-600">{classStudentNames(cls?.id, data)}</p>
                 <p className="mt-1 text-sm text-slate-500">{venue?.area || venue?.venue_name || customer?.whatsapp || '-'}</p>
               </div>
               <StatusBadge value={lesson.status} />
             </div>
-          </button>
+            <div className="mt-4 grid gap-2">
+              <Button onClick={() => go(`/lessons/${lesson.id}`)}>{coachView ? (approved ? 'Approved' : 'Submit / Open') : 'Open'}</Button>
+              {coachView ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? 'WhatsApp' : 'No WhatsApp'}</a>
+                  <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? 'Map' : 'No map'}</a>
+                </div>
+              ) : null}
+            </div>
+          </article>
         );
       })}
     </div>
@@ -666,6 +705,14 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
     ['Class', 'Create Class / Group', 'Choose coach, class type, students, and schedule mode.'],
     ['Package', 'Add Package', 'Set lessons, remaining count, and expiry.'],
     ['Schedule', 'Schedule First Lesson', 'Create the first lesson appointment.'],
+  ];
+  const completedSteps = [
+    Boolean(context.customerId),
+    customerStudents.length > 0 || context.studentIds.length > 0,
+    Boolean(context.venueId),
+    Boolean(context.classId),
+    Boolean(context.packageId),
+    false,
   ];
   const saveFamily = async (event) => {
     event.preventDefault();
@@ -742,13 +789,18 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
       <div className="mt-4 grid gap-2 md:grid-cols-6">
         {steps.map(([short, title, body], index) => (
           <button key={title} onClick={() => setStep(index)} className={`rounded-lg border p-3 text-left ${step === index ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200'}`}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Step {index + 1}</p>
-            <p className="font-semibold text-slate-950">{short}</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">{body}</p>
+            <div className="flex items-center justify-between gap-3 md:block">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Step {index + 1}</p>
+                <p className="font-semibold text-slate-950">{short}</p>
+              </div>
+              <span className={`text-sm font-semibold md:mt-2 md:block ${completedSteps[index] ? 'text-emerald-600' : step === index ? 'text-sky-700' : 'text-slate-300'}`}>{completedSteps[index] ? '✓' : step === index ? 'Open' : '›'}</span>
+            </div>
+            <p className={`${step === index ? 'block' : 'hidden'} mt-2 text-xs leading-5 text-slate-500 md:block`}>{body}</p>
           </button>
         ))}
       </div>
-      <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:p-4">
         {step === 0 ? (
           <form className="grid gap-3" onSubmit={saveFamily}>
             <WizardHeader title="Step 1: Add Family / Customer" body="Create the parent/customer record first. WhatsApp is kept as text so leading zeroes stay safe." />
@@ -771,7 +823,7 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
               <Field label="Safety alert"><Input value={student.safety_alert} onChange={(event) => setStudent({ ...student, safety_alert: event.target.value })} placeholder="Optional" /></Field>
             </div>
             <div className="rounded-lg bg-white p-3 text-sm text-slate-600">Students for this family: {customerStudents.map((item) => item.display_name).join(', ') || 'None yet'}</div>
-            <div className="flex flex-wrap gap-2"><Button>Save Student</Button><Button type="button" variant="soft" onClick={() => setStep(2)}>Continue to Venue</Button><Button type="button" variant="ghost" onClick={() => onOpenAdvanced('students')}>Open student records</Button></div>
+            <div className="grid gap-2 sm:flex sm:flex-wrap"><Button className="w-full sm:w-auto">Save Student</Button><Button className="w-full sm:w-auto" type="button" variant="soft" onClick={() => setStep(2)}>Continue to Venue</Button><Button className="w-full sm:w-auto" type="button" variant="ghost" onClick={() => onOpenAdvanced('students')}>Open student records</Button></div>
           </form>
         ) : null}
         {step === 2 ? (
@@ -833,7 +885,7 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
               <Field label="Start time"><Input type="time" value={lessonForm.start_time} onChange={(event) => setLessonForm({ ...lessonForm, start_time: event.target.value })} /></Field>
               <Field label="End time"><Input type="time" value={lessonForm.end_time} onChange={(event) => setLessonForm({ ...lessonForm, end_time: event.target.value })} /></Field>
             </div>
-            <div className="flex flex-wrap gap-2"><Button>Schedule Lesson</Button><Button type="button" variant="ghost" onClick={() => go('/schedule')}>Open full Schedule</Button></div>
+            <div className="grid gap-2 sm:flex sm:flex-wrap"><Button className="w-full sm:w-auto">Schedule Lesson</Button><Button className="w-full sm:w-auto" type="button" variant="ghost" onClick={() => go('/schedule')}>Open full Schedule</Button></div>
           </form>
         ) : null}
       </div>
@@ -846,7 +898,7 @@ function WizardHeader({ title, body }) {
 }
 
 function WizardActions({ primary, secondary, onSecondary }) {
-  return <div className="flex flex-wrap gap-2"><Button>{primary}</Button><Button type="button" variant="ghost" onClick={onSecondary}>{secondary}</Button></div>;
+  return <div className="grid gap-2 sm:flex sm:flex-wrap"><Button className="w-full sm:w-auto">{primary}</Button><Button className="w-full sm:w-auto" type="button" variant="ghost" onClick={onSecondary}>{secondary}</Button></div>;
 }
 
 function CustomerPicker({ data, value, onChange }) {
@@ -947,18 +999,27 @@ function MoneyPage(props) {
 }
 
 function MorePage(props) {
-  const tools = legacyAdminRoutes.filter(([key]) => ['help', 'system-check', 'import', 'cleanup', 'reports', 'settings', 'customers', 'venues', 'classes', 'packages', 'lessons'].includes(key));
+  const { signOut } = props;
+  const tools = [
+    ['money', '/money', 'Money'],
+    ...legacyAdminRoutes.filter(([key]) => ['help', 'system-check', 'customers', 'venues', 'classes', 'packages', 'lessons', 'import', 'cleanup', 'reports', 'settings'].includes(key)),
+  ];
   return (
     <div className="grid gap-5">
       <Section title="More">
         <p className="text-sm leading-6 text-slate-500">Advanced and occasional tools live here so the daily menu stays simple.</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {tools.map(([key, href, label]) => (
-            <button key={key} onClick={() => go(href)} className="rounded-lg border border-slate-200 bg-white p-4 text-left hover:border-sky-200 hover:bg-sky-50">
+            <button key={key} onClick={() => go(href)} className="flex min-h-14 items-center justify-between rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-sky-200 hover:bg-sky-50 sm:block sm:min-h-0 sm:p-4">
               <p className="font-semibold text-slate-950">{label}</p>
-              <p className="mt-1 text-sm text-slate-500">{moreToolDescription(key)}</p>
+              <p className="hidden text-sm text-slate-500 sm:mt-1 sm:block">{moreToolDescription(key)}</p>
+              <span className="text-slate-300 sm:hidden">›</span>
             </button>
           ))}
+          <button onClick={signOut} className="flex min-h-14 items-center justify-between rounded-lg border border-rose-100 bg-rose-50 p-3 text-left font-semibold text-rose-700 hover:bg-rose-100 sm:hidden">
+            Sign out
+            <span className="text-rose-300">›</span>
+          </button>
         </div>
       </Section>
       <Section title="Users and Coach Rates">
@@ -971,6 +1032,7 @@ function MorePage(props) {
 
 function moreToolDescription(key) {
   return {
+    money: 'Payments, payroll, expenses, and accounting summary.',
     help: 'Simple owner and coach guide for daily use.',
     'system-check': 'Check whether the OS is ready and see what to fix first.',
     import: 'Bring in old Google Sheet CSV data.',
@@ -1521,9 +1583,10 @@ function LessonsPage({ profile, data, reload, toast }) {
       </Section> : null}
       {activeMode === 'fixed_weekly' ? (
         <>
-          <Section title="Fixed Weekly Schedules" action={isAdmin ? <Button onClick={() => setRecurring({})}>Generate Upcoming Lessons</Button> : null}>
+          <Section title="Fixed Weekly Schedules">
             <p className="mb-4 text-sm leading-6 text-slate-500">Use this for families/classes with the same usual day and time every week. Generated lesson occurrences can still be rescheduled one by one.</p>
-            <DataTable rows={fixedSchedules} empty="No fixed weekly schedule yet." columns={[
+            <FixedScheduleCardList rows={fixedSchedules} data={data} />
+            <DataTable className="hidden md:block" rows={fixedSchedules} empty="No fixed weekly schedule yet." columns={[
               { key: 'class', label: 'Class', render: (row) => data.classes.find((cls) => cls.id === row.class_id)?.class_name || '-' },
               { key: 'day', label: 'Day', render: (row) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][row.day_of_week] || '-' },
               { key: 'time', label: 'Time', render: (row) => `${row.start_time || ''} - ${row.end_time || ''}` },
@@ -1539,7 +1602,8 @@ function LessonsPage({ profile, data, reload, toast }) {
         <>
           <Section title="Flexible Classes Needing Appointment" action={<Button onClick={() => setFlexible({})}>Create Flexible Lesson</Button>}>
             <p className="mb-4 text-sm leading-6 text-slate-500">Use this for classes where coach and customer arrange each lesson time directly. Coach-created or rescheduled appointments appear for Admin attention.</p>
-            <DataTable rows={flexibleClasses} empty="No flexible classes." columns={[
+            <FlexibleClassCardList rows={flexibleClasses} data={data} onCreate={() => setFlexible({})} />
+            <DataTable className="hidden md:block" rows={flexibleClasses} empty="No flexible classes." columns={[
               { key: 'class_name', label: 'Class / Group' },
               { key: 'coach', label: 'Coach', render: (row) => data.coaches.find((item) => item.id === row.assigned_coach_id)?.display_name || '-' },
               { key: 'students', label: 'Students', render: (row) => classStudentNames(row.id, data) },
@@ -1551,6 +1615,49 @@ function LessonsPage({ profile, data, reload, toast }) {
       ) : null}
       {recurring ? <RecurringModal data={data} reload={reload} toast={toast} onClose={() => setRecurring(null)} /> : null}
       {flexible ? <FlexibleLessonModal profile={profile} data={data} reload={reload} toast={toast} onClose={() => setFlexible(null)} /> : null}
+    </div>
+  );
+}
+
+function FixedScheduleCardList({ rows, data }) {
+  if (rows.length === 0) return <div className="md:hidden"><EmptyState title="No fixed weekly schedule yet" body="Create one when a class has a regular weekly day and time." /></div>;
+  return (
+    <div className="grid gap-3 md:hidden">
+      {rows.map((row) => {
+        const cls = data.classes.find((item) => item.id === row.class_id);
+        const coach = data.coaches.find((item) => item.id === row.coach_id);
+        const venue = data.venues.find((item) => item.id === row.venue_id);
+        const nextLesson = data.lessons.filter((lesson) => lesson.recurring_schedule_id === row.id && lesson.scheduled_date >= todayISO()).sort((a, b) => String(a.scheduled_date).localeCompare(String(b.scheduled_date)))[0];
+        return (
+          <article key={row.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-sky-700">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][row.day_of_week] || '-'} · {row.start_time || ''} - {row.end_time || ''}</p>
+                <h3 className="mt-1 font-semibold text-slate-950">{cls?.class_name || '-'}</h3>
+                <p className="mt-1 text-sm text-slate-500">{coach?.display_name || '-'} · {venue?.venue_name || venue?.area || 'Venue not set'}</p>
+              </div>
+              <StatusBadge value={row.status}>{row.status}</StatusBadge>
+            </div>
+            <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">Next lesson: {nextLesson?.scheduled_date || '-'}</p>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function FlexibleClassCardList({ rows, data, onCreate }) {
+  if (rows.length === 0) return <div className="md:hidden"><EmptyState title="No flexible classes" body="Flexible classes will appear here when they need appointments." /></div>;
+  return (
+    <div className="grid gap-3 md:hidden">
+      {rows.map((row) => (
+        <article key={row.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="font-semibold text-slate-950">{row.class_name}</p>
+          <p className="mt-1 text-sm text-slate-500">{data.coaches.find((item) => item.id === row.assigned_coach_id)?.display_name || 'Coach not set'}</p>
+          <p className="mt-1 text-sm text-slate-600">{classStudentNames(row.id, data)}</p>
+          <Button className="mt-4 w-full" onClick={onCreate}>Create appointment</Button>
+        </article>
+      ))}
     </div>
   );
 }
@@ -1847,7 +1954,7 @@ function CoachLessonSubmission({ lesson, cls, customer, venue, data, form, setFo
         </div>
         <Field label="Coach note"><Textarea disabled={coachLocked} value={form.coach_notes || ''} onChange={(event) => setForm({ ...form, coach_notes: event.target.value })} placeholder="Optional note for Admin" /></Field>
         <LessonPhotos lesson={lesson} data={data} reload={reload} toast={toast} disabled={coachLocked} />
-        <div className="sticky bottom-3 mt-4 flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white/95 p-3 shadow-lg shadow-slate-200/70 backdrop-blur">
+        <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] mt-4 flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white/95 p-3 shadow-lg shadow-slate-200/70 backdrop-blur lg:bottom-3">
           <Button variant="ghost" onClick={saveLesson} disabled={coachLocked}>Save draft</Button>
           <Button className="min-h-12 flex-1 text-base sm:flex-none" onClick={() => submitReview(outcome === 'cancelled' ? 'cancelled_pending_review' : 'completed_pending_review')} disabled={coachLocked}>Submit Record</Button>
         </div>
@@ -1978,14 +2085,14 @@ function ReviewPage({ data, reload, toast }) {
     <div className="grid gap-5">
       <Section title="Review">
         <p className="text-sm leading-6 text-slate-500">Use this like an approval inbox. Each card shows what Admin needs before approving, requesting an edit, or rejecting.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible">
           {[
             ['pending', 'Pending lesson records'],
             ['rescheduled', 'Rescheduled lessons'],
             ['cancelled', 'Cancelled lessons'],
             ['needs_edit', 'Needs edit'],
             ['missing_photos', 'Missing required photos'],
-          ].map(([key, label]) => <Button key={key} variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{label} ({groups[key].length})</Button>)}
+          ].map(([key, label]) => <Button key={key} className="whitespace-nowrap" variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{label} ({groups[key].length})</Button>)}
         </div>
       </Section>
       <Section title="Approval Inbox" action={<Button variant="ghost" onClick={() => setShowTable((value) => !value)}>{showTable ? 'Hide detailed records' : 'Show detailed records'}</Button>}>
@@ -2014,11 +2121,11 @@ function ReviewPage({ data, reload, toast }) {
                     <p><span className="font-semibold text-slate-800">Photos:</span> {photoRequired ? <StatusBadge value="needs_edit">Missing required photo</StatusBadge> : `${photoCount} uploaded`}</p>
                   </div>
                   <p className={`mt-4 rounded-lg p-3 text-sm font-medium ${lesson.status === 'cancelled_pending_review' ? 'bg-amber-50 text-amber-800' : 'bg-sky-50 text-sky-800'}`}>{approvalImpactText(lesson)}</p>
-                  <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                    <Button onClick={() => approve(lesson)}>Approve</Button>
-                    <Button variant="soft" onClick={() => updateStatus(lesson, 'needs_edit')}>Request edit</Button>
-                    <Button variant="danger" onClick={() => updateStatus(lesson, 'rejected')}>Reject</Button>
-                    <Button variant="ghost" onClick={() => go(`/lessons/${lesson.id}`)}>Open</Button>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:flex xl:flex-wrap">
+                    <Button className="w-full xl:w-auto" onClick={() => approve(lesson)}>Approve</Button>
+                    <Button className="w-full xl:w-auto" variant="soft" onClick={() => updateStatus(lesson, 'needs_edit')}>Request edit</Button>
+                    <Button className="w-full xl:w-auto" variant="danger" onClick={() => updateStatus(lesson, 'rejected')}>Reject</Button>
+                    <Button className="w-full xl:w-auto" variant="ghost" onClick={() => go(`/lessons/${lesson.id}`)}>Open</Button>
                   </div>
                 </article>
               );
@@ -2087,7 +2194,8 @@ function PayrollPage({ profile, data, reload, toast }) {
       </div>
       <Section title={isAdmin ? 'Generate Payroll' : 'My Expected Payroll'} action={isAdmin ? <div className="flex gap-2"><Input type="month" value={month} onChange={(event) => setMonth(event.target.value)} /><Button onClick={generate}>Generate</Button><Button variant="ghost" onClick={() => downloadCsv(`ty-payroll-${month}.csv`, items)}>Export CSV</Button></div> : null}>
         {!isAdmin ? <p className="mb-4 text-sm leading-6 text-slate-500">This shows approved lessons that count toward your pay. Payments marked paid will appear as paid here.</p> : null}
-        <DataTable rows={periods} columns={[
+        <PayrollPeriodCards rows={periods} data={data} isAdmin={isAdmin} markPaid={markPaid} />
+        <DataTable className="hidden md:block" rows={periods} columns={[
           { key: 'coach', label: 'Coach', render: (row) => data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-' },
           { key: 'period_month', label: 'Month', render: (row) => formatDate(row.period_month).slice(0, 7) },
           { key: 'total_lessons', label: 'Lessons' },
@@ -2097,7 +2205,8 @@ function PayrollPage({ profile, data, reload, toast }) {
         ]} />
       </Section>
       <Section title="Payroll Items">
-        <DataTable rows={items} columns={[
+        <PayrollItemCards rows={items} data={data} />
+        <DataTable className="hidden md:block" rows={items} columns={[
           { key: 'lesson', label: 'Lesson', render: (row) => data.lessons.find((item) => item.id === row.lesson_id)?.lesson_code || '-' },
           { key: 'coach', label: 'Coach', render: (row) => data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-' },
           { key: 'pay_amount', label: 'Amount', render: (row) => formatMoney(row.pay_amount) },
@@ -2105,6 +2214,51 @@ function PayrollPage({ profile, data, reload, toast }) {
           { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status}>{row.status}</StatusBadge> },
         ]} />
       </Section>
+    </div>
+  );
+}
+
+function PayrollPeriodCards({ rows, data, isAdmin, markPaid }) {
+  if (rows.length === 0) return <div className="md:hidden"><EmptyState title="No payroll yet" body="Approved payable lessons will appear here after payroll is generated." /></div>;
+  return (
+    <div className="grid gap-3 md:hidden">
+      {rows.map((row) => (
+        <article key={row.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-semibold text-slate-950">{formatDate(row.period_month).slice(0, 7)}</p>
+              <p className="mt-1 text-sm text-slate-500">{data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-'}</p>
+            </div>
+            <StatusBadge value={row.status}>{row.status}</StatusBadge>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+            <Info label="Lessons" value={row.total_lessons} />
+            <Info label="Amount" value={formatMoney(row.total_amount)} />
+          </div>
+          {isAdmin && row.status !== 'paid' ? <Button className="mt-3 w-full" onClick={() => markPaid(row)}>Mark paid</Button> : null}
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function PayrollItemCards({ rows, data }) {
+  if (rows.length === 0) return <div className="md:hidden"><EmptyState title="No payroll items yet" body="Approved payable lessons will show here." /></div>;
+  return (
+    <div className="grid gap-3 md:hidden">
+      {rows.map((row) => (
+        <article key={row.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-semibold text-slate-950">{data.lessons.find((item) => item.id === row.lesson_id)?.lesson_code || 'Lesson'}</p>
+              <p className="mt-1 text-sm text-slate-500">{data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-'}</p>
+            </div>
+            <StatusBadge value={row.status}>{row.status}</StatusBadge>
+          </div>
+          <p className="mt-3 text-xl font-semibold text-slate-950">{formatMoney(row.pay_amount)}</p>
+          <p className="mt-1 text-sm text-slate-500">Rate source: {row.rate_source || '-'}</p>
+        </article>
+      ))}
     </div>
   );
 }
