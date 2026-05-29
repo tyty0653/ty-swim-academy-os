@@ -74,7 +74,10 @@ The schema includes:
 
 Financial data is intentionally separated from packages in `package_financials`, which is Admin-only.
 
-For an existing Supabase test project that already has an older schema, run `supabase/skill-progress-migration.sql` to add the student progress tables and RLS policies.
+For an existing Supabase test project that already has an older schema, run:
+
+1. `supabase/skill-progress-migration.sql` to add the student progress tables and RLS policies.
+2. `supabase/pre-real-use-safety-migration.sql` to add backup/audit support, safe approval reversal, photo consent fields, and lesson photo usage controls.
 
 ## Approval Rules
 
@@ -94,6 +97,25 @@ Coach completion flow:
 - Only approved lessons with `coach_payable = true` affect payroll.
 
 If an approval must be reversed, void or adjust with an Admin note and audit trail instead of hard-deleting records.
+
+Admin can use `Void / Reverse approval` on an approved lesson if payroll has not been paid. The reversal restores one package lesson only when the original approval deducted it, voids the unpaid payroll item, writes an audit log, and sets the lesson to `void`. If payroll was already paid, the system blocks automatic reversal and Admin should create a manual adjustment.
+
+## Backup And Audit
+
+Admin can export an all-data JSON backup from More -> Admin Tools or Reports. The export includes database rows and storage paths, but not storage file binaries. Keep this file private because it can include finance and child/student data.
+
+Audit Logs are available from More -> Audit Logs. They are read-only and Admin-only.
+
+## Photo Privacy
+
+Students have photo consent fields:
+
+- `unknown`
+- `internal_only`
+- `marketing_approved`
+- `not_allowed`
+
+Lesson photo uploads default to internal usage. Coach uploads stay internal. Admin can change lesson photo usage to marketing only when every active student in that lesson has `marketing_approved` consent.
 
 ## Scheduling
 

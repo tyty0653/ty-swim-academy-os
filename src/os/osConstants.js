@@ -18,6 +18,7 @@ export const legacyAdminRoutes = [
   ['help', '/help', 'Help Guide'],
   ['skill-levels', '/skill-levels', 'Levels & Progress'],
   ['system-check', '/system-check', 'Setup Check'],
+  ['audit-logs', '/audit-logs', 'Audit Logs'],
   ['customers', '/customers', 'Customers / Families'],
   ['venues', '/venues', 'Venues'],
   ['classes', '/classes', 'Classes / Groups'],
@@ -67,6 +68,12 @@ export const statusTones = {
   learning: 'sky',
   almost: 'amber',
   almost_ready: 'amber',
+  unknown: 'slate',
+  internal: 'sky',
+  internal_only: 'sky',
+  marketing_candidate: 'amber',
+  marketing_approved: 'green',
+  not_allowed: 'rose',
 };
 
 export const packageValidityMonths = {

@@ -71,6 +71,10 @@ Main workflows:
 - Admin records expenses and uploads receipts
 - Admin/Coach use Setup Check to verify setup and permissions
 - Coach can optionally update student skill progress during lesson submission
+- Admin can export all database records as JSON backup from More/Reports
+- Admin can review read-only Audit Logs
+- Admin can safely void/reverse approved unpaid lessons
+- Student photo consent controls protect lesson photo marketing usage
 
 Role boundaries:
 
@@ -108,6 +112,8 @@ Tone:
 - Students page starts with a guided setup wizard instead of showing tables immediately.
 - Levels & Progress adds TY Swim Academy's Level 1-6 syllabus with clear goals, cue words, and checklist criteria.
 - Coach progress updates show only the current level checklist by default, which reduces lesson-time overload.
+- Coach lesson submit now uses a quicker 1-2 focus-skill progress update instead of opening the full checklist by default.
+- Admin backup, audit log, and approval reversal make the system safer before real use.
 - Schedule page separates Fixed Weekly and Flexible / Coach-arranged modes.
 - Review page groups Pending, Rescheduled, Cancelled, Needs edit, and Missing photos.
 - Money page groups Payments, Payroll, Expenses, and Summary.

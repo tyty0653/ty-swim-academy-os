@@ -6,7 +6,7 @@ create extension if not exists pgcrypto;
 create type app_role as enum ('admin', 'coach');
 create type class_type as enum ('1-1', '1-2', '1-3', '1-4', 'special');
 create type scheduling_mode as enum ('fixed_weekly', 'flexible');
-create type lesson_status as enum ('scheduled', 'rescheduled', 'completed_pending_review', 'cancelled_pending_review', 'needs_edit', 'approved', 'rejected', 'archived');
+create type lesson_status as enum ('scheduled', 'rescheduled', 'completed_pending_review', 'cancelled_pending_review', 'needs_edit', 'approved', 'rejected', 'archived', 'void');
 create type attendance_status as enum ('present', 'absent', 'sick', 'late', 'no_show', 'not_applicable');
 
 create or replace function public.set_updated_at()
@@ -83,6 +83,9 @@ create table public.students (
   health_notes text,
   special_needs text,
   safety_alert text,
+  photo_consent_status text not null default 'unknown' check (photo_consent_status in ('unknown', 'internal_only', 'marketing_approved', 'not_allowed')),
+  photo_consent_note text,
+  photo_consent_updated_at timestamptz,
   preferred_language text,
   status text not null default 'active',
   created_at timestamptz not null default now(),
@@ -238,6 +241,7 @@ create table public.lesson_photos (
   uploaded_by uuid references public.profiles(id) on delete set null,
   storage_path text not null,
   photo_type text not null default 'attendance_proof',
+  usage text not null default 'internal' check (usage in ('internal', 'marketing_candidate', 'marketing_approved')),
   caption text,
   created_at timestamptz not null default now()
 );
@@ -539,6 +543,38 @@ create trigger protect_coach_lesson_update
 before update on public.lessons
 for each row execute function public.prevent_coach_sensitive_lesson_update();
 
+create or replace function public.enforce_lesson_photo_usage()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.usage in ('marketing_candidate', 'marketing_approved') then
+    if exists (
+      select 1
+      from public.lessons l
+      join public.class_students cs on cs.class_id = l.class_id and cs.active is not false
+      join public.students s on s.id = cs.student_id
+      where l.id = new.lesson_id
+        and coalesce(s.photo_consent_status, 'unknown') <> 'marketing_approved'
+    ) then
+      raise exception 'Marketing photo usage requires marketing-approved consent for every student in the lesson';
+    end if;
+  end if;
+
+  if not public.is_admin() and new.usage <> 'internal' then
+    raise exception 'Coach uploads must stay internal';
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger enforce_lesson_photo_usage_trigger
+before insert or update on public.lesson_photos
+for each row execute function public.enforce_lesson_photo_usage();
+
 create or replace function public.approve_lesson(p_lesson_id uuid)
 returns void
 language plpgsql
@@ -556,6 +592,10 @@ begin
   select * into v_lesson from public.lessons where id = p_lesson_id for update;
   if not found then
     raise exception 'Lesson not found';
+  end if;
+
+  if v_lesson.status = 'void' then
+    raise exception 'Voided lessons cannot be approved';
   end if;
 
   if v_lesson.count_package_lesson and v_lesson.package_id is not null and not v_lesson.approved_package_applied then
@@ -590,6 +630,88 @@ begin
       admin_reviewed_by = auth.uid(),
       updated_by = auth.uid()
   where id = p_lesson_id;
+end;
+$$;
+
+create or replace function public.reverse_approved_lesson(p_lesson_id uuid, p_reason text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_lesson public.lessons%rowtype;
+  v_payroll public.payroll_items%rowtype;
+  v_period_status text;
+  v_reason text := nullif(trim(coalesce(p_reason, '')), '');
+  v_has_payroll boolean := false;
+begin
+  if not public.is_admin() then
+    raise exception 'Only Admin can reverse approved lessons';
+  end if;
+
+  if v_reason is null then
+    raise exception 'A reversal reason is required';
+  end if;
+
+  select * into v_lesson from public.lessons where id = p_lesson_id for update;
+  if not found then
+    raise exception 'Lesson not found';
+  end if;
+
+  if v_lesson.status <> 'approved' then
+    raise exception 'Only approved lessons can be reversed';
+  end if;
+
+  select * into v_payroll from public.payroll_items where lesson_id = p_lesson_id for update;
+  if found then
+    v_has_payroll := true;
+    select status into v_period_status from public.payroll_periods where id = v_payroll.payroll_period_id;
+    if v_payroll.status = 'paid' or v_period_status = 'paid' then
+      raise exception 'Cannot reverse automatically because payroll has already been paid. Please create an adjustment manually.';
+    end if;
+  end if;
+
+  if v_lesson.approved_package_applied and v_lesson.package_id is not null then
+    update public.packages
+    set used_lessons = greatest(used_lessons - 1, 0),
+        remaining_lessons = remaining_lessons + 1,
+        status = case when status = 'completed' then 'active' else status end
+    where id = v_lesson.package_id;
+  end if;
+
+  if v_has_payroll then
+    update public.payroll_items
+    set status = 'void',
+        override_reason = concat_ws(' | ', nullif(override_reason, ''), 'Voided by lesson reversal: ' || v_reason)
+    where id = v_payroll.id;
+
+    if v_payroll.payroll_period_id is not null then
+      update public.payroll_periods pp
+      set total_lessons = (select count(*) from public.payroll_items where payroll_period_id = v_payroll.payroll_period_id and status <> 'void'),
+          total_amount = (select coalesce(sum(pay_amount), 0) from public.payroll_items where payroll_period_id = v_payroll.payroll_period_id and status <> 'void')
+      where pp.id = v_payroll.payroll_period_id;
+    end if;
+  end if;
+
+  update public.lessons
+  set status = 'void',
+      approved_package_applied = false,
+      admin_notes = concat_ws(E'\n', nullif(admin_notes, ''), 'Approval reversed: ' || v_reason),
+      admin_reviewed_at = now(),
+      admin_reviewed_by = auth.uid(),
+      updated_by = auth.uid()
+  where id = p_lesson_id;
+
+  insert into public.audit_logs(actor_id, action, entity_type, entity_id, old_data, new_data)
+  values (
+    auth.uid(),
+    'reverse_approval',
+    'lessons',
+    p_lesson_id,
+    to_jsonb(v_lesson),
+    jsonb_build_object('reason', v_reason, 'restored_package', v_lesson.approved_package_applied, 'voided_payroll_item', v_has_payroll)
+  );
 end;
 $$;
 
@@ -807,6 +929,7 @@ create policy coach_read_own_photos on public.lesson_photos for select using (pu
 create policy coach_insert_own_photos on public.lesson_photos for insert with check (
   public.is_assigned_lesson(lesson_id)
   and exists (select 1 from public.lessons l where l.id = public.lesson_photos.lesson_id and l.status <> 'approved')
+  and usage = 'internal'
 );
 
 create policy admin_all_change_logs on public.lesson_change_logs for all using (public.is_admin()) with check (public.is_admin());
@@ -840,6 +963,7 @@ create policy coach_insert_own_lesson_skill_assessments on public.lesson_skill_a
 
 create policy admin_all_import_batches on public.import_batches for all using (public.is_admin()) with check (public.is_admin());
 create policy admin_all_audit_logs on public.audit_logs for select using (public.is_admin());
+create policy admin_insert_audit_logs on public.audit_logs for insert with check (public.is_admin());
 create policy admin_all_settings on public.settings for all using (public.is_admin()) with check (public.is_admin());
 
 insert into storage.buckets (id, name, public)
@@ -885,7 +1009,7 @@ with check (bucket_id = 'expense-receipts' and public.is_admin());
 insert into public.settings(key, value)
 values
   ('package_validity_months', '{"single":1,"4_lessons":2,"6_lessons":3,"8_lessons":4,"special":null}'),
-  ('lesson_statuses', '["scheduled","rescheduled","completed_pending_review","cancelled_pending_review","needs_edit","approved","rejected","archived"]'),
+  ('lesson_statuses', '["scheduled","rescheduled","completed_pending_review","cancelled_pending_review","needs_edit","approved","rejected","archived","void"]'),
   ('payment_methods', '["TNG","bank_transfer","DuitNow","cash","other"]'),
   ('expense_categories', '["coach_salary","pool_fee","advertising","equipment","transport","software","bank_charge","other"]'),
   ('class_types', '["1-1","1-2","1-3","1-4","special"]'),

@@ -16,7 +16,7 @@ Run:
 1. `supabase/schema.sql`
 2. `supabase/demo-seed.sql`
 
-If this is an existing test project with an older OS schema, run `supabase/skill-progress-migration.sql` before rerunning `demo-seed.sql`.
+If this is an existing test project with an older OS schema, run `supabase/skill-progress-migration.sql` and `supabase/pre-real-use-safety-migration.sql` before rerunning `demo-seed.sql`.
 
 Before running `demo-seed.sql`, replace:
 
@@ -95,6 +95,10 @@ Admin:
 - Payment, expense, and payroll data are accessible to Admin.
 - Student skill progress data is accessible.
 - `/skill-levels` shows the Level 1-6 syllabus and demo student progress.
+- Admin can export all data JSON and an audit log is written.
+- Audit Logs page is Admin-only.
+- Approved unpaid lessons can be safely reversed; paid payroll reversals are blocked.
+- Lesson photo marketing usage is blocked unless every active student has marketing-approved consent.
 - Admin can approve the demo pending lesson.
 - Package remaining lessons deducts exactly once.
 - Payroll item is created exactly once.

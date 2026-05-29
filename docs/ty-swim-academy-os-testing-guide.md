@@ -23,7 +23,7 @@ Expected:
 ## 2. Supabase Test Project
 
 1. Create a separate Supabase project for testing.
-2. Run `supabase/schema.sql`. If your test Supabase project already had an older OS schema, run `supabase/skill-progress-migration.sql` before rerunning demo seed.
+2. Run `supabase/schema.sql`. If your test Supabase project already had an older OS schema, run `supabase/skill-progress-migration.sql` and `supabase/pre-real-use-safety-migration.sql` before rerunning demo seed.
 3. Create one Admin Auth user and one Coach Auth user.
 4. Copy both Auth user IDs.
 5. Open `supabase/demo-seed.sql`.
@@ -39,6 +39,8 @@ To reset demo data later, run the same `supabase/demo-seed.sql` again. The reset
 After seeding, `DEMO-LES-0003` should exist with status `completed_pending_review`. If it does not, rerun the latest `demo-seed.sql`; the seed raises an error if that pending review lesson cannot be created.
 
 The demo seed also creates fake Level 1 student progress rows for the two demo students, so `/skill-levels`, Students, My Students, and lesson progress updates can be tested without entering data manually.
+
+After the safety migration, test Export All Data JSON from More -> Admin Tools or Reports, Audit Logs from More, and Void / Reverse approval on an approved unpaid demo lesson.
 
 ## 3. Local Env
 

@@ -77,6 +77,10 @@ Date: 2026-05-28
 - [x] Coach-facing screens do not show customer charged price, company income, payments, expenses, profit, or other coaches' payroll.
 - [x] Added Admin-only `/system-check` page under More.
 - [x] System Check shows env, session, profile, role, table, storage, demo data, coach profile, sensitive-module, payroll-scope, service-role, and data-count checks.
+- [x] Admin backup export downloads JSON rows only and logs the export when audit insert is available.
+- [x] Audit Logs page is Admin-only and read-only.
+- [x] Approved lesson reversal is Admin-only, requires a reason, restores package only once, voids unpaid payroll, and blocks paid payroll reversal.
+- [x] Lesson photo usage defaults to internal, Coach uploads stay internal, and marketing usage requires student marketing-approved consent.
 - [x] Coach can open `/system-check` as a Coach Check to verify assigned records are visible and financial records stay hidden.
 
 ## UX QA

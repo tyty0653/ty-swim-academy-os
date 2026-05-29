@@ -1,7 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 
 const port = 4191;
-const routes = ['/', '/login', '/dashboard', '/students', '/skill-levels', '/schedule', '/review', '/money', '/more', '/help', '/system-check'];
+const routes = ['/', '/login', '/dashboard', '/students', '/skill-levels', '/schedule', '/review', '/money', '/more', '/help', '/system-check', '/audit-logs'];
 const isWindows = process.platform === 'win32';
 const command = isWindows ? 'cmd.exe' : 'npm';
 const args = isWindows

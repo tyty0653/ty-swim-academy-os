@@ -341,7 +341,7 @@ function activeNav(pathInfo, key) {
   if (key === 'schedule') return ['schedule', 'lessons'].includes(pathInfo.section);
   if (key === 'students') return ['students', 'customers', 'venues', 'classes', 'packages', 'skill-levels'].includes(pathInfo.section);
   if (key === 'money') return ['money', 'payments', 'payroll', 'expenses'].includes(pathInfo.section);
-  if (key === 'more') return ['more', 'help', 'system-check', 'import', 'data-cleanup', 'reports', 'settings'].includes(pathInfo.section);
+  if (key === 'more') return ['more', 'help', 'system-check', 'audit-logs', 'import', 'data-cleanup', 'reports', 'settings'].includes(pathInfo.section);
   return pathInfo.section === key;
 }
 
@@ -359,6 +359,7 @@ function pageTitle(pathInfo) {
     review: 'Review Queue',
     money: 'Money',
     'system-check': 'Setup Check',
+    'audit-logs': 'Audit Logs',
     payroll: 'Payroll',
     payments: 'Payments',
     expenses: 'Expenses',
@@ -396,6 +397,7 @@ function RoutePage(props) {
   if (pathInfo.section === 'import') return <ImportPage {...props} />;
   if (pathInfo.section === 'data-cleanup') return <CleanupPage {...props} />;
   if (pathInfo.section === 'reports') return <ReportsPage {...props} />;
+  if (pathInfo.section === 'audit-logs') return <AuditLogPage {...props} />;
   if (pathInfo.section === 'settings') return <SettingsPage {...props} />;
   return <Dashboard {...props} />;
 }
@@ -517,7 +519,7 @@ function CoachDashboard({ profile, data }) {
   const today = ownLessons.filter((lesson) => lesson.scheduled_date === todayISO());
   const pending = ownLessons.filter((lesson) => ['scheduled', 'rescheduled', 'needs_edit'].includes(lesson.status));
   const payroll = data.payroll_items.filter((item) => item.coach_id === coach?.id && item.status !== 'void');
-  const todayDone = today.length > 0 && today.every((lesson) => ['completed_pending_review', 'cancelled_pending_review', 'approved', 'rejected', 'archived'].includes(lesson.status));
+  const todayDone = today.length > 0 && today.every((lesson) => ['completed_pending_review', 'cancelled_pending_review', 'approved', 'rejected', 'archived', 'void'].includes(lesson.status));
 
   return (
     <div className="grid gap-5">
@@ -708,7 +710,7 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
   const [context, setContext] = useState({ customerId: '', studentIds: [], venueId: '', classId: '', packageId: '' });
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [family, setFamily] = useState({ display_name: '', parent_name: '', whatsapp: '', status: 'active' });
-  const [student, setStudent] = useState({ display_name: '', age: '', level: '', safety_alert: '', status: 'active' });
+  const [student, setStudent] = useState({ display_name: '', age: '', level: '', safety_alert: '', photo_consent_status: 'unknown', photo_consent_note: '', status: 'active' });
   const [venue, setVenue] = useState({ venue_name: '', full_address: '', area: '', pool_type: 'condo', google_maps_link: '', active: true });
   const [clsForm, setClsForm] = useState({ class_name: '', class_type: '1-2', scheduling_mode: 'fixed_weekly', assigned_coach_id: data.coaches[0]?.id || '', default_duration_minutes: 60, photo_required: false, status: 'active' });
   const [pkgForm, setPkgForm] = useState({ package_type: '8_lessons', total_lessons: 8, used_lessons: 0, remaining_lessons: 8, validity_months: 4, start_date: todayISO(), payment_date: todayISO(), status: 'active' });
@@ -745,11 +747,11 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
   const saveStudent = async (event) => {
     event.preventDefault();
     if (!customerId) return toast('Add or select a family first.');
-    const { data: saved, error } = await supabase.from('students').insert({ ...student, customer_id: customerId, age: student.age ? Number(student.age) : null }).select('*').single();
+    const { data: saved, error } = await supabase.from('students').insert({ ...student, customer_id: customerId, age: student.age ? Number(student.age) : null, photo_consent_updated_at: student.photo_consent_status !== 'unknown' ? new Date().toISOString() : null }).select('*').single();
     if (error) return toast(error.message);
     setContext((current) => ({ ...current, studentIds: [...new Set([...current.studentIds, saved.id])] }));
     setSelectedStudentIds((current) => [...new Set([...current, saved.id])]);
-    setStudent({ display_name: '', age: '', level: '', safety_alert: '', status: 'active' });
+    setStudent({ display_name: '', age: '', level: '', safety_alert: '', photo_consent_status: 'unknown', photo_consent_note: '', status: 'active' });
     toast('Student saved. Add another student or continue to venue.');
     await reload();
   };
@@ -839,6 +841,8 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
               <Field label="Age"><Input type="number" value={student.age} onChange={(event) => setStudent({ ...student, age: event.target.value })} /></Field>
               <Field label="Level"><Input value={student.level} onChange={(event) => setStudent({ ...student, level: event.target.value })} /></Field>
               <Field label="Safety alert"><Input value={student.safety_alert} onChange={(event) => setStudent({ ...student, safety_alert: event.target.value })} placeholder="Optional" /></Field>
+              <Field label="Photo consent"><Select value={student.photo_consent_status} onChange={(event) => setStudent({ ...student, photo_consent_status: event.target.value })}>{['unknown', 'internal_only', 'marketing_approved', 'not_allowed'].map((item) => <option key={item}>{item}</option>)}</Select></Field>
+              <Field label="Photo consent note"><Input value={student.photo_consent_note} onChange={(event) => setStudent({ ...student, photo_consent_note: event.target.value })} placeholder="Optional" /></Field>
             </div>
             <div className="rounded-lg bg-white p-3 text-sm text-slate-600">Students for this family: {customerStudents.map((item) => item.display_name).join(', ') || 'None yet'}</div>
             <div className="grid gap-2 sm:flex sm:flex-wrap"><Button className="w-full sm:w-auto">Save Student</Button><Button className="w-full sm:w-auto" type="button" variant="soft" onClick={() => setStep(2)}>Continue to Venue</Button><Button className="w-full sm:w-auto" type="button" variant="ghost" onClick={() => onOpenAdvanced('students')}>Open student records</Button></div>
@@ -1017,12 +1021,12 @@ function MoneyPage(props) {
 }
 
 function MorePage(props) {
-  const { signOut, profile } = props;
+  const { signOut, profile, data, toast } = props;
   const isAdmin = profile.role === 'admin';
   const tools = [
     ...(isAdmin ? [['money', '/money', 'Money']] : []),
     ...legacyAdminRoutes.filter(([key]) => (isAdmin
-      ? ['help', 'skill-levels', 'system-check', 'customers', 'venues', 'classes', 'packages', 'lessons', 'import', 'cleanup', 'reports', 'settings'].includes(key)
+      ? ['help', 'skill-levels', 'system-check', 'audit-logs', 'customers', 'venues', 'classes', 'packages', 'lessons', 'import', 'cleanup', 'reports', 'settings'].includes(key)
       : ['help', 'skill-levels', 'system-check'].includes(key))),
   ];
   return (
@@ -1043,10 +1047,14 @@ function MorePage(props) {
           </button>
         </div>
       </Section>
-      <Section title="Users and Coach Rates">
-        <p className="text-sm leading-6 text-slate-500">Open Settings to manage Admin/Coach users, coach profiles, and coach rates.</p>
-        <div className="mt-4"><Button onClick={() => go('/settings')}>Open Settings</Button></div>
-      </Section>
+      {isAdmin ? <Section title="Admin Tools">
+        <p className="text-sm leading-6 text-slate-500">Use these before real operations or when checking sensitive changes.</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button onClick={() => go('/settings')}>Open Settings</Button>
+          <Button variant="ghost" onClick={() => go('/audit-logs')}>Audit Logs</Button>
+          <Button variant="ghost" onClick={() => exportAllDataBackup(data, profile, toast)}>Export All Data JSON</Button>
+        </div>
+      </Section> : null}
     </div>
   );
 }
@@ -1057,6 +1065,7 @@ function moreToolDescription(key) {
     help: 'Simple owner and coach guide for daily use.',
     'skill-levels': 'TY Swim Level 1-6 syllabus and student progress.',
     'system-check': 'Check whether the OS is ready and see what to fix first.',
+    'audit-logs': 'Read-only history of important Admin and system actions.',
     import: 'Bring in old Google Sheet CSV data.',
     cleanup: 'Find missing names, address, age, consent, coach, and proof records.',
     reports: 'Monthly lesson, renewal, payment, expense, and payroll exports.',
@@ -1338,6 +1347,7 @@ function CustomerDetail({ profile, pathInfo, data, reload, toast }) {
           { key: 'age', label: 'Age' },
           { key: 'legacy_level', label: 'Legacy Level', render: (row) => row.level || '-' },
           { key: 'alert', label: 'Health / Safety', render: (row) => row.safety_alert || row.health_notes || row.special_needs || '-' },
+          { key: 'photo_consent_status', label: 'Photo Consent', render: (row) => <StatusBadge value={row.photo_consent_status || 'unknown'}>{row.photo_consent_status || 'unknown'}</StatusBadge> },
         ]} />
       </Section>
       <Section title="Skill Progress">
@@ -1451,6 +1461,9 @@ function StudentsPage({ profile, data, reload, toast }) {
             ['health_notes', 'Health notes', 'textarea'],
             ['special_needs', 'Special needs', 'textarea'],
             ['safety_alert', 'Safety alert', 'textarea'],
+            ['photo_consent_status', 'Photo consent', 'select', ['unknown', 'internal_only', 'marketing_approved', 'not_allowed']],
+            ['photo_consent_note', 'Photo consent note', 'textarea'],
+            ['photo_consent_updated_at', 'Photo consent updated at', 'date'],
             ['preferred_language', 'Preferred language'],
             ['status', 'Status', 'select', ['active', 'paused', 'completed', 'inactive']],
           ]}
@@ -1461,6 +1474,7 @@ function StudentsPage({ profile, data, reload, toast }) {
             ['level_progress', 'Level', (row) => <StudentLevelBadge student={row} data={data} />],
             ['focus', 'Focus', (row) => getStudentSkillProfile(row, data).current_focus || row.learning_goal || '-'],
             ['health', 'Health / Safety', (row) => row.safety_alert || row.health_notes || row.special_needs || '-'],
+            ['photo_consent_status', 'Photo Consent', (row) => <StatusBadge value={row.photo_consent_status || 'unknown'}>{row.photo_consent_status || 'unknown'}</StatusBadge>],
             ['status', 'Status', (row) => <StatusBadge value={row.status}>{row.status}</StatusBadge>],
           ]}
         />
@@ -1868,7 +1882,7 @@ function LessonsPage({ profile, data, reload, toast }) {
           <Field label="To"><Input type="date" value={filters.dateTo} onChange={(event) => setFilters({ ...filters, dateTo: event.target.value })} /></Field>
           <Field label="Coach"><Select value={filters.coach} onChange={(event) => setFilters({ ...filters, coach: event.target.value })}><option value="">All</option>{data.coaches.map((item) => <option key={item.id} value={item.id}>{item.display_name}</option>)}</Select></Field>
           <Field label="Class"><Select value={filters.classId} onChange={(event) => setFilters({ ...filters, classId: event.target.value })}><option value="">All</option>{data.classes.map((item) => <option key={item.id} value={item.id}>{item.class_name}</option>)}</Select></Field>
-          <Field label="Status"><Select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option value="">All</option>{['scheduled', 'rescheduled', 'completed_pending_review', 'cancelled_pending_review', 'needs_edit', 'approved', 'rejected', 'archived'].map((item) => <option key={item} value={item}>{item}</option>)}</Select></Field>
+          <Field label="Status"><Select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option value="">All</option>{['scheduled', 'rescheduled', 'completed_pending_review', 'cancelled_pending_review', 'needs_edit', 'approved', 'rejected', 'archived', 'void'].map((item) => <option key={item} value={item}>{item}</option>)}</Select></Field>
           <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={filters.pending} onChange={(event) => setFilters({ ...filters, pending: event.target.checked })} /> Pending review</label>
           <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={filters.replacement} onChange={(event) => setFilters({ ...filters, replacement: event.target.checked })} /> Replacement</label>
         </div>
@@ -2033,6 +2047,8 @@ function LessonDetail({ profile, pathInfo, data, reload, toast }) {
   const [form, setForm] = useState(lesson || {});
   const [rescheduleReason, setRescheduleReason] = useState('');
   const [participants, setParticipants] = useState([]);
+  const [reverseModal, setReverseModal] = useState(false);
+  const [reverseReason, setReverseReason] = useState('');
   useEffect(() => {
     if (!lesson) return;
     const existing = data.lesson_participants.filter((item) => item.lesson_id === lesson.id);
@@ -2046,7 +2062,7 @@ function LessonDetail({ profile, pathInfo, data, reload, toast }) {
   const customer = data.customers.find((item) => item.id === cls?.customer_id);
   const venue = data.venues.find((item) => item.id === lesson.venue_id);
   const approved = lesson.status === 'approved';
-  const coachLocked = !isAdmin && approved;
+  const coachLocked = !isAdmin && ['approved', 'void', 'rejected', 'archived'].includes(lesson.status);
 
   const saveLesson = async () => {
     const updates = { ...form, updated_by: profile.id };
@@ -2101,6 +2117,20 @@ function LessonDetail({ profile, pathInfo, data, reload, toast }) {
     if (error) toast(error.message);
     else {
       toast('Review updated');
+      await reload();
+    }
+  };
+  const reverseApproval = async () => {
+    if (!reverseReason.trim()) {
+      toast('Please add a reversal reason.');
+      return;
+    }
+    const { error } = await supabase.rpc('reverse_approved_lesson', { p_lesson_id: lesson.id, p_reason: reverseReason.trim() });
+    if (error) toast(error.message);
+    else {
+      toast('Approval reversed safely.');
+      setReverseModal(false);
+      setReverseReason('');
       await reload();
     }
   };
@@ -2177,10 +2207,22 @@ function LessonDetail({ profile, pathInfo, data, reload, toast }) {
           <Field label="Coach notes"><Textarea disabled={coachLocked} value={form.coach_notes || ''} onChange={(event) => setForm({ ...form, coach_notes: event.target.value })} /></Field>
           {isAdmin ? <Field label="Admin notes"><Textarea value={form.admin_notes || ''} onChange={(event) => setForm({ ...form, admin_notes: event.target.value })} /></Field> : null}
         </div>
-        <LessonPhotos lesson={lesson} data={data} reload={reload} toast={toast} canDelete />
+        <LessonPhotos lesson={lesson} profile={profile} data={data} reload={reload} toast={toast} canDelete />
       </Section>
-      <LessonApprovalPanel isAdmin={isAdmin} lesson={lesson} onSave={saveLesson} onSubmit={submitReview} onApprove={approve} onReviewUpdate={reviewUpdate} disabled={coachLocked} />
+      <LessonApprovalPanel isAdmin={isAdmin} lesson={lesson} onSave={saveLesson} onSubmit={submitReview} onApprove={approve} onReviewUpdate={reviewUpdate} onReverse={() => setReverseModal(true)} disabled={coachLocked} />
       {isAdmin ? <AuditPanels lesson={lesson} data={data} /> : null}
+      {reverseModal ? (
+        <Modal title="Void / Reverse Approval" onClose={() => setReverseModal(false)}>
+          <div className="grid gap-4">
+            <p className="rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-800">This will restore one package lesson only if this approval deducted it, and void the unpaid payroll item if one exists. If payroll was already paid, the system will block automatic reversal.</p>
+            <Field label="Reason"><Textarea value={reverseReason} onChange={(event) => setReverseReason(event.target.value)} placeholder="Required. Example: approved wrong lesson date." /></Field>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setReverseModal(false)}>Cancel</Button>
+              <Button variant="danger" onClick={reverseApproval}>Reverse approval</Button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }
@@ -2189,7 +2231,6 @@ function CoachLessonSubmission({ lesson, profile, cls, customer, venue, data, fo
   const photoRequired = Boolean(cls?.photo_required || lesson.photo_required);
   const [showScheduleChange, setShowScheduleChange] = useState(false);
   const [outcome, setOutcome] = useState(lesson.status === 'cancelled_pending_review' ? 'cancelled' : 'completed');
-  const [progressStudent, setProgressStudent] = useState(null);
   const submitted = ['completed_pending_review', 'cancelled_pending_review'].includes(lesson.status);
   const lessonStudents = participants.map((item) => data.students.find((student) => student.id === item.student_id)).filter(Boolean);
   return (
@@ -2205,8 +2246,8 @@ function CoachLessonSubmission({ lesson, profile, cls, customer, venue, data, fo
         </div>
         {studentAlerts(cls, data) ? <p className="mt-4 rounded-lg border border-rose-100 bg-rose-50 p-3 text-sm font-semibold text-rose-700">Safety alert: {studentAlerts(cls, data)}</p> : <p className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm font-medium text-emerald-700">No health/safety alerts recorded.</p>}
       </Section>
-      <Section title={coachLocked ? 'Approved Lesson Record' : 'Submit Lesson Record'}>
-        {coachLocked ? <p className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">Approved - no further action needed. This lesson is read-only.</p> : null}
+      <Section title={coachLocked ? 'Read-only Lesson Record' : 'Submit Lesson Record'}>
+        {coachLocked ? <p className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">{lesson.status === 'approved' ? 'Approved - no further action needed.' : 'This lesson is closed.'} This lesson is read-only.</p> : null}
         {submitted && !coachLocked ? <p className="mb-4 rounded-lg bg-sky-50 p-3 text-sm font-semibold text-sky-700">Record submitted for Admin review.</p> : null}
         {!coachLocked ? (
           <div className="mb-4 grid gap-3 rounded-lg border border-sky-100 bg-sky-50 p-3 sm:grid-cols-[1fr_auto] sm:items-end">
@@ -2248,39 +2289,139 @@ function CoachLessonSubmission({ lesson, profile, cls, customer, venue, data, fo
           })}
         </div>
         <Field label="Coach note"><Textarea disabled={coachLocked} value={form.coach_notes || ''} onChange={(event) => setForm({ ...form, coach_notes: event.target.value })} placeholder="Optional note for Admin" /></Field>
-        <LessonPhotos lesson={lesson} data={data} reload={reload} toast={toast} disabled={coachLocked} />
+        <LessonPhotos lesson={lesson} profile={profile} data={data} reload={reload} toast={toast} disabled={coachLocked} />
         <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="font-semibold text-slate-950">Update student progress</p>
-              <p className="mt-1 text-sm leading-6 text-slate-500">Optional. Record the current level checklist without affecting package count or payroll.</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">Optional. Quickly update 1-2 current focus skills. Full checklist stays in Levels & Progress.</p>
             </div>
             <Button variant="ghost" onClick={() => go('/skill-levels')}>View full syllabus</Button>
           </div>
-          <div className="mt-3 grid gap-2">
-            {lessonStudents.map((student) => (
-              <button key={student.id} type="button" disabled={coachLocked} onClick={() => setProgressStudent(student)} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left disabled:opacity-60">
-                <div>
-                  <p className="font-semibold text-slate-950">{student.display_name}</p>
-                  <p className="text-sm text-slate-500">{getStudentSkillProfile(student, data).current_focus || getSkillLevel(getStudentSkillProfile(student, data).current_level).title}</p>
-                </div>
-                <StudentLevelBadge student={student} data={data} />
-              </button>
-            ))}
-          </div>
+          <CoachQuickProgress students={lessonStudents} lesson={lesson} data={data} profile={profile} reload={reload} toast={toast} disabled={coachLocked} />
         </div>
         <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] mt-4 flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white/95 p-3 shadow-lg shadow-slate-200/70 backdrop-blur lg:bottom-3">
           <Button variant="ghost" onClick={saveLesson} disabled={coachLocked}>Save draft</Button>
           <Button className="min-h-12 flex-1 text-base sm:flex-none" onClick={() => submitReview(outcome === 'cancelled' ? 'cancelled_pending_review' : 'completed_pending_review')} disabled={coachLocked}>Submit Record</Button>
         </div>
       </Section>
-      {progressStudent ? <StudentProgressModal student={progressStudent} data={data} profile={profile} lesson={lesson} reload={reload} toast={toast} onClose={() => setProgressStudent(null)} /> : null}
     </div>
   );
 }
 
-function LessonPhotos({ lesson, data, reload, toast, disabled = false, canDelete = false }) {
+function CoachQuickProgress({ students, lesson, data, profile, reload, toast, disabled }) {
+  if (students.length === 0) return <EmptyState title="No students linked" body="Add students to the class before recording progress." />;
+  return (
+    <div className="mt-3 grid gap-3">
+      {students.map((student) => <CoachQuickProgressCard key={student.id} student={student} lesson={lesson} data={data} profile={profile} reload={reload} toast={toast} disabled={disabled} />)}
+    </div>
+  );
+}
+
+function CoachQuickProgressCard({ student, lesson, data, profile, reload, toast, disabled }) {
+  const skillProfile = getStudentSkillProfile(student, data);
+  const level = getSkillLevel(skillProfile.current_level);
+  const existingRows = data.student_skill_progress.filter((item) => item.student_id === student.id && Number(item.level_number) === Number(level.level));
+  const focusCriteria = level.criteria
+    .filter(([criterionId]) => existingRows.find((row) => row.criterion_id === criterionId)?.status !== 'passed')
+    .slice(0, 2);
+  const criteria = focusCriteria.length ? focusCriteria : level.criteria.slice(0, 2);
+  const [statusMap, setStatusMap] = useState(() => Object.fromEntries(criteria.map(([criterionId]) => [criterionId, existingRows.find((row) => row.criterion_id === criterionId)?.status || 'learning'])));
+  const [note, setNote] = useState('');
+  const [focus, setFocus] = useState(skillProfile.current_focus || criteria[0]?.[1] || level.title);
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    const now = new Date().toISOString();
+    const progressPayload = criteria.map(([criterionId]) => ({
+      student_id: student.id,
+      level_number: level.level,
+      criterion_id: criterionId,
+      status: statusMap[criterionId] || 'learning',
+      note: note || null,
+      last_assessed_at: now,
+      assessed_by: profile.id,
+      lesson_id: lesson.id,
+    }));
+    const { error: profileError } = await supabase.from('student_skill_profiles').upsert({
+      student_id: student.id,
+      current_level: level.level,
+      level_status: Object.values(statusMap).some((value) => value === 'almost' || value === 'passed') ? 'almost_ready' : 'learning',
+      current_focus: focus,
+      last_assessed_at: now,
+      assessment_note: note || skillProfile.assessment_note || '',
+      suggested_level_up: skillProfile.suggested_level_up || false,
+      updated_by: profile.id,
+    }, { onConflict: 'student_id' });
+    if (profileError) {
+      setSaving(false);
+      toast(profileError.message);
+      return;
+    }
+    const { error: progressError } = await supabase.from('student_skill_progress').upsert(progressPayload, { onConflict: 'student_id,level_number,criterion_id' });
+    if (progressError) {
+      setSaving(false);
+      toast(progressError.message);
+      return;
+    }
+    const { error: assessmentError } = await supabase.from('lesson_skill_assessments').insert(progressPayload.map((item) => ({
+      lesson_id: lesson.id,
+      student_id: student.id,
+      level_number: level.level,
+      criterion_id: item.criterion_id,
+      status: item.status,
+      note: item.note,
+      next_focus: focus,
+      suggest_level_up: false,
+      assessed_by: profile.id,
+    })));
+    if (assessmentError) {
+      setSaving(false);
+      toast(assessmentError.message);
+      return;
+    }
+    setSaving(false);
+    toast(`Progress saved for ${student.display_name}`);
+    await reload();
+  };
+
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold text-slate-950">{student.display_name}</p>
+          <p className="text-sm text-slate-500">Level {level.level}: {level.title}</p>
+        </div>
+        <StudentLevelBadge student={student} data={data} />
+      </div>
+      <div className="mt-3 grid gap-2">
+        {criteria.map(([criterionId, label]) => (
+          <div key={criterionId} className="rounded-lg bg-slate-50 p-2">
+            <p className="text-sm font-semibold text-slate-800">{label}</p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {['learning', 'almost', 'passed'].map((status) => (
+                <button key={status} type="button" disabled={disabled} onClick={() => setStatusMap((current) => ({ ...current, [criterionId]: status }))} className={`min-h-10 rounded-lg border px-2 text-sm font-semibold disabled:opacity-60 ${statusMap[criterionId] === status ? 'border-sky-500 bg-sky-600 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>
+                  {progressStatusLabels[status]}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 grid gap-2">
+        <Input disabled={disabled} value={focus} onChange={(event) => setFocus(event.target.value)} placeholder="Next focus" />
+        <Textarea disabled={disabled} className="min-h-16" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional progress note" />
+        <Button disabled={disabled || saving} onClick={save}>{saving ? 'Saving...' : 'Save progress'}</Button>
+      </div>
+    </article>
+  );
+}
+
+function LessonPhotos({ lesson, profile, data, reload, toast, disabled = false, canDelete = false }) {
   const [type, setType] = useState('attendance_proof');
+  const isAdmin = profile?.role === 'admin';
+  const photoTypes = isAdmin ? ['attendance_proof', 'progress_record', 'pool_issue', 'marketing_candidate', 'other'] : ['attendance_proof', 'progress_record', 'pool_issue', 'other'];
   const photos = data.lesson_photos?.filter((photo) => photo.lesson_id === lesson.id) || [];
   const upload = async (event) => {
     const file = event.target.files?.[0];
@@ -2291,7 +2432,7 @@ function LessonPhotos({ lesson, data, reload, toast, disabled = false, canDelete
       toast(error.message);
       return;
     }
-    await supabase.from('lesson_photos').insert({ lesson_id: lesson.id, storage_path: path, photo_type: type });
+    await supabase.from('lesson_photos').insert({ lesson_id: lesson.id, uploaded_by: profile?.id || null, storage_path: path, photo_type: type, usage: 'internal' });
     toast('Photo uploaded');
     await reload();
   };
@@ -2309,10 +2450,18 @@ function LessonPhotos({ lesson, data, reload, toast, disabled = false, canDelete
       await reload();
     }
   };
+  const updateUsage = async (photo, usage) => {
+    const { error } = await supabase.from('lesson_photos').update({ usage }).eq('id', photo.id);
+    if (error) toast(error.message);
+    else {
+      toast('Photo usage updated');
+      await reload();
+    }
+  };
   return (
     <div className="mt-4 rounded-lg border border-slate-200 p-3">
       <div className="flex flex-wrap items-center gap-3">
-        <Select disabled={disabled} value={type} onChange={(event) => setType(event.target.value)}>{['attendance_proof', 'progress_record', 'pool_issue', 'marketing_candidate', 'other'].map((item) => <option key={item}>{item}</option>)}</Select>
+        <Select disabled={disabled} value={type} onChange={(event) => setType(event.target.value)}>{photoTypes.map((item) => <option key={item}>{item}</option>)}</Select>
         <Input disabled={disabled} type="file" accept="image/*" onChange={upload} />
       </div>
       <div className="mt-3 grid gap-2 md:grid-cols-3">
@@ -2321,6 +2470,8 @@ function LessonPhotos({ lesson, data, reload, toast, disabled = false, canDelete
             <StoragePreview bucket="lesson-photos" path={photo.storage_path} image />
             <div className="mt-2 flex items-center justify-between gap-2">
               <span className="font-medium text-slate-700">{photo.photo_type}</span>
+              <StatusBadge value={photo.usage || 'internal'}>{photo.usage || 'internal'}</StatusBadge>
+              {isAdmin ? <Select value={photo.usage || 'internal'} onChange={(event) => updateUsage(photo, event.target.value)}>{['internal', 'marketing_candidate', 'marketing_approved'].map((item) => <option key={item}>{item}</option>)}</Select> : null}
               {canDelete ? <Button variant="danger" onClick={() => remove(photo)}>Delete</Button> : null}
             </div>
           </div>
@@ -2330,14 +2481,15 @@ function LessonPhotos({ lesson, data, reload, toast, disabled = false, canDelete
   );
 }
 
-function LessonApprovalPanel({ isAdmin, lesson, onSave, onSubmit, onApprove, onReviewUpdate, disabled }) {
+function LessonApprovalPanel({ isAdmin, lesson, onSave, onSubmit, onApprove, onReviewUpdate, onReverse, disabled }) {
   return (
     <Section title="Lesson Approval">
       <div className="flex flex-wrap gap-2">
         <Button variant="ghost" onClick={onSave} disabled={disabled}>Save changes</Button>
         {!isAdmin ? <Button onClick={() => onSubmit('completed_pending_review')} disabled={disabled}>Submit completed lesson</Button> : null}
         {!isAdmin ? <Button variant="soft" onClick={() => onSubmit('cancelled_pending_review')} disabled={disabled}>Submit cancellation</Button> : null}
-        {isAdmin ? <Button onClick={onApprove} disabled={lesson.status === 'approved'}>Approve and apply package/payroll</Button> : null}
+        {isAdmin ? <Button onClick={onApprove} disabled={['approved', 'void'].includes(lesson.status)}>Approve and apply package/payroll</Button> : null}
+        {isAdmin && lesson.status === 'approved' ? <Button variant="danger" onClick={onReverse}>Void / Reverse approval</Button> : null}
         {isAdmin ? <Button variant="soft" onClick={() => onReviewUpdate('needs_edit')}>Request edit</Button> : null}
         {isAdmin ? <Button variant="danger" onClick={() => onReviewUpdate('rejected')}>Reject</Button> : null}
       </div>
@@ -2763,7 +2915,57 @@ function CleanupPage({ data }) {
   );
 }
 
-function ReportsPage({ data }) {
+async function exportAllDataBackup(data, profile, toast) {
+  if (!window.confirm('Export all Admin-accessible OS data as JSON? This includes private operational and finance records, but not storage file binaries. Keep the file secure.')) return;
+  const exportTables = [
+    'profiles',
+    'coaches',
+    'coach_rates',
+    'customers',
+    'students',
+    'venues',
+    'classes',
+    'class_students',
+    'packages',
+    'package_financials',
+    'recurring_schedules',
+    'lessons',
+    'lesson_participants',
+    'lesson_photos',
+    'lesson_change_logs',
+    'payroll_periods',
+    'payroll_items',
+    'expenses',
+    'consents',
+    'student_skill_profiles',
+    'student_skill_progress',
+    'lesson_skill_assessments',
+    'audit_logs',
+  ];
+  const payload = {
+    exported_at: new Date().toISOString(),
+    exported_by: { id: profile.id, email: profile.email, role: profile.role },
+    note: 'Storage files are not included. Storage paths are included where stored in database rows.',
+    tables: Object.fromEntries(exportTables.map((name) => [name, data[name] || []])),
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `ty-swim-academy-os-backup-${todayISO()}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+  const { error } = await supabase.from('audit_logs').insert({
+    actor_id: profile.id,
+    action: 'export_all_data',
+    entity_type: 'backup',
+    new_data: { exported_at: payload.exported_at, tables: exportTables, row_counts: Object.fromEntries(exportTables.map((name) => [name, (data[name] || []).length])) },
+  });
+  if (error) toast(`Backup downloaded. Audit log note: ${error.message}`);
+  else toast('Backup downloaded and audit log saved.');
+}
+
+function ReportsPage({ profile, data, toast }) {
   const month = todayISO().slice(0, 7);
   const lessonCount = data.lessons.filter((row) => String(row.scheduled_date).startsWith(month)).length;
   const payments = sumThisMonth(data.package_financials, 'payment_date', 'amount');
@@ -2787,8 +2989,96 @@ function ReportsPage({ data }) {
           { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status}>{row.status}</StatusBadge> },
         ]} />
       </Section>
+      <Section title="Admin Backup">
+        <p className="mb-4 text-sm leading-6 text-slate-500">Download a JSON backup of Admin-accessible database records. Storage files are not included; only storage paths are included.</p>
+        <Button onClick={() => exportAllDataBackup(data, profile, toast)}>Export All Data JSON</Button>
+      </Section>
     </div>
   );
+}
+
+function AuditLogPage({ data }) {
+  const [filters, setFilters] = useState({ from: '', to: '', actor: '', entity: '', action: '' });
+  const rows = (data.audit_logs || [])
+    .filter((row) => !filters.from || String(row.created_at || '').slice(0, 10) >= filters.from)
+    .filter((row) => !filters.to || String(row.created_at || '').slice(0, 10) <= filters.to)
+    .filter((row) => !filters.actor || row.actor_id === filters.actor)
+    .filter((row) => !filters.entity || row.entity_type === filters.entity)
+    .filter((row) => !filters.action || row.action === filters.action)
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+  const actors = [...new Set((data.audit_logs || []).map((row) => row.actor_id).filter(Boolean))];
+  const entities = [...new Set((data.audit_logs || []).map((row) => row.entity_type).filter(Boolean))].sort();
+  const actions = [...new Set((data.audit_logs || []).map((row) => row.action).filter(Boolean))].sort();
+  return (
+    <div className="grid gap-5">
+      <Section title="Audit Logs">
+        <p className="text-sm leading-6 text-slate-500">Read-only history of important system actions. Use this when checking who changed a lesson, package, payroll, payment, expense, backup, or reversal.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-5">
+          <Field label="From"><Input type="date" value={filters.from} onChange={(event) => setFilters({ ...filters, from: event.target.value })} /></Field>
+          <Field label="To"><Input type="date" value={filters.to} onChange={(event) => setFilters({ ...filters, to: event.target.value })} /></Field>
+          <Field label="Actor"><Select value={filters.actor} onChange={(event) => setFilters({ ...filters, actor: event.target.value })}><option value="">All actors</option>{actors.map((id) => <option key={id} value={id}>{actorName(id, data)}</option>)}</Select></Field>
+          <Field label="Entity"><Select value={filters.entity} onChange={(event) => setFilters({ ...filters, entity: event.target.value })}><option value="">All entities</option>{entities.map((item) => <option key={item}>{item}</option>)}</Select></Field>
+          <Field label="Action"><Select value={filters.action} onChange={(event) => setFilters({ ...filters, action: event.target.value })}><option value="">All actions</option>{actions.map((item) => <option key={item}>{item}</option>)}</Select></Field>
+        </div>
+      </Section>
+      <Section title="Recent Activity">
+        {rows.length === 0 ? <EmptyState title="No audit logs found" body="Actions will appear here after Admin updates important records." /> : (
+          <>
+            <div className="grid gap-3 md:hidden">
+              {rows.map((row) => <AuditLogCard key={row.id} row={row} data={data} />)}
+            </div>
+            <DataTable className="hidden md:block" rows={rows} columns={[
+              { key: 'created_at', label: 'When', render: (row) => `${formatDate(row.created_at)} ${String(row.created_at || '').slice(11, 16)}` },
+              { key: 'actor', label: 'Actor', render: (row) => actorName(row.actor_id, data) },
+              { key: 'action', label: 'Action' },
+              { key: 'entity_type', label: 'Entity' },
+              { key: 'entity', label: 'ID / Code', render: (row) => entityLabel(row, data) },
+              { key: 'summary', label: 'Summary', render: (row) => auditSummary(row) },
+            ]} />
+          </>
+        )}
+      </Section>
+    </div>
+  );
+}
+
+function AuditLogCard({ row, data }) {
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-sky-700">{formatDate(row.created_at)} {String(row.created_at || '').slice(11, 16)}</p>
+          <h3 className="mt-1 font-semibold text-slate-950">{row.action}</h3>
+        </div>
+        <StatusBadge value={row.entity_type}>{row.entity_type}</StatusBadge>
+      </div>
+      <p className="mt-3 text-sm text-slate-600"><span className="font-semibold">Actor:</span> {actorName(row.actor_id, data)}</p>
+      <p className="mt-1 break-all text-sm text-slate-600"><span className="font-semibold">Record:</span> {entityLabel(row, data)}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-500">{auditSummary(row)}</p>
+    </article>
+  );
+}
+
+function actorName(actorId, data) {
+  const profile = data.profiles.find((item) => item.id === actorId);
+  return profile?.full_name || profile?.email || actorId || 'System';
+}
+
+function entityLabel(row, data) {
+  const table = data[row.entity_type] || [];
+  const item = table.find((candidate) => candidate.id === row.entity_id);
+  return item?.lesson_code || item?.package_code || item?.customer_code || item?.student_code || item?.class_code || item?.coach_code || item?.display_name || row.entity_id || '-';
+}
+
+function auditSummary(row) {
+  if (row.action === 'export_all_data') return 'Admin exported a JSON backup.';
+  if (row.action === 'reverse_approval') return row.new_data?.reason ? `Approval reversed: ${row.new_data.reason}` : 'Approval reversed.';
+  const oldData = row.old_data || {};
+  const newData = row.new_data || {};
+  const changed = Object.keys(newData).filter((key) => JSON.stringify(oldData[key]) !== JSON.stringify(newData[key]) && !['updated_at'].includes(key)).slice(0, 5);
+  if (row.action === 'insert') return `Created ${row.entity_type}.`;
+  if (changed.length) return `Changed ${changed.join(', ')}.`;
+  return 'System record saved.';
 }
 
 function SettingsPage({ data, reload, toast }) {

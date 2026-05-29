@@ -113,7 +113,7 @@ async function main() {
   if (adminProfile?.role === 'admin' && adminProfile.active) pass('Admin profile active', adminProfile.email);
   else fail('Admin profile active', `Expected active admin, got ${adminProfile?.role || 'missing'}.`);
 
-  for (const table of ['profiles', 'coaches', 'customers', 'students', 'venues', 'classes', 'packages', 'lessons', 'package_financials', 'expenses', 'payroll_items']) {
+  for (const table of ['profiles', 'coaches', 'customers', 'students', 'venues', 'classes', 'packages', 'lessons', 'package_financials', 'expenses', 'payroll_items', 'student_skill_profiles', 'student_skill_progress', 'lesson_skill_assessments', 'audit_logs']) {
     const { error } = await selectRows(admin.supabase, table, 'id', { limit: 1 });
     if (error) fail(`Admin can read ${table}`, error.message);
     else pass(`Admin can read ${table}`);
@@ -157,7 +157,7 @@ async function main() {
     else warn(`Coach can read ${label}`, 'No assigned demo rows visible. Check demo-seed profile IDs.');
   }
 
-  for (const table of ['package_financials', 'expenses']) {
+  for (const table of ['package_financials', 'expenses', 'audit_logs']) {
     const { data, error } = await selectRows(coach.supabase, table, 'id', { limit: 5 });
     if (error || (data || []).length === 0) pass(`Coach cannot see ${table}`, error ? error.message : '0 rows visible');
     else fail(`Coach cannot see ${table}`, `${data.length} row(s) visible to Coach.`);

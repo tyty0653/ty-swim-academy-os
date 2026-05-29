@@ -200,17 +200,20 @@ begin
     source = 'demo_seed'
   returning id into v_customer_id;
 
-  insert into public.students (student_code, customer_id, display_name, age, gender, level, learning_goal, health_notes, special_needs, safety_alert, preferred_language, status)
+  insert into public.students (student_code, customer_id, display_name, age, gender, level, learning_goal, health_notes, special_needs, safety_alert, photo_consent_status, photo_consent_note, photo_consent_updated_at, preferred_language, status)
   values
-    ('DEMO-STU-0001', v_customer_id, 'Demo Student A', 7, 'female', 'Beginner', 'Water confidence and floating.', 'No known health issue confirmed in demo.', null, null, 'English / Chinese', 'active'),
-    ('DEMO-STU-0002', v_customer_id, 'Demo Student B', 9, 'male', 'Beginner', 'Breathing and kicking.', 'Demo note: mild water anxiety.', null, 'Needs gentle warm-up.', 'English / Chinese', 'active')
+    ('DEMO-STU-0001', v_customer_id, 'Demo Student A', 7, 'female', 'Beginner', 'Water confidence and floating.', 'No known health issue confirmed in demo.', null, null, 'marketing_approved', 'DEMO_SEED fake marketing consent approved for testing photo usage.', now(), 'English / Chinese', 'active'),
+    ('DEMO-STU-0002', v_customer_id, 'Demo Student B', 9, 'male', 'Beginner', 'Breathing and kicking.', 'Demo note: mild water anxiety.', null, 'Needs gentle warm-up.', 'internal_only', 'DEMO_SEED internal lesson photo only.', now(), 'English / Chinese', 'active')
   on conflict (student_code) do update set
     customer_id = excluded.customer_id,
     display_name = excluded.display_name,
     age = excluded.age,
     level = excluded.level,
     health_notes = excluded.health_notes,
-    safety_alert = excluded.safety_alert;
+    safety_alert = excluded.safety_alert,
+    photo_consent_status = excluded.photo_consent_status,
+    photo_consent_note = excluded.photo_consent_note,
+    photo_consent_updated_at = excluded.photo_consent_updated_at;
 
   select id into v_student_a_id from public.students where student_code = 'DEMO-STU-0001';
   select id into v_student_b_id from public.students where student_code = 'DEMO-STU-0002';

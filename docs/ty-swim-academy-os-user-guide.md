@@ -285,6 +285,18 @@ Expenses:
 
 Warning: Money is Admin-only. Coaches must not see it.
 
+### Backup Export
+
+Admin can export all Admin-accessible database records from More -> Admin Tools or Reports.
+
+The JSON backup includes operational records, finance/payment/payroll/expense records, lesson records, student progress records, audit logs if accessible, and storage paths saved in database rows. It does not include raw image files, payment proof file binaries, or expense receipt file binaries.
+
+Keep the JSON file private. It can contain customer, child/student, lesson, and finance data.
+
+### Audit Logs
+
+Audit Logs are Admin-only and read-only. They show date/time, actor, action, entity type, record id/code, and a short summary. Use them to check important changes such as lesson approvals, reversals, payment edits, package updates, payroll actions, expense changes, and backup exports.
+
 ### More
 
 Purpose: advanced and occasional tools so the daily menu stays simple.
@@ -297,10 +309,12 @@ Tools:
 - CSV Import: import old Google Sheet CSV data
 - Data Cleanup: find missing important data
 - Reports: lesson, payment, expense, payroll, and renewal exports
+- Audit Logs: read-only history of important changes and backup exports
+- Export All Data JSON: Admin backup download from More -> Admin Tools or Reports
 - Settings: profiles, coaches, coach rates
 - Detailed list routes for customers, venues, classes, packages, and lesson history
 
-Use More when setup, troubleshooting, import, reports, or advanced data management is needed.
+Use More when setup, troubleshooting, import, reports, backup export, audit review, or advanced data management is needed.
 
 ### Setup Check
 
@@ -541,7 +555,8 @@ Coach:
 5. Add short progress note.
 6. Add next focus.
 7. Upload photo if needed.
-8. Click Lesson completed or Lesson cancelled.
+8. Optionally update 1-2 current focus skills with Learning / Almost / Passed.
+9. Click Lesson completed or Lesson cancelled.
 
 Result:
 
@@ -601,7 +616,17 @@ When payroll is marked paid, the database function creates an expense row with c
 
 A unique database index prevents duplicate coach salary expenses for the same paid payroll period.
 
-### 14. Payment Proof Upload
+### 14. Void / Reverse Approved Lesson
+
+Admin can open an approved lesson and use Void / Reverse approval.
+
+This requires a reason. If the original approval deducted a package lesson, the system restores one lesson. If an unpaid payroll item exists, it is voided. If payroll has already been paid, the system blocks automatic reversal and shows:
+
+`Cannot reverse automatically because payroll has already been paid. Please create an adjustment manually.`
+
+The lesson becomes `void`, Coach still cannot edit it, and an audit log is written.
+
+### 15. Payment Proof Upload
 
 Admin:
 
@@ -613,7 +638,7 @@ Admin:
 
 Coach cannot access payment proofs.
 
-### 15. Expense Receipt Upload
+### 16. Expense Receipt Upload
 
 Admin:
 
@@ -625,7 +650,7 @@ Admin:
 
 Coach cannot access expense receipts.
 
-### 16. Setup Check Usage
+### 17. Setup Check Usage
 
 Admin:
 
@@ -641,7 +666,7 @@ Coach:
 2. Confirm assigned lessons/students are visible.
 3. Confirm finance is hidden.
 
-### 17. Demo Seed / Testing Usage
+### 18. Demo Seed / Testing Usage
 
 Use demo seed only in a test Supabase project.
 
@@ -681,6 +706,7 @@ Do not mix demo data with real customer data in production.
 | Upload Photo | Lesson detail | Coach / Admin | Uploads image to `lesson-photos` | Coach only for assigned lessons; bucket is private |
 | Approve | Review | Admin | Approves lesson | Can deduct package once and create payroll item once |
 | Approve and apply package/payroll | Lesson detail | Admin | Runs lesson approval function | Check toggles before approving |
+| Void / Reverse approval | Lesson detail | Admin | Reverses an approved unpaid lesson safely | Requires reason; blocks if payroll already paid |
 | Request edit / Needs Edit | Review | Admin | Sends lesson back for correction | Coach must update and resubmit |
 | Reject | Review | Admin | Rejects lesson record | Does not deduct package or create payroll |
 | Generate | Payroll | Admin | Generates monthly payroll period/items | Based on approved payable lessons |
@@ -688,6 +714,8 @@ Do not mix demo data with real customer data in production.
 | Upload Payment Proof | Payments | Admin | Uploads proof screenshot | Admin-only private bucket |
 | Upload Expense Receipt | Expenses | Admin | Uploads receipt | Admin-only private bucket |
 | Export CSV | Tables / Money / Reports | Admin mostly, Coach where allowed | Downloads visible rows | Be careful not to share exported sensitive data |
+| Export All Data JSON | More / Reports | Admin | Downloads Admin-accessible database backup | Includes finance and child/student data; keep private |
+| Audit Logs | More | Admin | Opens read-only change history | Coach cannot access |
 | Import preview rows | CSV Import | Admin | Imports mapped CSV rows | Use test data first; phone numbers are text |
 | Run Setup Check | Today / More / direct | Admin / Coach | Checks setup and access | Coach check proves coach-scoped view only |
 | Open | Review / cleanup | Admin | Opens detailed record | Use for records needing inspection |
@@ -837,6 +865,19 @@ The full syllabus is available through View Syllabus, but it is secondary so Coa
 
 During Coach lesson submission, Update student progress is optional. It does not affect package deduction or payroll. Package deduction and coach payroll still only happen after Admin approves the lesson.
 
+The normal Coach submit screen shows only 1-2 current focus skills for each student. Coach can tap Learning / Almost / Passed, add a short note or next focus, and save. The full checklist stays in Levels & Progress so the lesson submit page stays fast on phone.
+
+## 11. Photo Consent And Usage
+
+Each student has photo consent:
+
+- `unknown`
+- `internal_only`
+- `marketing_approved`
+- `not_allowed`
+
+Coach-uploaded lesson photos default to internal usage. Coach cannot mark a photo as marketing-approved. Admin can change usage to marketing candidate or marketing approved only when every active student in the lesson has `marketing_approved` consent.
+
 ### Bonus Skills
 
 Bonus skills are useful teaching tools and do not block main level progression unless Admin decides:
@@ -851,6 +892,7 @@ For a new Supabase project, run `supabase/schema.sql`.
 For an existing test project that already has the OS schema, run:
 
 1. `supabase/skill-progress-migration.sql`
-2. then rerun `supabase/demo-seed.sql` if you want demo progress data
+2. `supabase/pre-real-use-safety-migration.sql`
+3. then rerun `supabase/demo-seed.sql` if you want demo progress data
 
 Do not put the Supabase service role key in the frontend or Vercel. Coaches are protected by RLS and can update progress only for assigned students.
