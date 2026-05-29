@@ -75,7 +75,8 @@ Date: 2026-05-28
 - [x] Coach navigation hides Money, Review, Import, Cleanup, Reports, Settings, Payments, and Expenses.
 - [x] Coach data loading excludes payment/expense/audit/import tables.
 - [x] Coach-facing screens do not show customer charged price, company income, payments, expenses, profit, or other coaches' payroll.
-- [x] Added Admin-only `/system-check` page under More.
+- [x] Admin `/system-check` remains the full technical Setup Check page under More.
+- [x] Coach `/system-check` shows a simple My Account Check with no technical setup wording.
 - [x] System Check shows env, session, profile, role, table, storage, demo data, coach profile, sensitive-module, payroll-scope, service-role, and data-count checks.
 - [x] Admin backup export downloads JSON rows only and logs the export when audit insert is available.
 - [x] Audit Logs page is Admin-only and read-only.

@@ -69,7 +69,7 @@ Main workflows:
 - Mark payroll paid creates coach salary expense once
 - Admin records payments and uploads payment proof
 - Admin records expenses and uploads receipts
-- Admin/Coach use Setup Check to verify setup and permissions
+- Admin uses Setup Check for full system health; Coach uses My Account Check for account, assignments, pay access, and finance privacy
 - Coach can optionally update student skill progress during lesson submission
 - Admin can export all database records as JSON backup from More/Reports
 - Admin can review read-only Audit Logs
@@ -96,7 +96,7 @@ Design intent:
 - student progress uses compact cards and current-level checklist updates
 - Review is grouped by action type
 - Money is available but not the main dashboard focus
-- Setup Check explains setup and permission problems in beginner-friendly language
+- Admin Setup Check explains setup and permission problems in beginner-friendly language
 
 Tone:
 
@@ -117,7 +117,8 @@ Tone:
 - Schedule page separates Fixed Weekly and Flexible / Coach-arranged modes.
 - Review page groups Pending, Rescheduled, Cancelled, Needs edit, and Missing photos.
 - Money page groups Payments, Payroll, Expenses, and Summary.
-- Setup Check gives a beginner summary first, with pass/warning/fail details available below.
+- Admin Setup Check gives a beginner summary first, with pass/warning/fail details available below.
+- Coach My Account Check avoids technical setup wording and uses simple mobile cards.
 - Demo seed and QA scripts exist for safer testing.
 - Approved lessons are read-only for Coach.
 - Package deduction and payroll creation happen through approval functions designed to avoid duplicates.
@@ -168,9 +169,9 @@ The current approach is intentionally simple: student cards, current level, focu
 
 The normal Coach path hides the full syllabus behind View Syllabus, but the `/skill-levels` page has a lot of teaching content. It may need search, collapse-all, or level filters later.
 
-11. Setup Check still contains technical concepts in advanced details.
+11. Admin Setup Check still contains technical concepts in advanced details.
 
-It now has a beginner summary at the top, but terms such as storage buckets, RLS, service_role, and env variables still appear in advanced details.
+This is intentional for Admin. Coach now sees a separate My Account Check without technical setup terms.
 
 12. Mobile navigation is simple but not fully app-like.
 

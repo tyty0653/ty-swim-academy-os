@@ -83,8 +83,8 @@ Check:
 - `/review`: review categories show pending, rescheduled, cancelled, needs edit, missing photos.
 - `/money`: payments, payroll, expenses, and export summary are grouped.
 - `/more`: System Check, import, cleanup, reports, settings, and advanced tools are available.
-- `/system-check`: all setup checks are pass or understandable warnings.
-- `/system-check`: confirms env, session, profile, role, tables, buckets, demo data, coach profile link, sensitive coach restrictions, counts, and next action.
+- `/system-check` as Admin: all setup checks are pass or understandable warnings.
+- `/system-check` as Admin: confirms env, session, profile, role, tables, buckets, demo data, coach profile link, sensitive coach restrictions, counts, and next action.
 - Bucket checks use bucket-specific reachability, not `listBuckets()`, because `listBuckets()` can be unreliable from an anon/authenticated frontend client.
 
 Flow:
@@ -104,7 +104,8 @@ Sign in as Coach.
 Check:
 
 - Navigation shows only Today, My Schedule, My Students, My Pay.
-- Coach cannot open `/money`, `/payments`, `/expenses`, `/review`, `/import`, `/settings`, or `/system-check`.
+- Coach cannot open `/money`, `/payments`, `/expenses`, `/review`, `/import`, or `/settings`.
+- Coach can open `/system-check`, but it shows only My Account Check with account, assignments, pay access, and finance privacy.
 - Today cards show lesson time, class/group, student names, venue/address, WhatsApp, map, safety alert, photo required badge, and Submit Record.
 - Coach lesson form shows only attendance, completed/cancelled, short progress note, next focus, optional photo, and submit.
 - Approved lessons are read-only.

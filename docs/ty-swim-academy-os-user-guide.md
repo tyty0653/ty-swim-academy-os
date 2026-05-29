@@ -348,7 +348,7 @@ If a check fails, read the Next action column.
 
 ## 4. Coach Navigation
 
-Coach navigation has four main items: Today, My Schedule, My Students, and My Pay. Coach can also open Setup Check directly.
+Coach navigation has four main items: Today, My Schedule, My Students, and My Pay. Coach can also open My Account Check from Today or More.
 
 ### Today
 
@@ -439,17 +439,20 @@ Coach does not see:
 - company expenses
 - customer payments
 
-### Coach Setup Check
+### My Account Check
 
-Coach can open Setup Check directly, usually from the Setup Check button on Today or by going to `/system-check`.
+Coach can open My Account Check from Today, More, or by going to `/system-check`.
 
 This helps confirm:
 
+- account is active
 - coach profile is linked
 - assigned lessons are visible
-- assigned students/classes/venues are visible
-- payments and expenses are hidden
-- other coach payroll is hidden
+- assigned students and venues are visible
+- My Pay access is working
+- finance and admin-only records are hidden for privacy
+
+It does not show technical setup details. If something looks wrong, Coach should contact Admin.
 
 ## 5. Core Workflows
 
@@ -662,9 +665,10 @@ Admin:
 
 Coach:
 
-1. Open Setup Check from Today or go to `/system-check`.
-2. Confirm assigned lessons/students are visible.
-3. Confirm finance is hidden.
+1. Open My Account Check from Today or go to `/system-check`.
+2. Confirm assigned lessons/students/venues are visible.
+3. Confirm My Pay access is working.
+4. Confirm finance and admin-only records are hidden.
 
 ### 18. Demo Seed / Testing Usage
 
@@ -676,7 +680,7 @@ Use demo seed only in a test Supabase project.
 4. Replace the Admin and Coach Auth ID variables where the file instructs you.
 5. Run the SQL in Supabase SQL Editor.
 6. Log in as Admin and open Setup Check.
-7. Log in as Coach and open Setup Check.
+7. Log in as Coach and open My Account Check.
 
 Demo rows use `DEMO-*` codes so they can be reset without deleting future real records.
 
@@ -717,7 +721,8 @@ Do not mix demo data with real customer data in production.
 | Export All Data JSON | More / Reports | Admin | Downloads Admin-accessible database backup | Includes finance and child/student data; keep private |
 | Audit Logs | More | Admin | Opens read-only change history | Coach cannot access |
 | Import preview rows | CSV Import | Admin | Imports mapped CSV rows | Use test data first; phone numbers are text |
-| Run Setup Check | Today / More / direct | Admin / Coach | Checks setup and access | Coach check proves coach-scoped view only |
+| Run Setup Check | Today / More / direct | Admin | Checks setup and technical access | Admin-only full system health page |
+| My Account Check | Coach Today / More / direct | Coach | Checks coach account, assignments, pay access, and finance privacy | No technical setup details are shown |
 | Open | Review / cleanup | Admin | Opens detailed record | Use for records needing inspection |
 | Delete lesson photo | Lesson detail | Admin | Deletes photo from storage and row | Confirm before deleting |
 

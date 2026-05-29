@@ -294,14 +294,14 @@ function OsShell({ session, profile, pathInfo, data, tableErrors, reload, toast,
           <div className="flex items-center justify-between gap-3 lg:hidden">
             <div>
               <p className="text-xs font-semibold text-sky-700">TY Swim OS · {isAdmin ? 'Admin' : 'Coach'}</p>
-              <h2 className="text-lg font-semibold leading-tight text-slate-950">{pageTitle(pathInfo)}</h2>
+              <h2 className="text-lg font-semibold leading-tight text-slate-950">{pageTitle(pathInfo, profile)}</h2>
             </div>
             <Button variant="ghost" onClick={() => go('/more')}>More</Button>
           </div>
           <div className="hidden items-center justify-between gap-3 lg:flex">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">{profile.role}</p>
-              <h2 className="text-xl font-semibold text-slate-950">{pageTitle(pathInfo)}</h2>
+              <h2 className="text-xl font-semibold text-slate-950">{pageTitle(pathInfo, profile)}</h2>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" onClick={() => go('/dashboard')}>Dashboard</Button>
@@ -345,8 +345,9 @@ function activeNav(pathInfo, key) {
   return pathInfo.section === key;
 }
 
-function pageTitle(pathInfo) {
+function pageTitle(pathInfo, profile) {
   if (pathInfo.path === '/dashboard') return 'Today';
+  if (pathInfo.section === 'system-check' && profile?.role === 'coach') return 'My Account Check';
   return {
     customers: 'Customers',
     students: 'Students',
@@ -538,7 +539,7 @@ function CoachDashboard({ profile, data }) {
 
 function CoachTodayCards({ lessons, data }) {
   return (
-    <Section title="Today" action={<Button variant="ghost" onClick={() => go('/system-check')}>Setup Check</Button>}>
+    <Section title="Today" action={<Button variant="ghost" onClick={() => go('/system-check')}>My Account Check</Button>}>
       {lessons.length === 0 ? (
         <EmptyState title="No lessons today" body="Assigned lessons will appear here with contact, map, safety alerts, and a fast submit button." />
       ) : (
@@ -1036,8 +1037,8 @@ function MorePage(props) {
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {tools.map(([key, href, label]) => (
             <button key={key} onClick={() => go(href)} className="flex min-h-14 items-center justify-between rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-sky-200 hover:bg-sky-50 sm:block sm:min-h-0 sm:p-4">
-              <p className="font-semibold text-slate-950">{label}</p>
-              <p className="hidden text-sm text-slate-500 sm:mt-1 sm:block">{moreToolDescription(key)}</p>
+              <p className="font-semibold text-slate-950">{!isAdmin && key === 'system-check' ? 'My Account Check' : label}</p>
+              <p className="hidden text-sm text-slate-500 sm:mt-1 sm:block">{moreToolDescription(key, isAdmin)}</p>
               <span className="text-slate-300 sm:hidden">›</span>
             </button>
           ))}
@@ -1059,12 +1060,12 @@ function MorePage(props) {
   );
 }
 
-function moreToolDescription(key) {
+function moreToolDescription(key, isAdmin = true) {
   return {
     money: 'Payments, payroll, expenses, and accounting summary.',
     help: 'Simple owner and coach guide for daily use.',
     'skill-levels': 'TY Swim Level 1-6 syllabus and student progress.',
-    'system-check': 'Check whether the OS is ready and see what to fix first.',
+    'system-check': isAdmin ? 'Check whether the OS is ready and see what to fix first.' : 'Check your coach account, assigned lessons, students, venues, and pay access.',
     'audit-logs': 'Read-only history of important Admin and system actions.',
     import: 'Bring in old Google Sheet CSV data.',
     cleanup: 'Find missing names, address, age, consent, coach, and proof records.',
@@ -1221,6 +1222,9 @@ function SystemCheckPage({ session, profile, data, tableErrors = {} }) {
   const assignedLessonCount = ownCoach ? data.lessons.filter((lesson) => lesson.coach_id === ownCoach.id).length : 0;
   const assignedClassCount = ownCoach ? data.classes.filter((cls) => cls.assigned_coach_id === ownCoach.id).length : 0;
   const visiblePayrollForOtherCoach = isCoach && ownCoach ? data.payroll_items.some((item) => item.coach_id !== ownCoach.id) : false;
+  if (isCoach) {
+    return <CoachAccountCheck profile={profile} ownCoach={ownCoach} data={data} assignedLessonCount={assignedLessonCount} assignedClassCount={assignedClassCount} visiblePayrollForOtherCoach={visiblePayrollForOtherCoach} />;
+  }
   const coachProfileExists = data.coaches.some((coach) => coach.profile_id);
   const frontendEnvKeys = Object.keys(import.meta.env || {});
   const serviceRoleExposed = frontendEnvKeys.some((key) => key.toLowerCase().includes('service_role'));
@@ -1304,6 +1308,60 @@ function SystemCheckPage({ session, profile, data, tableErrors = {} }) {
         </div>
       </Section>
     </div>
+  );
+}
+
+function CoachAccountCheck({ profile, ownCoach, data, assignedLessonCount, assignedClassCount, visiblePayrollForOtherCoach }) {
+  const assignedStudentCount = data.students.length;
+  const assignedVenueCount = data.venues.length;
+  const financeHidden = data.package_financials.length === 0 && data.expenses.length === 0 && data.audit_logs.length === 0 && !visiblePayrollForOtherCoach;
+  const rows = [
+    checkRow('Account active', profile?.active ? 'pass' : 'fail', profile?.active ? 'Your coach account is active.' : 'Your coach account is not active.', 'Contact Admin.'),
+    checkRow('Coach profile linked', ownCoach?.id ? 'pass' : 'fail', ownCoach?.display_name || ownCoach?.coach_code || 'Your coach profile is not linked yet.', 'Contact Admin.'),
+    checkRow('Assigned lessons visible', assignedLessonCount > 0 ? 'pass' : 'warning', assignedLessonCount > 0 ? `${assignedLessonCount} assigned lesson(s) visible.` : 'No assigned lessons are visible yet.', 'If you expect lessons, contact Admin.'),
+    checkRow('Assigned students visible', assignedStudentCount > 0 ? 'pass' : 'warning', assignedStudentCount > 0 ? `${assignedStudentCount} assigned student(s) visible.` : 'No assigned students are visible yet.', 'If you expect students, contact Admin.'),
+    checkRow('Assigned venues visible', assignedVenueCount > 0 ? 'pass' : 'warning', assignedVenueCount > 0 ? `${assignedVenueCount} assigned venue(s) visible.` : 'No assigned venues are visible yet.', 'If you expect venue details, contact Admin.'),
+    checkRow('My Pay access working', data.payroll_items.every((item) => !ownCoach?.id || item.coach_id === ownCoach.id) ? 'pass' : 'fail', data.payroll_items.length ? `${data.payroll_items.length} pay item(s) visible for your account.` : 'No pay records yet. Approved payable lessons will appear later.', 'If pay records look wrong, contact Admin.'),
+    checkRow('Finance privacy protected', financeHidden ? 'pass' : 'fail', financeHidden ? 'Finance and admin-only records are hidden for privacy.' : 'Something private appears visible on this account.', 'Contact Admin before using real customer records.'),
+  ];
+  const failCount = rows.filter((row) => row.status === 'fail').length;
+  const warningCount = rows.filter((row) => row.status === 'warning').length;
+  const title = failCount ? 'Your coach account needs help.' : warningCount ? 'Your coach account is almost ready.' : 'Your coach account is ready.';
+  const body = failCount
+    ? 'Something needs Admin help before this account is ready.'
+    : warningCount
+      ? 'Your account works, but some assignments may not be added yet.'
+      : 'You can see your assigned lessons and students. Finance and admin-only records are hidden for privacy.';
+  return (
+    <div className="grid gap-5">
+      <Section title="My Account Check">
+        <div className={`rounded-lg border p-4 ${failCount ? 'border-rose-100 bg-rose-50' : warningCount ? 'border-amber-100 bg-amber-50' : 'border-emerald-100 bg-emerald-50'}`}>
+          <p className="text-lg font-semibold text-slate-950">{title}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-700">{body}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">If something looks wrong, contact Admin.</p>
+        </div>
+      </Section>
+      <Section title="What You Can Use">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {rows.map((row) => <CoachCheckCard key={row.id} row={row} />)}
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+function CoachCheckCard({ row }) {
+  const tone = row.status === 'pass' ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : row.status === 'warning' ? 'border-amber-100 bg-amber-50 text-amber-700' : 'border-rose-100 bg-rose-50 text-rose-700';
+  const label = row.status === 'pass' ? 'Ready' : row.status === 'warning' ? 'Check' : 'Needs help';
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="font-semibold text-slate-950">{row.check}</h3>
+        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${tone}`}>{label}</span>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-slate-600">{row.detail}</p>
+      {row.status !== 'pass' ? <p className="mt-2 text-sm font-medium text-slate-700">{row.nextAction}</p> : null}
+    </article>
   );
 }
 
