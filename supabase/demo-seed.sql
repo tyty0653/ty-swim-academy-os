@@ -26,6 +26,15 @@ declare
   v_class_id uuid;
   v_package_id uuid;
   v_schedule_id uuid;
+  v_demo_coach_ids uuid[];
+  v_demo_customer_ids uuid[];
+  v_demo_student_ids uuid[];
+  v_demo_venue_ids uuid[];
+  v_demo_class_ids uuid[];
+  v_demo_package_ids uuid[];
+  v_demo_schedule_ids uuid[];
+  v_demo_lesson_ids uuid[];
+  v_demo_payroll_period_ids uuid[];
 begin
   -- This guard only rejects the original placeholder values, not real Auth IDs.
   if v_admin_profile_id::text = '00000000-0000-0000-0000-000000000001'
@@ -33,26 +42,124 @@ begin
     raise exception 'Replace v_admin_profile_id and v_coach_profile_id with real Supabase Auth user IDs before running demo-seed.sql';
   end if;
 
-  delete from public.lesson_change_logs where lesson_id in (select id from public.lessons where lesson_code like 'DEMO-%');
-  delete from public.lesson_participants where lesson_id in (select id from public.lessons where lesson_code like 'DEMO-%');
-  delete from public.lesson_photos where lesson_id in (select id from public.lessons where lesson_code like 'DEMO-%');
-  delete from public.expenses where linked_payroll_period_id in (
-    select pp.id from public.payroll_periods pp join public.coaches c on c.id = pp.coach_id where c.coach_code like 'DEMO%'
-  ) or notes like 'DEMO_SEED%';
-  delete from public.payroll_items where lesson_id in (select id from public.lessons where lesson_code like 'DEMO-%');
-  delete from public.payroll_periods where coach_id in (select id from public.coaches where coach_code like 'DEMO%');
-  delete from public.lessons where lesson_code like 'DEMO-%';
-  delete from public.recurring_schedules where notes like 'DEMO_SEED%';
-  delete from public.package_financials where notes like 'DEMO_SEED%';
-  delete from public.packages where package_code like 'DEMO-%';
-  delete from public.class_students where class_id in (select id from public.classes where class_code like 'DEMO-%');
-  delete from public.classes where class_code like 'DEMO-%';
-  delete from public.consents where notes like 'DEMO_SEED%';
-  delete from public.venues where venue_notes like 'DEMO_SEED%';
-  delete from public.students where student_code like 'DEMO-%';
-  delete from public.customers where customer_code like 'DEMO-%';
-  delete from public.coach_rates where coach_id in (select id from public.coaches where coach_code like 'DEMO%') or notes like 'DEMO_SEED%';
-  delete from public.coaches where coach_code like 'DEMO%';
+  -- Reset demo data only. The id sets intentionally include generated lessons and
+  -- mutation-QA rows that reference demo packages/classes/coaches/schedules even
+  -- when their generated code does not start with DEMO-.
+  select coalesce(array_agg(id), '{}'::uuid[]) into v_demo_coach_ids
+  from public.coaches
+  where coach_code like 'DEMO%' or notes like 'DEMO_SEED%';
+
+  select coalesce(array_agg(id), '{}'::uuid[]) into v_demo_customer_ids
+  from public.customers
+  where customer_code like 'DEMO-%' or source = 'demo_seed' or internal_notes like 'DEMO_SEED%';
+
+  select coalesce(array_agg(id), '{}'::uuid[]) into v_demo_student_ids
+  from public.students
+  where student_code like 'DEMO-%'
+     or customer_id = any(v_demo_customer_ids)
+     or learning_goal like 'DEMO_SEED%'
+     or health_notes like 'DEMO_SEED%';
+
+  select coalesce(array_agg(id), '{}'::uuid[]) into v_demo_venue_ids
+  from public.venues
+  where venue_notes like 'DEMO_SEED%'
+     or customer_id = any(v_demo_customer_ids);
+
+  select coalesce(array_agg(id), '{}'::uuid[]) into v_demo_class_ids
+  from public.classes
+  where class_code like 'DEMO-%'
+     or notes like 'DEMO_SEED%'
+     or customer_id = any(v_demo_customer_ids)
+     or assigned_coach_id = any(v_demo_coach_ids);
+
+  select coalesce(array_agg(id), '{}'::uuid[]) into v_demo_package_ids
+  from public.packages
+  where package_code like 'DEMO-%'
+     or notes like 'DEMO_SEED%'
+     or customer_id = any(v_demo_customer_ids)
+     or class_id = any(v_demo_class_ids);
+
+  select coalesce(array_agg(id), '{}'::uuid[]) into v_demo_schedule_ids
+  from public.recurring_schedules
+  where notes like 'DEMO_SEED%'
+     or class_id = any(v_demo_class_ids)
+     or coach_id = any(v_demo_coach_ids);
+
+  select coalesce(array_agg(id), '{}'::uuid[]) into v_demo_lesson_ids
+  from public.lessons
+  where lesson_code like 'DEMO-%'
+     or package_id = any(v_demo_package_ids)
+     or class_id = any(v_demo_class_ids)
+     or coach_id = any(v_demo_coach_ids)
+     or recurring_schedule_id = any(v_demo_schedule_ids)
+     or exists (
+       select 1
+       from public.lesson_participants lp
+       where lp.lesson_id = public.lessons.id
+         and lp.student_id = any(v_demo_student_ids)
+     )
+     or coach_notes like 'DEMO_SEED%'
+     or admin_notes like 'DEMO_SEED%';
+
+  select coalesce(array_agg(id), '{}'::uuid[]) into v_demo_payroll_period_ids
+  from public.payroll_periods
+  where coach_id = any(v_demo_coach_ids)
+     or notes like 'DEMO_SEED%';
+
+  delete from public.lesson_change_logs where lesson_id = any(v_demo_lesson_ids);
+  delete from public.lesson_participants where lesson_id = any(v_demo_lesson_ids);
+  delete from public.lesson_photos where lesson_id = any(v_demo_lesson_ids);
+  delete from public.payroll_items
+  where lesson_id = any(v_demo_lesson_ids)
+     or coach_id = any(v_demo_coach_ids)
+     or payroll_period_id = any(v_demo_payroll_period_ids);
+  delete from public.expenses
+  where linked_payroll_period_id = any(v_demo_payroll_period_ids)
+     or notes like 'DEMO_SEED%';
+  delete from public.payroll_periods
+  where id = any(v_demo_payroll_period_ids)
+     or coach_id = any(v_demo_coach_ids);
+  delete from public.lessons where id = any(v_demo_lesson_ids);
+  delete from public.recurring_schedules
+  where id = any(v_demo_schedule_ids)
+     or class_id = any(v_demo_class_ids)
+     or coach_id = any(v_demo_coach_ids)
+     or notes like 'DEMO_SEED%';
+  delete from public.package_financials
+  where package_id = any(v_demo_package_ids)
+     or customer_id = any(v_demo_customer_ids)
+     or notes like 'DEMO_SEED%';
+  delete from public.packages
+  where id = any(v_demo_package_ids)
+     or package_code like 'DEMO-%'
+     or notes like 'DEMO_SEED%';
+  delete from public.class_students
+  where class_id = any(v_demo_class_ids)
+     or student_id = any(v_demo_student_ids);
+  delete from public.classes
+  where id = any(v_demo_class_ids)
+     or class_code like 'DEMO-%'
+     or notes like 'DEMO_SEED%';
+  delete from public.consents
+  where customer_id = any(v_demo_customer_ids)
+     or student_id = any(v_demo_student_ids)
+     or notes like 'DEMO_SEED%';
+  delete from public.venues
+  where id = any(v_demo_venue_ids)
+     or venue_notes like 'DEMO_SEED%';
+  delete from public.students
+  where id = any(v_demo_student_ids)
+     or student_code like 'DEMO-%';
+  delete from public.customers
+  where id = any(v_demo_customer_ids)
+     or customer_code like 'DEMO-%'
+     or source = 'demo_seed';
+  delete from public.coach_rates
+  where coach_id = any(v_demo_coach_ids)
+     or notes like 'DEMO_SEED%';
+  delete from public.coaches
+  where id = any(v_demo_coach_ids)
+     or coach_code like 'DEMO%';
 
   insert into public.profiles (id, full_name, email, role, active)
   values
