@@ -378,6 +378,7 @@ function RoutePage(props) {
   const isAdmin = profile.role === 'admin';
   if (pathInfo.path === '/dashboard') return <Dashboard {...props} />;
   if (pathInfo.section === 'customers' && pathInfo.id) return <CustomerDetail {...props} />;
+  if (pathInfo.section === 'students' && pathInfo.id) return <StudentProfilePage {...props} />;
   if (pathInfo.section === 'lessons' && pathInfo.id) return <LessonDetail {...props} />;
   if (pathInfo.section === 'customers') return <CustomersPage {...props} />;
   if (pathInfo.section === 'students') return isAdmin ? <StudentsHub {...props} /> : <StudentsPage {...props} />;
@@ -666,6 +667,7 @@ function StudentsHub(props) {
   const { data, reload, toast, profile } = props;
   const [active, setActive] = useState('customers');
   const [advanced, setAdvanced] = useState(false);
+  const [mode, setMode] = useState(data.students.length ? 'profiles' : 'add');
   const [progressStudent, setProgressStudent] = useState(null);
   const tabs = [
     ['customers', 'Families'],
@@ -676,14 +678,13 @@ function StudentsHub(props) {
   ];
   return (
     <div className="grid gap-5">
-      <StudentSetupWizard data={data} reload={reload} toast={toast} profile={profile} onOpenAdvanced={(key) => { setActive(key); setAdvanced(true); }} />
-      <Section title="Levels & Progress" action={<Button variant="ghost" onClick={() => go('/skill-levels')}>Open full syllabus</Button>}>
-        <p className="mb-4 text-sm leading-6 text-slate-500">Track each student's TY Swim level, focus, safety confidence, and passed skills. Coaches can update assigned students from phone after lessons.</p>
-        <StudentProgressCards students={data.students.slice(0, 6)} data={data} onUpdate={setProgressStudent} />
-        {data.students.length > 6 ? <p className="mt-3 text-sm text-slate-500">Showing the first 6 students. Open Levels & Progress for the full list.</p> : null}
+      <Section title="Students" action={<div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"><Button variant={mode === 'profiles' ? 'primary' : 'ghost'} onClick={() => setMode('profiles')}>Student Profiles</Button><Button variant={mode === 'add' ? 'primary' : 'soft'} onClick={() => setMode('add')}>Add Student / Family</Button></div>}>
+        <p className="text-sm leading-6 text-slate-500">Use Student Profiles for daily view and follow-up. Use Add Student / Family when a new family joins, then fill the missing pieces step by step.</p>
       </Section>
+      {mode === 'add' ? <StudentSetupWizard data={data} reload={reload} toast={toast} profile={profile} onOpenAdvanced={(key) => { setActive(key); setAdvanced(true); }} /> : null}
+      {mode === 'profiles' ? <StudentProfileDirectory data={data} profile={profile} onUpdateProgress={setProgressStudent} onAddStudent={() => setMode('add')} /> : null}
       <Section title="Advanced records" action={<Button variant="ghost" onClick={() => setAdvanced((value) => !value)}>{advanced ? 'Hide advanced records' : 'Show advanced records'}</Button>}>
-        <p className="text-sm leading-6 text-slate-500">Use these tables for search, editing, CSV export, and unusual corrections. The guided setup above is the easiest way to add a new family.</p>
+        <p className="text-sm leading-6 text-slate-500">Use these only for detailed corrections, CSV export, or unusual records. The profile cards and guided setup are the normal daily workflow.</p>
       </Section>
       {advanced ? (
         <>
@@ -706,15 +707,112 @@ function StudentsHub(props) {
   );
 }
 
+function StudentProfileDirectory({ data, profile, onUpdateProgress, onAddStudent }) {
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('active');
+  const [levelFilter, setLevelFilter] = useState('');
+  const isAdmin = profile.role === 'admin';
+  const rows = data.students.map((student) => buildStudentProfileContext(student, data)).filter((item) => {
+    const text = [
+      item.student.display_name,
+      item.customer?.display_name,
+      item.customer?.parent_name,
+      item.customer?.whatsapp,
+      item.primaryClass?.class_name,
+      item.coach?.display_name,
+      item.coach?.coach_code,
+      item.venue?.area,
+    ].filter(Boolean).join(' ').toLowerCase();
+    const matchesQuery = !query || text.includes(query.toLowerCase());
+    const days = daysUntil(item.activePackage?.expiry_date);
+    const matchesFilter = filter === 'all'
+      || (filter === 'active' && item.student.status !== 'inactive')
+      || (filter === 'expiring' && days >= 0 && days <= 14)
+      || (filter === 'low' && Number(item.activePackage?.remaining_lessons || 0) <= 1)
+      || (filter === 'missing-health' && (!item.student.health_notes && !item.student.safety_alert))
+      || (filter === 'missing-venue' && !item.venue?.full_address)
+      || (filter === 'missing-consent' && (!item.student.photo_consent_status || item.student.photo_consent_status === 'unknown'));
+    const matchesLevel = !levelFilter || Number(item.skillProfile.current_level) === Number(levelFilter);
+    return matchesQuery && matchesFilter && matchesLevel;
+  });
+  const filterLabels = [
+    ['active', 'Active'],
+    ['all', 'All'],
+    ['expiring', 'Expiring soon'],
+    ['low', 'Low lessons'],
+    ['missing-health', 'Missing health'],
+    ['missing-venue', 'Missing venue'],
+    ['missing-consent', 'Missing consent'],
+  ];
+  return (
+    <Section title={isAdmin ? 'Student / Family Profiles' : 'My Students'} action={isAdmin ? <Button onClick={onAddStudent || (() => go('/students'))}>Add Student / Family</Button> : null}>
+      <p className="text-sm leading-6 text-slate-500">{isAdmin ? 'Search families and open a clean profile with safety, lesson setup, package, progress, and recent lessons.' : 'Open a student profile for WhatsApp, map, safety notes, current level, progress, and lesson history.'}</p>
+      <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto]">
+        <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search student, parent, phone, class, coach, area" />
+        <Select value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)} className="lg:w-40">
+          <option value="">All levels</option>
+          {[1, 2, 3, 4, 5, 6].map((level) => <option key={level} value={level}>Level {level}</option>)}
+        </Select>
+      </div>
+      <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+        {filterLabels.map(([key, label]) => <Button key={key} variant={filter === key ? 'primary' : 'ghost'} className="shrink-0" onClick={() => setFilter(key)}>{label}</Button>)}
+      </div>
+      {rows.length === 0 ? (
+        <EmptyState title="No matching students" body={isAdmin ? 'Try a different search or start by adding a new family.' : 'Assigned students will appear after Admin links you to a class.'} action={isAdmin ? <Button onClick={onAddStudent || (() => go('/students'))}>Add Student / Family</Button> : null} />
+      ) : (
+        <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+          {rows.map((item) => <StudentProfileCard key={item.student.id} item={item} isAdmin={isAdmin} onUpdateProgress={onUpdateProgress} />)}
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function StudentProfileCard({ item, isAdmin, onUpdateProgress }) {
+  const { student, customer, primaryClass, coach, venue, activePackage, skillProfile, missingItems } = item;
+  const whatsapp = customer?.whatsapp;
+  const map = venue?.google_maps_link;
+  const lowPackage = Number(activePackage?.remaining_lessons || 0) <= 1;
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-semibold text-slate-950">{student.display_name || 'Unnamed student'}</h3>
+          <p className="mt-1 text-sm text-slate-500">{customer?.display_name || 'Family not set'}{customer?.parent_name ? ` / ${customer.parent_name}` : ''}</p>
+        </div>
+        <StudentLevelBadge student={student} data={item.data} />
+      </div>
+      {student.safety_alert ? <p className="mt-3 rounded-lg bg-rose-50 p-2 text-sm font-semibold text-rose-700">{student.safety_alert}</p> : null}
+      <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+        <Info label="Coach" value={coach?.display_name || coach?.coach_code || 'Not set'} />
+        <Info label="Class" value={primaryClass?.class_name || primaryClass?.class_type || 'Not set'} />
+        <Info label="Package" value={<span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${lowPackage ? 'bg-amber-50 text-amber-700 ring-amber-100' : 'bg-emerald-50 text-emerald-700 ring-emerald-100'}`}>{activePackage ? `${activePackage.remaining_lessons} left` : 'No package'}</span>} />
+        <Info label="Focus" value={skillProfile.current_focus || student.learning_goal || 'Not set'} />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {missingItems.slice(0, 4).map((label) => <span key={label} className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">{label}</span>)}
+        {missingItems.length > 4 ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">+{missingItems.length - 4} more</span> : null}
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        <Button onClick={() => go(`/students/${student.id}`)}>Open Profile</Button>
+        <Button variant="soft" onClick={() => onUpdateProgress(student)}>Update Progress</Button>
+        <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? 'WhatsApp' : 'No WhatsApp'}</a>
+        <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${map ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={map || undefined} target="_blank" rel="noreferrer">{map ? 'Map' : 'No map'}</a>
+      </div>
+      {isAdmin && customer?.internal_notes ? <p className="mt-3 rounded-lg bg-slate-50 p-2 text-xs leading-5 text-slate-500">Admin note: {customer.internal_notes}</p> : null}
+    </article>
+  );
+}
+
 function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
   const [step, setStep] = useState(0);
   const [context, setContext] = useState({ customerId: '', studentIds: [], venueId: '', classId: '', packageId: '' });
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
-  const [family, setFamily] = useState({ display_name: '', parent_name: '', whatsapp: '', status: 'active' });
-  const [student, setStudent] = useState({ display_name: '', age: '', level: '', safety_alert: '', photo_consent_status: 'unknown', photo_consent_note: '', status: 'active' });
-  const [venue, setVenue] = useState({ venue_name: '', full_address: '', area: '', pool_type: 'condo', google_maps_link: '', active: true });
-  const [clsForm, setClsForm] = useState({ class_name: '', class_type: '1-2', scheduling_mode: 'fixed_weekly', assigned_coach_id: data.coaches[0]?.id || '', default_duration_minutes: 60, photo_required: false, status: 'active' });
-  const [pkgForm, setPkgForm] = useState({ package_type: '8_lessons', total_lessons: 8, used_lessons: 0, remaining_lessons: 8, validity_months: 4, start_date: todayISO(), payment_date: todayISO(), status: 'active' });
+  const [family, setFamily] = useState({ display_name: '', parent_name: '', whatsapp: '', secondary_contact: '', source: '', internal_notes: '', status: 'active' });
+  const [student, setStudent] = useState({ display_name: '', age: '', gender: '', level: '1', learning_goal: '', health_notes: '', special_needs: '', safety_alert: '', preferred_language: 'English', photo_consent_status: 'unknown', photo_consent_note: '', status: 'active' });
+  const [venue, setVenue] = useState({ venue_name: '', full_address: '', area: '', pool_type: 'condo', google_maps_link: '', access_instruction: '', parking_note: '', pool_depth_note: '', active: true });
+  const [clsForm, setClsForm] = useState({ class_name: '', class_type: '1-2', scheduling_mode: 'fixed_weekly', assigned_coach_id: data.coaches[0]?.id || '', default_duration_minutes: 60, day_of_week: '6', fixed_start_time: '17:00', fixed_end_time: '18:00', photo_required: false, status: 'active' });
+  const [pkgForm, setPkgForm] = useState({ package_type: '8_lessons', total_lessons: 8, used_lessons: 0, remaining_lessons: 8, validity_months: 4, start_date: todayISO(), payment_date: todayISO(), status: 'active', amount: '', payment_status: 'pending', payment_method: 'bank_transfer' });
   const [lessonForm, setLessonForm] = useState({ scheduled_date: todayISO(), start_time: '17:00', end_time: '18:00' });
   const customerId = context.customerId || data.customers[0]?.id || '';
   const customerStudents = data.students.filter((item) => item.customer_id === customerId);
@@ -740,7 +838,7 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
     const { data: saved, error } = await supabase.from('customers').insert({ ...family, parent_name: family.parent_name || family.display_name }).select('*').single();
     if (error) return toast(error.message);
     setContext((current) => ({ ...current, customerId: saved.id }));
-    setFamily({ display_name: '', parent_name: '', whatsapp: '', status: 'active' });
+    setFamily({ display_name: '', parent_name: '', whatsapp: '', secondary_contact: '', source: '', internal_notes: '', status: 'active' });
     toast('Family saved. Next: add student details.');
     await reload();
     setStep(1);
@@ -752,7 +850,7 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
     if (error) return toast(error.message);
     setContext((current) => ({ ...current, studentIds: [...new Set([...current.studentIds, saved.id])] }));
     setSelectedStudentIds((current) => [...new Set([...current, saved.id])]);
-    setStudent({ display_name: '', age: '', level: '', safety_alert: '', photo_consent_status: 'unknown', photo_consent_note: '', status: 'active' });
+    setStudent({ display_name: '', age: '', gender: '', level: '1', learning_goal: '', health_notes: '', special_needs: '', safety_alert: '', preferred_language: 'English', photo_consent_status: 'unknown', photo_consent_note: '', status: 'active' });
     toast('Student saved. Add another student or continue to venue.');
     await reload();
   };
@@ -761,7 +859,7 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
     const { data: saved, error } = await supabase.from('venues').insert({ ...venue, customer_id: customerId || null }).select('*').single();
     if (error) return toast(error.message);
     setContext((current) => ({ ...current, venueId: saved.id }));
-    setVenue({ venue_name: '', full_address: '', area: '', pool_type: 'condo', google_maps_link: '', active: true });
+    setVenue({ venue_name: '', full_address: '', area: '', pool_type: 'condo', google_maps_link: '', access_instruction: '', parking_note: '', pool_depth_note: '', active: true });
     toast('Venue saved. Next: create the class/group.');
     await reload();
     setStep(3);
@@ -770,11 +868,25 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
     event.preventDefault();
     if (!customerId) return toast('Select a family before creating a class.');
     const studentIds = selectedStudentIds.length ? selectedStudentIds : customerStudents.map((item) => item.id);
-    const payload = { ...clsForm, customer_id: customerId, assigned_coach_id: clsForm.assigned_coach_id || null, default_venue_id: context.venueId || null, class_name: clsForm.class_name || `${data.customers.find((item) => item.id === customerId)?.display_name || 'Family'} Group` };
+    const { day_of_week, fixed_start_time, fixed_end_time, ...classPayload } = clsForm;
+    const payload = { ...classPayload, customer_id: customerId, assigned_coach_id: clsForm.assigned_coach_id || null, default_venue_id: context.venueId || null, class_name: clsForm.class_name || `${data.customers.find((item) => item.id === customerId)?.display_name || 'Family'} Group` };
     const { data: saved, error } = await supabase.from('classes').insert(payload).select('*').single();
     if (error) return toast(error.message);
     if (studentIds.length) {
       await supabase.from('class_students').insert(studentIds.map((studentId) => ({ class_id: saved.id, student_id: studentId, active: true })));
+    }
+    if (saved.scheduling_mode === 'fixed_weekly' && saved.assigned_coach_id && fixed_start_time && fixed_end_time) {
+      await supabase.from('recurring_schedules').insert({
+        class_id: saved.id,
+        coach_id: saved.assigned_coach_id,
+        venue_id: saved.default_venue_id,
+        day_of_week: Number(day_of_week),
+        start_time: fixed_start_time,
+        end_time: fixed_end_time,
+        active_from: todayISO(),
+        status: 'active',
+        notes: 'Created from student setup flow.',
+      });
     }
     setContext((current) => ({ ...current, classId: saved.id }));
     toast('Class saved. Next: add the package.');
@@ -784,10 +896,22 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
   const savePackage = async (event) => {
     event.preventDefault();
     if (!customerId || !context.classId) return toast('Create the family and class before adding a package.');
-    const payload = { ...pkgForm, customer_id: customerId, class_id: context.classId, total_lessons: Number(pkgForm.total_lessons), used_lessons: Number(pkgForm.used_lessons), remaining_lessons: Number(pkgForm.remaining_lessons), validity_months: Number(pkgForm.validity_months) };
+    const { amount, payment_status, payment_method, ...packageForm } = pkgForm;
+    const payload = { ...packageForm, customer_id: customerId, class_id: context.classId, total_lessons: Number(pkgForm.total_lessons), used_lessons: Number(pkgForm.used_lessons), remaining_lessons: Number(pkgForm.remaining_lessons), validity_months: Number(pkgForm.validity_months) };
     payload.expiry_date = derivePackageExpiry(payload);
     const { data: saved, error } = await supabase.from('packages').insert(payload).select('*').single();
     if (error) return toast(error.message);
+    if (amount || payment_status === 'paid') {
+      await supabase.from('package_financials').insert({
+        package_id: saved.id,
+        customer_id: customerId,
+        amount: Number(amount || 0),
+        payment_date: pkgForm.payment_date,
+        payment_method: payment_method || 'other',
+        payment_status,
+        notes: 'Created from student setup flow. Upload proof in Money > Payments if needed.',
+      });
+    }
     setContext((current) => ({ ...current, packageId: saved.id }));
     toast('Package saved. Next: schedule the first lesson.');
     await reload();
@@ -805,8 +929,8 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
     go('/schedule');
   };
   return (
-    <Section title="New Family Setup">
-      <p className="text-sm leading-6 text-slate-500">Follow these steps from left to right. Each saved step unlocks the next practical action, while full records stay available under Advanced records.</p>
+    <Section title="Add Student / Family">
+      <p className="text-sm leading-6 text-slate-500">Create a family, student, venue, class, package, and first lesson in one guided flow. Required fields are marked by the browser; optional details can be added now or filled later from the profile.</p>
       <div className="mt-4 grid gap-2 md:grid-cols-6">
         {steps.map(([short, title, body], index) => (
           <button key={title} onClick={() => setStep(index)} className={`rounded-lg border p-3 text-left ${step === index ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200'}`}>
@@ -815,7 +939,7 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
                 <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Step {index + 1}</p>
                 <p className="font-semibold text-slate-950">{short}</p>
               </div>
-              <span className={`text-sm font-semibold md:mt-2 md:block ${completedSteps[index] ? 'text-emerald-600' : step === index ? 'text-sky-700' : 'text-slate-300'}`}>{completedSteps[index] ? '✓' : step === index ? 'Open' : '›'}</span>
+              <span className={`text-sm font-semibold md:mt-2 md:block ${completedSteps[index] ? 'text-emerald-600' : step === index ? 'text-sky-700' : 'text-slate-300'}`}>{completedSteps[index] ? 'Done' : step === index ? 'Open' : 'Next'}</span>
             </div>
             <p className={`${step === index ? 'block' : 'hidden'} mt-2 text-xs leading-5 text-slate-500 md:block`}>{body}</p>
           </button>
@@ -824,24 +948,32 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
       <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:p-4">
         {step === 0 ? (
           <form className="grid gap-3" onSubmit={saveFamily}>
-            <WizardHeader title="Step 1: Add Family / Customer" body="Create the parent/customer record first. WhatsApp is kept as text so leading zeroes stay safe." />
-            <div className="grid gap-3 md:grid-cols-3">
+            <WizardHeader title="Step 1: Add Family / Customer" body="Start with the parent or family contact. WhatsApp is kept as text so leading zeroes stay safe." />
+            <div className="grid gap-3 md:grid-cols-2">
               <Field label="Family display name"><Input required value={family.display_name} onChange={(event) => setFamily({ ...family, display_name: event.target.value })} placeholder="Tan Family" /></Field>
               <Field label="Parent name"><Input value={family.parent_name} onChange={(event) => setFamily({ ...family, parent_name: event.target.value })} /></Field>
               <Field label="WhatsApp"><Input value={family.whatsapp} onChange={(event) => setFamily({ ...family, whatsapp: event.target.value })} placeholder="0123456789" /></Field>
+              <Field label="Secondary contact (optional)"><Input value={family.secondary_contact} onChange={(event) => setFamily({ ...family, secondary_contact: event.target.value })} /></Field>
+              <Field label="Source (optional)"><Input value={family.source} onChange={(event) => setFamily({ ...family, source: event.target.value })} placeholder="Referral / Instagram / Walk-in" /></Field>
+              <Field label="Internal note (Admin only)"><Textarea value={family.internal_notes} onChange={(event) => setFamily({ ...family, internal_notes: event.target.value })} placeholder="Admin-only context. Coaches cannot see this." /></Field>
             </div>
             <WizardActions primary="Save Family" secondary="Open family records" onSecondary={() => onOpenAdvanced('customers')} />
           </form>
         ) : null}
         {step === 1 ? (
           <form className="grid gap-3" onSubmit={saveStudent}>
-            <WizardHeader title="Step 2: Add Student(s)" body="Add one student at a time. After saving, you can add another student or continue to the venue." />
+            <WizardHeader title="Step 2: Add Student(s)" body="Add one student at a time. Health, safety, confidence, and consent are shown clearly later in the profile." />
             <CustomerPicker data={data} value={customerId} onChange={(value) => setContext((current) => ({ ...current, customerId: value }))} />
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-3">
               <Field label="Student name"><Input required value={student.display_name} onChange={(event) => setStudent({ ...student, display_name: event.target.value })} /></Field>
               <Field label="Age"><Input type="number" value={student.age} onChange={(event) => setStudent({ ...student, age: event.target.value })} /></Field>
-              <Field label="Level"><Input value={student.level} onChange={(event) => setStudent({ ...student, level: event.target.value })} /></Field>
-              <Field label="Safety alert"><Input value={student.safety_alert} onChange={(event) => setStudent({ ...student, safety_alert: event.target.value })} placeholder="Optional" /></Field>
+              <Field label="Gender"><Select value={student.gender} onChange={(event) => setStudent({ ...student, gender: event.target.value })}><option value="">Optional</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></Select></Field>
+              <Field label="Current Level 1-6"><Select value={student.level} onChange={(event) => setStudent({ ...student, level: event.target.value })}>{[1, 2, 3, 4, 5, 6].map((item) => <option key={item} value={item}>Level {item}</option>)}</Select></Field>
+              <Field label="Preferred language"><Input value={student.preferred_language} onChange={(event) => setStudent({ ...student, preferred_language: event.target.value })} placeholder="English / Chinese / Malay" /></Field>
+              <Field label="Learning goal"><Textarea value={student.learning_goal} onChange={(event) => setStudent({ ...student, learning_goal: event.target.value })} placeholder="Water confidence, freestyle, or adult breaststroke confidence." /></Field>
+              <Field label="Health notes / emergency note"><Textarea value={student.health_notes} onChange={(event) => setStudent({ ...student, health_notes: event.target.value })} placeholder="Asthma, medication, emergency note, or write None confirmed." /></Field>
+              <Field label="Special needs / confidence"><Textarea value={student.special_needs} onChange={(event) => setStudent({ ...student, special_needs: event.target.value })} placeholder="Fear of water, nervous, mobility, or learning support." /></Field>
+              <Field label="Safety alert"><Textarea value={student.safety_alert} onChange={(event) => setStudent({ ...student, safety_alert: event.target.value })} placeholder="Short warning shown prominently to coaches." /></Field>
               <Field label="Photo consent"><Select value={student.photo_consent_status} onChange={(event) => setStudent({ ...student, photo_consent_status: event.target.value })}>{['unknown', 'internal_only', 'marketing_approved', 'not_allowed'].map((item) => <option key={item}>{item}</option>)}</Select></Field>
               <Field label="Photo consent note"><Input value={student.photo_consent_note} onChange={(event) => setStudent({ ...student, photo_consent_note: event.target.value })} placeholder="Optional" /></Field>
             </div>
@@ -856,8 +988,12 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Venue name"><Input value={venue.venue_name} onChange={(event) => setVenue({ ...venue, venue_name: event.target.value })} placeholder="Home pool / Condo pool" /></Field>
               <Field label="Area"><Input value={venue.area} onChange={(event) => setVenue({ ...venue, area: event.target.value })} /></Field>
+              <Field label="Pool type"><Select value={venue.pool_type} onChange={(event) => setVenue({ ...venue, pool_type: event.target.value })}>{['home', 'condo', 'public', 'other'].map((item) => <option key={item}>{item}</option>)}</Select></Field>
               <Field label="Full address"><Textarea value={venue.full_address} onChange={(event) => setVenue({ ...venue, full_address: event.target.value })} /></Field>
               <Field label="Google Maps link"><Input value={venue.google_maps_link} onChange={(event) => setVenue({ ...venue, google_maps_link: event.target.value })} /></Field>
+              <Field label="Access instruction"><Textarea value={venue.access_instruction} onChange={(event) => setVenue({ ...venue, access_instruction: event.target.value })} placeholder="Guard house, pool level, call parent first." /></Field>
+              <Field label="Parking note"><Textarea value={venue.parking_note} onChange={(event) => setVenue({ ...venue, parking_note: event.target.value })} /></Field>
+              <Field label="Pool depth / safety note"><Textarea value={venue.pool_depth_note} onChange={(event) => setVenue({ ...venue, pool_depth_note: event.target.value })} /></Field>
             </div>
             <WizardActions primary="Save Venue" secondary="Open venue records" onSecondary={() => onOpenAdvanced('venues')} />
           </form>
@@ -872,6 +1008,14 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
               <Field label="Scheduling mode"><Select value={clsForm.scheduling_mode} onChange={(event) => setClsForm({ ...clsForm, scheduling_mode: event.target.value })}><option value="fixed_weekly">Fixed weekly</option><option value="flexible">Flexible / Coach-arranged</option></Select></Field>
               <Field label="Assigned coach"><Select value={clsForm.assigned_coach_id || ''} onChange={(event) => setClsForm({ ...clsForm, assigned_coach_id: event.target.value || null })}><option value="">Choose later</option>{data.coaches.map((item) => <option key={item.id} value={item.id}>{item.display_name || item.coach_code}</option>)}</Select></Field>
               <Field label="Default venue"><Select value={context.venueId || ''} onChange={(event) => setContext((current) => ({ ...current, venueId: event.target.value }))}><option value="">Choose later</option>{data.venues.filter((item) => !customerId || item.customer_id === customerId).map((item) => <option key={item.id} value={item.id}>{item.venue_name || item.area || item.full_address}</option>)}</Select></Field>
+              <Field label="Lesson duration"><Input type="number" value={clsForm.default_duration_minutes} onChange={(event) => setClsForm({ ...clsForm, default_duration_minutes: Number(event.target.value) })} /></Field>
+              {clsForm.scheduling_mode === 'fixed_weekly' ? (
+                <>
+                  <Field label="Weekly day"><Select value={clsForm.day_of_week} onChange={(event) => setClsForm({ ...clsForm, day_of_week: event.target.value })}>{[['0', 'Sunday'], ['1', 'Monday'], ['2', 'Tuesday'], ['3', 'Wednesday'], ['4', 'Thursday'], ['5', 'Friday'], ['6', 'Saturday']].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></Field>
+                  <Field label="Default start"><Input type="time" value={clsForm.fixed_start_time} onChange={(event) => setClsForm({ ...clsForm, fixed_start_time: event.target.value })} /></Field>
+                  <Field label="Default end"><Input type="time" value={clsForm.fixed_end_time} onChange={(event) => setClsForm({ ...clsForm, fixed_end_time: event.target.value })} /></Field>
+                </>
+              ) : null}
               <label className="mt-7 flex items-center gap-2 text-sm font-medium text-slate-600"><input type="checkbox" checked={clsForm.photo_required} onChange={(event) => setClsForm({ ...clsForm, photo_required: event.target.checked })} /> Photo required</label>
             </div>
             <div className="rounded-lg bg-white p-3">
@@ -894,9 +1038,15 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
                 setPkgForm({ ...pkgForm, package_type: event.target.value, total_lessons: total, remaining_lessons: total });
               }}>{packageTypes.map((item) => <option key={item}>{item}</option>)}</Select></Field>
               <Field label="Total lessons"><Input type="number" value={pkgForm.total_lessons} onChange={(event) => setPkgForm({ ...pkgForm, total_lessons: Number(event.target.value), remaining_lessons: Number(event.target.value) })} /></Field>
+              <Field label="Remaining lessons"><Input type="number" value={pkgForm.remaining_lessons} onChange={(event) => setPkgForm({ ...pkgForm, remaining_lessons: Number(event.target.value) })} /></Field>
               <Field label="Start date"><Input type="date" value={pkgForm.start_date} onChange={(event) => setPkgForm({ ...pkgForm, start_date: event.target.value, payment_date: event.target.value })} /></Field>
+              <Field label="Payment date"><Input type="date" value={pkgForm.payment_date} onChange={(event) => setPkgForm({ ...pkgForm, payment_date: event.target.value })} /></Field>
               <Field label="Validity months"><Input type="number" value={pkgForm.validity_months} onChange={(event) => setPkgForm({ ...pkgForm, validity_months: Number(event.target.value) })} /></Field>
+              <Field label="Customer price (Admin only)"><Input type="number" value={pkgForm.amount} onChange={(event) => setPkgForm({ ...pkgForm, amount: event.target.value })} placeholder="Optional" /></Field>
+              <Field label="Payment status"><Select value={pkgForm.payment_status} onChange={(event) => setPkgForm({ ...pkgForm, payment_status: event.target.value })}>{['pending', 'paid', 'partial', 'refunded', 'void'].map((item) => <option key={item}>{item}</option>)}</Select></Field>
+              <Field label="Payment method"><Select value={pkgForm.payment_method} onChange={(event) => setPkgForm({ ...pkgForm, payment_method: event.target.value })}>{paymentMethods.map((item) => <option key={item}>{item}</option>)}</Select></Field>
             </div>
+            <p className="rounded-lg bg-sky-50 p-3 text-sm leading-6 text-sky-800">Payment proof upload stays in Money &gt; Payments so private files remain Admin-only and easy to review.</p>
             <WizardActions primary="Save Package" secondary="Open package records" onSecondary={() => onOpenAdvanced('packages')} />
           </form>
         ) : null}
@@ -932,6 +1082,197 @@ function CustomerPicker({ data, value, onChange }) {
         {data.customers.map((item) => <option key={item.id} value={item.id}>{item.display_name || item.customer_code}</option>)}
       </Select>
     </Field>
+  );
+}
+
+function buildStudentProfileContext(student, data) {
+  const customer = data.customers.find((item) => item.id === student.customer_id);
+  const classLinks = data.class_students.filter((item) => item.student_id === student.id && item.active !== false);
+  const classes = classLinks.map((link) => data.classes.find((cls) => cls.id === link.class_id)).filter(Boolean);
+  const primaryClass = classes.find((cls) => cls.status === 'active') || classes[0];
+  const coach = data.coaches.find((item) => item.id === primaryClass?.assigned_coach_id);
+  const venue = data.venues.find((item) => item.id === primaryClass?.default_venue_id) || data.venues.find((item) => item.customer_id === customer?.id);
+  const packages = data.packages.filter((pkg) => pkg.customer_id === customer?.id || classes.some((cls) => cls.id === pkg.class_id));
+  const activePackage = packages.find((pkg) => pkg.status === 'active') || packages[0];
+  const lessonClassIds = new Set(classes.map((cls) => cls.id));
+  const recentLessons = data.lessons
+    .filter((lesson) => lessonClassIds.has(lesson.class_id) || data.lesson_participants.some((row) => row.lesson_id === lesson.id && row.student_id === student.id))
+    .sort((a, b) => String(b.scheduled_date || '').localeCompare(String(a.scheduled_date || '')));
+  const skillProfile = getStudentSkillProfile(student, data);
+  const levelProgress = getLevelProgress(student, data, skillProfile.current_level);
+  const payments = data.package_financials.filter((payment) => payment.customer_id === customer?.id || packages.some((pkg) => pkg.id === payment.package_id));
+  return {
+    data,
+    student,
+    customer,
+    classes,
+    primaryClass,
+    coach,
+    venue,
+    packages,
+    activePackage,
+    recentLessons,
+    payments,
+    skillProfile,
+    levelProgress,
+    missingItems: missingStudentDataItems(student, data),
+  };
+}
+
+function missingStudentDataItems(student, data) {
+  const item = {
+    student,
+    customer: data.customers.find((row) => row.id === student.customer_id),
+  };
+  const links = data.class_students.filter((row) => row.student_id === student.id && row.active !== false);
+  const classes = links.map((link) => data.classes.find((cls) => cls.id === link.class_id)).filter(Boolean);
+  const cls = classes[0];
+  const venue = data.venues.find((row) => row.id === cls?.default_venue_id) || data.venues.find((row) => row.customer_id === item.customer?.id);
+  const pkg = data.packages.find((row) => row.class_id === cls?.id || row.customer_id === item.customer?.id);
+  const skillProfile = data.student_skill_profiles.find((row) => row.student_id === student.id);
+  const missing = [];
+  if (!item.customer?.whatsapp) missing.push('WhatsApp');
+  if (!student.age) missing.push('Age');
+  if (!student.health_notes && !student.safety_alert) missing.push('Health confirmation');
+  if (!venue?.full_address) missing.push('Venue address');
+  if (!venue?.google_maps_link) missing.push('Map link');
+  if (!cls?.assigned_coach_id) missing.push('Coach');
+  if (!pkg) missing.push('Package');
+  if (!student.photo_consent_status || student.photo_consent_status === 'unknown') missing.push('Photo consent');
+  if (!skillProfile && !student.level) missing.push('Current level');
+  return missing;
+}
+
+function photoConsentLabel(value) {
+  return {
+    unknown: 'Unknown',
+    internal_only: 'Internal only',
+    marketing_approved: 'Marketing approved',
+    not_allowed: 'Not allowed',
+  }[value] || 'Unknown';
+}
+
+function StudentProfilePage({ profile, pathInfo, data, reload, toast }) {
+  const isAdmin = profile.role === 'admin';
+  const student = data.students.find((item) => item.id === pathInfo.id);
+  const [progressStudent, setProgressStudent] = useState(null);
+  if (!student) return <Section title="Student not found" action={<Button variant="ghost" onClick={() => go('/students')}>Back to Students</Button>}><p className="text-sm text-slate-500">This student is not visible to your account or no longer exists.</p></Section>;
+  const item = buildStudentProfileContext(student, data);
+  const { customer, primaryClass, coach, venue, activePackage, skillProfile, levelProgress, recentLessons, payments, missingItems } = item;
+  const whatsapp = customer?.whatsapp;
+  const mapsLink = venue?.google_maps_link;
+  const renewalWarning = activePackage && (Number(activePackage.remaining_lessons || 0) <= 1 || daysUntil(activePackage.expiry_date) <= 14);
+  return (
+    <div className="grid gap-5">
+      <Section title={student.display_name || 'Student Profile'} action={<Button variant="ghost" onClick={() => go('/students')}>Back</Button>}>
+        <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+          <div>
+            <p className="text-sm font-semibold text-sky-700">{customer?.display_name || 'Family not set'}</p>
+            <h1 className="mt-1 text-2xl font-semibold text-slate-950">{student.display_name || 'Unnamed student'}</h1>
+            <p className="mt-2 text-sm leading-6 text-slate-500">Parent: {customer?.parent_name || '-'}{customer?.whatsapp ? ` / WhatsApp: ${customer.whatsapp}` : ''}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <StudentLevelBadge student={student} data={data} />
+              <StatusBadge value={student.status}>{student.status || 'active'}</StatusBadge>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${renewalWarning ? 'bg-amber-50 text-amber-700 ring-amber-100' : 'bg-emerald-50 text-emerald-700 ring-emerald-100'}`}>{activePackage ? `${activePackage.remaining_lessons} lessons left` : 'No package'}</span>
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:min-w-60 lg:grid-cols-1">
+            <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? 'WhatsApp Parent' : 'No WhatsApp'}</a>
+            <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? 'Open Map' : 'No map link'}</a>
+          </div>
+        </div>
+      </Section>
+      {missingItems.length ? (
+        <Section title="Missing Data">
+          <p className="mb-3 text-sm leading-6 text-slate-500">These items make daily operations smoother. Fill them when available.</p>
+          <div className="flex flex-wrap gap-2">{missingItems.map((label) => <span key={label} className="rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-700">{label}</span>)}</div>
+        </Section>
+      ) : null}
+      <div className="grid gap-5 xl:grid-cols-2">
+        <Section title="Safety">
+          <div className="grid gap-3">
+            {student.safety_alert ? <div className="rounded-lg border border-rose-100 bg-rose-50 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Safety alert</p><p className="mt-1 text-sm font-semibold leading-6 text-rose-800">{student.safety_alert}</p></div> : null}
+            <Info label="Health notes" value={student.health_notes || 'Not confirmed yet'} />
+            <Info label="Special needs / confidence" value={student.special_needs || '-'} />
+            <Info label="Photo consent" value={<StatusBadge value={student.photo_consent_status || 'unknown'}>{photoConsentLabel(student.photo_consent_status)}</StatusBadge>} />
+            {student.photo_consent_note ? <Info label="Consent note" value={student.photo_consent_note} /> : null}
+          </div>
+        </Section>
+        <Section title="Lesson Setup">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Info label="Coach" value={coach?.display_name || coach?.coach_code || 'Not set'} />
+            <Info label="Class type" value={primaryClass?.class_type || '-'} />
+            <Info label="Schedule mode" value={primaryClass?.scheduling_mode === 'fixed_weekly' ? 'Fixed weekly' : primaryClass?.scheduling_mode === 'flexible' ? 'Flexible / Coach-arranged' : '-'} />
+            <Info label="Photo required" value={primaryClass?.photo_required ? 'Yes' : 'No'} />
+            <Info label="Venue" value={venue?.venue_name || venue?.area || '-'} />
+            <Info label="Address" value={venue?.full_address || '-'} />
+            <Info label="Access" value={venue?.access_instruction || '-'} />
+            <Info label="Parking / pool note" value={[venue?.parking_note, venue?.pool_depth_note].filter(Boolean).join(' / ') || '-'} />
+          </div>
+        </Section>
+        <Section title="Package">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Info label="Remaining" value={activePackage ? `${activePackage.remaining_lessons} lessons` : 'No package'} />
+            <Info label="Used" value={activePackage ? `${activePackage.used_lessons || 0} / ${activePackage.total_lessons || 0}` : '-'} />
+            <Info label="Expiry" value={activePackage?.expiry_date ? `${formatDate(activePackage.expiry_date)}${daysUntil(activePackage.expiry_date) < 0 ? ' (expired)' : ''}` : '-'} />
+            <Info label="Status" value={activePackage ? <StatusBadge value={activePackage.status}>{activePackage.status}</StatusBadge> : '-'} />
+          </div>
+          {renewalWarning ? <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-700">Renewal follow-up recommended.</p> : null}
+        </Section>
+        <Section title="Progress" action={<Button variant="soft" onClick={() => setProgressStudent(student)}>Update Progress</Button>}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Info label="Current level" value={`Level ${skillProfile.current_level}`} />
+            <Info label="Level status" value={levelStatusLabels[skillProfile.level_status] || skillProfile.level_status} />
+            <Info label="Current focus" value={skillProfile.current_focus || student.learning_goal || '-'} />
+            <Info label="Last assessed" value={formatDate(skillProfile.last_assessed_at)} />
+            <Info label="Passed criteria" value={`${levelProgress.passed}/${levelProgress.total}`} />
+            <Info label="Assessment note" value={skillProfile.assessment_note || '-'} />
+          </div>
+        </Section>
+      </div>
+      <Section title="Recent Lessons">
+        {recentLessons.length === 0 ? <EmptyState title="No lesson history yet" body="Scheduled and completed lessons will appear here after this student is linked to a class." /> : (
+          <div className="grid gap-3">
+            {recentLessons.slice(0, 5).map((lesson) => {
+              const cls = data.classes.find((row) => row.id === lesson.class_id);
+              const photos = data.lesson_photos.filter((photo) => photo.lesson_id === lesson.id);
+              return (
+                <button key={lesson.id} onClick={() => go(`/lessons/${lesson.id}`)} className="rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-sky-200 hover:bg-sky-50">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-sky-700">{formatDate(lesson.scheduled_date)} {lesson.start_time || ''}</p>
+                      <p className="mt-1 font-semibold text-slate-950">{cls?.class_name || lesson.lesson_code}</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-500">{lesson.coach_notes || 'No coach note yet.'}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2"><StatusBadge value={lesson.status}>{lesson.status}</StatusBadge><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{photos.length} photo{photos.length === 1 ? '' : 's'}</span></div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </Section>
+      {isAdmin ? (
+        <Section title="Admin-only Finance">
+          <p className="mb-3 text-sm leading-6 text-slate-500">This section is hidden from coaches. It contains customer price and payment records only.</p>
+          {payments.length === 0 ? <EmptyState title="No payment records" body="Payment records can be added from Money > Payments or during package setup." /> : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {payments.map((payment) => (
+                <div key={payment.id} className="rounded-lg border border-slate-200 bg-white p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div><p className="font-semibold text-slate-950">{formatMoney(payment.amount)}</p><p className="mt-1 text-sm text-slate-500">{formatDate(payment.payment_date)} / {payment.payment_method || '-'}</p></div>
+                    <StatusBadge value={payment.payment_status}>{payment.payment_status}</StatusBadge>
+                  </div>
+                  <p className="mt-2 text-xs break-all text-slate-500">{payment.proof_storage_path ? `Proof path: ${payment.proof_storage_path}` : 'No proof uploaded yet'}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          {customer?.internal_notes ? <div className="mt-3"><Info label="Internal notes" value={customer.internal_notes} /></div> : null}
+        </Section>
+      ) : null}
+      {progressStudent ? <StudentProgressModal student={progressStudent} data={data} profile={profile} reload={reload} toast={toast} onClose={() => setProgressStudent(null)} /> : null}
+    </div>
   );
 }
 
@@ -1495,10 +1836,14 @@ function StudentsPage({ profile, data, reload, toast }) {
   const rows = isAdmin ? data.students : data.students.filter((student) => assignedStudentIds.has(student.id));
   return (
     <div className="grid gap-5">
-      <Section title={isAdmin ? 'Student Level Progress' : 'My Students'}>
-        <p className="mb-4 text-sm leading-6 text-slate-500">{isAdmin ? 'Current TY Swim levels, focus, and assessment status for each student.' : 'Tap Update Progress after class to record the current level checklist.'}</p>
-        <StudentProgressCards students={rows} data={data} onUpdate={setProgressStudent} />
-      </Section>
+      {isAdmin ? (
+        <Section title="Student Level Progress">
+          <p className="mb-4 text-sm leading-6 text-slate-500">Current TY Swim levels, focus, and assessment status for each student.</p>
+          <StudentProgressCards students={rows} data={data} onUpdate={setProgressStudent} />
+        </Section>
+      ) : (
+        <StudentProfileDirectory data={{ ...data, students: rows }} profile={profile} onUpdateProgress={setProgressStudent} />
+      )}
       {isAdmin ? (
         <RecordManager
           title="Students"
@@ -3388,13 +3733,17 @@ function cleanupRows(data) {
   const rows = [];
   data.customers.forEach((customer) => {
     if (!customer.display_name || /^Customer \d{4}$/.test(customer.display_name)) rows.push({ id: `customer-name-${customer.id}`, type: 'Customer', name: customer.display_name || customer.customer_code, issue: 'Missing customer name', href: `/customers/${customer.id}` });
+    if (!customer.whatsapp) rows.push({ id: `customer-whatsapp-${customer.id}`, type: 'Customer', name: customer.display_name || customer.customer_code, issue: 'Missing WhatsApp', href: `/customers/${customer.id}` });
     if (!data.venues.some((venue) => venue.customer_id === customer.id && venue.full_address)) rows.push({ id: `address-${customer.id}`, type: 'Venue', name: customer.display_name || customer.customer_code, issue: 'Missing address/venue', href: `/customers/${customer.id}` });
+    if (data.venues.some((venue) => venue.customer_id === customer.id && venue.full_address && !venue.google_maps_link)) rows.push({ id: `map-${customer.id}`, type: 'Venue', name: customer.display_name || customer.customer_code, issue: 'Missing Google Maps link', href: `/customers/${customer.id}` });
     if (!data.consents.some((consent) => consent.customer_id === customer.id)) rows.push({ id: `consent-${customer.id}`, type: 'Consent', name: customer.display_name || customer.customer_code, issue: 'Missing consent info', href: `/customers/${customer.id}` });
   });
   data.students.forEach((student) => {
-    if (!student.display_name || /^Student \d{4}$/.test(student.display_name)) rows.push({ id: `student-name-${student.id}`, type: 'Student', name: student.display_name, issue: 'Missing student name', href: '/students' });
-    if (!student.age) rows.push({ id: `age-${student.id}`, type: 'Student', name: student.display_name, issue: 'Missing age', href: '/students' });
-    if (!student.health_notes && !student.safety_alert) rows.push({ id: `health-${student.id}`, type: 'Student', name: student.display_name, issue: 'Missing health confirmation', href: '/students' });
+    if (!student.display_name || /^Student \d{4}$/.test(student.display_name)) rows.push({ id: `student-name-${student.id}`, type: 'Student', name: student.display_name, issue: 'Missing student name', href: `/students/${student.id}` });
+    if (!student.age) rows.push({ id: `age-${student.id}`, type: 'Student', name: student.display_name, issue: 'Missing age', href: `/students/${student.id}` });
+    if (!student.health_notes && !student.safety_alert) rows.push({ id: `health-${student.id}`, type: 'Student', name: student.display_name, issue: 'Missing health confirmation', href: `/students/${student.id}` });
+    if (!student.photo_consent_status || student.photo_consent_status === 'unknown') rows.push({ id: `photo-consent-${student.id}`, type: 'Student', name: student.display_name, issue: 'Missing photo consent', href: `/students/${student.id}` });
+    if (!data.student_skill_profiles.some((profile) => profile.student_id === student.id) && !student.level) rows.push({ id: `level-${student.id}`, type: 'Student', name: student.display_name, issue: 'Missing current level', href: `/students/${student.id}` });
   });
   data.packages.forEach((pkg) => {
     if (daysUntil(pkg.expiry_date) < 0 && Number(pkg.remaining_lessons) > 0) rows.push({ id: `expired-${pkg.id}`, type: 'Package', name: pkg.package_code, issue: 'Expired package with remaining lessons', href: '/packages' });

@@ -163,9 +163,16 @@ Warning: Pending review should be checked before assuming packages or payroll ar
 
 ### Students
 
-Purpose: beginner-friendly setup wizard for customer/family records.
+Purpose: student and family workspace.
 
-Use this page when adding a new family. The default screen shows a real six-step setup wizard:
+Students now has two simple modes:
+
+- Student / Family Profiles: the normal daily view for searching students, checking safety, package status, progress, venue, coach, and recent lessons.
+- Add Student / Family: a guided setup flow for creating a new family, student, venue, class, package, and first lesson.
+
+Use Student / Family Profiles when you want to check or update an existing student. Use Add Student / Family when a new family joins. Advanced records stay hidden under `Advanced records` for unusual corrections and exports.
+
+The Add Student / Family flow has six steps:
 
 1. Add Family / Customer
 2. Add Student(s)
@@ -174,7 +181,19 @@ Use this page when adding a new family. The default screen shows a real six-step
 5. Add Package
 6. Schedule First Lesson
 
-Each step has a focused form and guides you to the next step after saving. The advanced tables are hidden under `Advanced records`.
+Each step has a focused form and guides you to the next step after saving. You can save progressively. If some information is not ready, save what you know first and finish the missing items later from the profile.
+
+The setup sections collect:
+
+- Family / Parent: family display name, parent name, WhatsApp, secondary contact, source, and Admin-only internal note.
+- Student Basic Info: student name, age, gender, current Level 1-6, language, and learning goal.
+- Health & Safety: health notes, special needs or water confidence, safety alert, emergency notes, and photo consent.
+- Venue / Location: pool name, full address, area, map link, pool type, access instruction, parking note, and pool depth/safety note.
+- Class / Lesson Setup: group name, class type, assigned coach, duration, fixed weekly or flexible schedule, default day/time if fixed weekly, and photo-required setting.
+- Package: package type, total lessons, remaining lessons, validity, payment date, Admin-only customer price, payment status, and payment method.
+- First Lesson: date, start time, end time, coach, venue, and package link.
+
+Payment proof upload stays in Money -> Payments because payment proof files are private Admin-only files.
 
 Advanced tables:
 
@@ -193,6 +212,31 @@ What each section means:
 - Packages: package type, total lessons, used/remaining lessons, expiry, status
 
 Important rule: package belongs to a family/group/class. A group lesson deducts one package lesson, not one per student.
+
+### Student / Family Profile
+
+Open a profile from Students by clicking `Open Profile` on a student card.
+
+The profile header shows:
+
+- student name
+- family/parent
+- WhatsApp button
+- map button
+- current level badge
+- package remaining badge
+- student status
+
+Profile cards:
+
+- Safety: health notes, special needs, safety alert, and photo consent.
+- Lesson Setup: coach, class type, schedule mode, venue, address, access notes, parking, and pool notes.
+- Package: remaining lessons, used lessons, expiry date, status, and renewal warning.
+- Progress: current Level 1-6, current focus, last assessment, passed criteria count, and Update Progress.
+- Recent Lessons: latest lesson records, status, coach note, and photo count.
+- Admin-only Finance: customer price/payment records, proof storage path, and internal notes. This card is hidden from Coach.
+
+The profile also highlights missing data such as missing WhatsApp, age, health confirmation, venue address, Google Maps link, coach, package, photo consent, or current level.
 
 ### Schedule
 
@@ -403,6 +447,8 @@ Coach cannot:
 
 Purpose: see assigned student/customer information needed for lesson coordination.
 
+The Coach view is a simplified profile-card view, not an admin table. Coach can search assigned students, open a student profile, tap WhatsApp, tap Map, and update progress.
+
 Coach can see:
 
 - assigned customer/family contact
@@ -413,6 +459,8 @@ Coach can see:
 - assigned venue/address and access notes
 - assigned class/group details
 - lesson history for assigned lessons
+
+Coach student profiles show Safety first, then lesson setup, package remaining count, progress, and recent lessons. Finance cards are not shown to Coach.
 
 Coach cannot see:
 
@@ -461,11 +509,10 @@ It does not show technical setup details. If something looks wrong, Coach should
 Admin:
 
 1. Open Students.
-2. Click Step 1 Add Family / Customer.
-3. Open advanced table if needed.
-4. Click Add Family in Customers / Families if using advanced records.
-5. Enter display name, parent name, WhatsApp, secondary contact, source, status, and optional internal notes.
-6. Save.
+2. Click Add Student / Family.
+3. Open Step 1 Add Family / Customer.
+4. Enter family display name, parent name, WhatsApp, secondary contact, source, and optional internal note.
+5. Save Family.
 
 Result: a customer/family row is created.
 
@@ -474,11 +521,11 @@ Result: a customer/family row is created.
 Admin:
 
 1. Open Students.
-2. Click Step 2 Add Student(s).
-3. Click Add Student in Students if using advanced records.
+2. Click Add Student / Family.
+3. Open Step 2 Add Student(s).
 4. Choose the family/customer.
-5. Enter display name, age, gender, level, learning goal, health notes, special needs, safety alert, preferred language, and status.
-6. Save.
+5. Enter display name, age, gender, current Level 1-6, preferred language, learning goal, health notes, special needs/confidence note, safety alert, and photo consent.
+6. Save Student.
 
 Result: student row is created and linked to family.
 
@@ -487,11 +534,11 @@ Result: student row is created and linked to family.
 Admin:
 
 1. Open Students.
-2. Click Step 3 Add Venue / Address.
-3. Click Add Venue in Venues if using advanced records.
+2. Click Add Student / Family.
+3. Open Step 3 Add Venue / Address.
 4. Choose customer if the venue belongs to a family.
-5. Enter venue name, address, area, pool type, map link, parking/access/entry/depth notes.
-6. Save.
+5. Enter venue name, address, area, pool type, map link, access instruction, parking note, and pool depth/safety note.
+6. Save Venue.
 
 Result: venue row is created.
 
@@ -500,11 +547,11 @@ Result: venue row is created.
 Admin:
 
 1. Open Students.
-2. Click Step 4 Create Class / Group.
-3. Click Add Class in Classes / Groups if using advanced records.
-4. Choose customer, class type, scheduling mode, assigned coach, default venue, duration, photo required, and status.
-5. Save.
-6. In the Classes / Groups table, use the Students action to add the student(s) into the class/group.
+2. Click Add Student / Family.
+3. Open Step 4 Create Class / Group.
+4. Choose customer, class type, scheduling mode, assigned coach, default venue, duration, photo required, and student(s) in the class.
+5. If fixed weekly, add the usual day and time.
+6. Save Class.
 
 Result: teaching group is created.
 
@@ -513,15 +560,26 @@ Result: teaching group is created.
 Admin:
 
 1. Open Students.
-2. Click Step 5 Add Package.
-3. Click Add Package in Packages if using advanced records.
-4. Choose customer and class.
-5. Select package type and enter total lessons.
-6. Enter used/remaining lessons if needed.
-7. Enter start/payment/expiry dates and status.
-8. Save.
+2. Click Add Student / Family.
+3. Open Step 5 Add Package.
+4. Select package type and enter total/remaining lessons.
+5. Enter start date, payment date, validity months, payment status, and optional Admin-only customer price.
+6. Save Package.
 
-Result: package is created. Expiry can be calculated from package type/start date in the app utilities, but Admin should still verify package data.
+Result: package is created. If a payment amount/status was entered, an Admin-only payment record is also created. Upload payment proof later in Money -> Payments.
+
+### View A Student Profile
+
+Admin or Coach:
+
+1. Open Students or My Students.
+2. Search by student, parent, phone, class, coach, or area.
+3. Use filters such as Active, Expiring soon, Low lessons, Missing health, Missing venue, Missing consent, or Level 1-6.
+4. Click Open Profile.
+5. Review Safety, Lesson Setup, Package, Progress, and Recent Lessons.
+6. Click Update Progress when the student's level/focus changes.
+
+Admin also sees the Admin-only Finance card. Coach does not.
 
 ### 6. Schedule Fixed Weekly Lesson
 
@@ -691,6 +749,9 @@ Do not mix demo data with real customer data in production.
 | Button / Action | Page | Role | What it does | Side effect / warning |
 | --- | --- | --- | --- | --- |
 | Add Family | Today / Students | Admin | Opens Students guided workflow | Creates customer data when saved |
+| Add Student / Family | Students | Admin | Opens the guided setup flow | Best starting point for a new family |
+| Student Profiles | Students | Admin | Opens searchable student/family profile cards | Normal daily student workspace |
+| Open Profile | Students / My Students | Admin / Coach | Opens the student profile with safety, lesson setup, package, progress, and recent lessons | Coach version hides Admin-only finance |
 | Add Family / Add Student / Add Venue / Add Class / Add Package | Advanced records | Admin | Opens a modal to create the matching record type | Use the setup wizard first for normal new families |
 | Add Student | Students workflow | Admin | Opens student setup area | Student should be linked to a family |
 | Add Class | Students workflow / classes table | Admin | Creates class/group | Must assign coach and schedule mode carefully |
