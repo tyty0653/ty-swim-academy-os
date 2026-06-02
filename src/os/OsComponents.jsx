@@ -10,7 +10,7 @@ export function Button({ children, variant = 'primary', className = '', ...props
     dark: 'bg-slate-950 text-white hover:bg-slate-800',
   };
   return (
-    <button {...props} className={cn('inline-flex min-h-10 max-w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-center text-sm font-semibold whitespace-normal disabled:cursor-not-allowed disabled:opacity-60', styles[variant], className)}>
+    <button {...props} className={cn('inline-flex min-h-10 max-w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-center text-sm font-semibold whitespace-normal break-words disabled:cursor-not-allowed disabled:opacity-60', styles[variant], className)}>
       {children}
     </button>
   );
@@ -46,10 +46,10 @@ export function Card({ title, value, note, tone = 'sky' }) {
     slate: 'border-slate-200 bg-white text-slate-600',
   };
   return (
-    <div className={cn('rounded-lg border p-4 shadow-sm', tones[tone])}>
-      <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{title}</p>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{value}</p>
-      {note ? <p className="mt-2 text-xs leading-5 opacity-80">{note}</p> : null}
+    <div className={cn('min-w-0 max-w-full rounded-lg border p-4 shadow-sm', tones[tone])}>
+      <p className="text-xs font-semibold uppercase tracking-wide opacity-80 ty-wrap">{title}</p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 ty-wrap">{value}</p>
+      {note ? <p className="mt-2 text-xs leading-5 opacity-80 ty-wrap">{note}</p> : null}
     </div>
   );
 }
@@ -63,15 +63,15 @@ export function StatusBadge({ value, children }) {
     rose: 'bg-rose-50 text-rose-700 ring-rose-100',
     slate: 'bg-slate-100 text-slate-600 ring-slate-200',
   };
-  return <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1', styles[tone])}>{children || statusLabels[value] || value || '-'}</span>;
+  return <span className={cn('inline-flex max-w-full rounded-full px-2.5 py-1 text-center text-xs font-semibold leading-5 whitespace-normal ring-1 ty-wrap', styles[tone])}>{children || statusLabels[value] || value || '-'}</span>;
 }
 
 export function Section({ title, action, children, className = '' }) {
   return (
-    <section className={cn('min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm', className)}>
+    <section className={cn('min-w-0 max-w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm', className)}>
       <div className="flex min-w-0 flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="min-w-0 text-lg font-semibold text-slate-950">{title}</h2>
-        {action ? <div className="min-w-0 max-w-full">{action}</div> : null}
+        <h2 className="min-w-0 text-lg font-semibold text-slate-950 ty-wrap">{title}</h2>
+        {action ? <div className="w-full min-w-0 max-w-full sm:w-auto">{action}</div> : null}
       </div>
       <div className="min-w-0 p-4">{children}</div>
     </section>
@@ -81,16 +81,16 @@ export function Section({ title, action, children, className = '' }) {
 export function DataTable({ columns, rows, empty = 'No records yet.', onRowClick, className = '' }) {
   return (
     <div className={cn('max-w-full overflow-x-auto rounded-lg border border-slate-200', className)}>
-      <table className="w-full min-w-0 table-fixed text-left text-sm">
+      <table className="w-full min-w-full table-fixed text-left text-sm">
         <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          <tr>{columns.map((column) => <th key={column.key} className="break-words px-3 py-3 sm:whitespace-nowrap">{column.label}</th>)}</tr>
+          <tr>{columns.map((column) => <th key={column.key} className="px-3 py-3 align-top ty-wrap">{column.label}</th>)}</tr>
         </thead>
         <tbody>
           {rows.length === 0 ? (
             <tr><td className="px-3 py-8 text-center text-slate-500" colSpan={columns.length}>{empty}</td></tr>
           ) : rows.map((row) => (
             <tr key={row.id || row.key} className={cn('border-t border-slate-100 bg-white', onRowClick && 'cursor-pointer hover:bg-sky-50/60')} onClick={() => onRowClick?.(row)}>
-              {columns.map((column) => <td key={column.key} className="break-words px-3 py-3 align-top text-slate-700 sm:whitespace-nowrap">{column.render ? column.render(row) : row[column.key]}</td>)}
+              {columns.map((column) => <td key={column.key} className="max-w-0 px-3 py-3 align-top text-slate-700 ty-wrap">{column.render ? column.render(row) : row[column.key]}</td>)}
             </tr>
           ))}
         </tbody>

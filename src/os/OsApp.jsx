@@ -291,12 +291,12 @@ function OsShell({ session, profile, pathInfo, data, tableErrors, reload, toast,
       </aside>
       <div className="lg:pl-64">
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:px-6">
-          <div className="flex items-center justify-between gap-3 lg:hidden">
-            <div>
+          <div className="flex min-w-0 items-center justify-between gap-3 lg:hidden">
+            <div className="min-w-0">
               <p className="text-xs font-semibold text-sky-700">TY Swim OS · {isAdmin ? 'Admin' : 'Coach'}</p>
-              <h2 className="text-lg font-semibold leading-tight text-slate-950">{pageTitle(pathInfo, profile)}</h2>
+              <h2 className="text-lg font-semibold leading-tight text-slate-950 ty-wrap">{pageTitle(pathInfo, profile)}</h2>
             </div>
-            <Button variant="ghost" onClick={() => go('/more')}>More</Button>
+            <Button className="shrink-0" variant="ghost" onClick={() => go('/more')}>More</Button>
           </div>
           <div className="hidden items-center justify-between gap-3 lg:flex">
             <div>
@@ -309,7 +309,7 @@ function OsShell({ session, profile, pathInfo, data, tableErrors, reload, toast,
             </div>
           </div>
         </header>
-        <main className="mx-auto max-w-7xl p-3 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:p-4 sm:pb-[calc(6rem+env(safe-area-inset-bottom))] lg:p-6">
+        <main className="mx-auto min-w-0 max-w-7xl overflow-x-hidden p-3 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:p-4 sm:pb-[calc(6rem+env(safe-area-inset-bottom))] lg:p-6">
           <RoutePage session={session} profile={profile} pathInfo={pathInfo} data={data} tableErrors={tableErrors} reload={reload} toast={toast} signOut={signOut} />
         </main>
         <MobileBottomNav nav={mobileNav} pathInfo={pathInfo} />
@@ -411,7 +411,7 @@ function NoAccess() {
 function EmptyState({ title, body, action }) {
   return (
     <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
-      <p className="font-semibold text-slate-950">{title}</p>
+      <p className="font-semibold text-slate-950 ty-wrap">{title}</p>
       <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">{body}</p>
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
@@ -439,7 +439,7 @@ function OnboardingChecklist({ data }) {
         {steps.map(([label, done, href], index) => (
           <button key={label} onClick={() => go(href)} className={`rounded-lg border p-3 text-left ${done ? 'border-emerald-100 bg-emerald-50' : 'border-slate-200 bg-white hover:border-sky-200'}`}>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step {index + 1}</p>
-            <p className="mt-1 font-semibold text-slate-950">{label}</p>
+            <p className="mt-1 font-semibold text-slate-950 ty-wrap">{label}</p>
             <p className={`mt-2 text-xs font-semibold ${done ? 'text-emerald-700' : 'text-sky-700'}`}>{done ? 'Done' : 'Open'}</p>
           </button>
         ))}
@@ -544,7 +544,7 @@ function CoachTodayCards({ lessons, data }) {
       {lessons.length === 0 ? (
         <EmptyState title="No lessons today" body="Assigned lessons will appear here with contact, map, safety alerts, and a fast submit button." />
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid min-w-0 gap-3 md:grid-cols-2">
           {lessons.map((lesson) => {
             const cls = data.classes.find((item) => item.id === lesson.class_id);
             const customer = data.customers.find((item) => item.id === cls?.customer_id);
@@ -554,23 +554,23 @@ function CoachTodayCards({ lessons, data }) {
             const approved = lesson.status === 'approved';
             const photoRequired = Boolean(cls?.photo_required || lesson.photo_required);
             return (
-              <article key={lesson.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
+              <article key={lesson.id} className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
                     <p className="text-sm font-semibold text-sky-700">{lesson.start_time || 'Time TBC'} - {lesson.end_time || ''}</p>
-                    <h3 className="mt-1 text-lg font-semibold text-slate-950">{cls?.class_name || lesson.lesson_code}</h3>
-                    <p className="mt-1 text-sm text-slate-700">{classStudentNames(cls?.id, data)}</p>
-                    <p className="mt-1 text-sm text-slate-500">{venue?.full_address || venue?.area || venue?.venue_name || 'Venue not set'}</p>
+                    <h3 className="mt-1 text-lg font-semibold text-slate-950 ty-wrap">{cls?.class_name || lesson.lesson_code}</h3>
+                    <p className="mt-1 text-sm text-slate-700 ty-wrap">{classStudentNames(cls?.id, data)}</p>
+                    <p className="mt-1 text-sm text-slate-500 ty-wrap">{venue?.full_address || venue?.area || venue?.venue_name || 'Venue not set'}</p>
                   </div>
-                  <div className="grid justify-items-end gap-2">
+                  <div className="flex flex-wrap gap-2 sm:grid sm:justify-items-end">
                     <StatusBadge value={lesson.status} />
                     {photoRequired ? <StatusBadge value="needs_edit">Photo required today</StatusBadge> : null}
                   </div>
                 </div>
-                {studentAlerts(cls, data) ? <p className="mt-3 rounded-lg bg-rose-50 p-3 text-sm font-medium text-rose-700">{studentAlerts(cls, data)}</p> : null}
+                {studentAlerts(cls, data) ? <p className="mt-3 rounded-lg bg-rose-50 p-3 text-sm font-medium text-rose-700 ty-wrap">{studentAlerts(cls, data)}</p> : null}
                 <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                  <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? 'WhatsApp' : 'No WhatsApp'}</a>
-                  <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? 'Map' : 'No map'}</a>
+                  <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? 'WhatsApp' : 'No WhatsApp'}</a>
+                  <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? 'Map' : 'No map'}</a>
                   <Button data-testid={!approved ? 'coach-submit-record-button' : undefined} disabled={approved} onClick={() => go(`/lessons/${lesson.id}`)}>{approved ? 'Approved' : 'Submit Record'}</Button>
                 </div>
               </article>
@@ -637,13 +637,13 @@ function LessonCardList({ rows, data, empty, coachView = false }) {
         const mapsLink = venue?.google_maps_link || '';
         const approved = lesson.status === 'approved';
         return (
-          <article key={lesson.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div>
+          <article key={lesson.id} className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
                 <p className="text-sm font-semibold text-sky-700">{formatDate(lesson.scheduled_date)} {lesson.start_time || ''}</p>
-                <p className="mt-1 font-semibold text-slate-950">{cls?.class_name || lesson.lesson_code}</p>
-                <p className="mt-1 text-sm text-slate-600">{classStudentNames(cls?.id, data)}</p>
-                <p className="mt-1 text-sm text-slate-500">{venue?.area || venue?.venue_name || customer?.whatsapp || '-'}</p>
+                <p className="mt-1 font-semibold text-slate-950 ty-wrap">{cls?.class_name || lesson.lesson_code}</p>
+                <p className="mt-1 text-sm text-slate-600 ty-wrap">{classStudentNames(cls?.id, data)}</p>
+                <p className="mt-1 text-sm text-slate-500 ty-wrap">{venue?.area || venue?.venue_name || customer?.whatsapp || '-'}</p>
               </div>
               <StatusBadge value={lesson.status} />
             </div>
@@ -651,8 +651,8 @@ function LessonCardList({ rows, data, empty, coachView = false }) {
               <Button data-testid={coachView && !approved ? 'coach-submit-record-button' : undefined} onClick={() => go(`/lessons/${lesson.id}`)}>{coachView ? (approved ? 'Approved' : 'Submit / Open') : 'Open'}</Button>
               {coachView ? (
                 <div className="grid grid-cols-2 gap-2">
-                  <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? 'WhatsApp' : 'No WhatsApp'}</a>
-                  <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? 'Map' : 'No map'}</a>
+                  <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? 'WhatsApp' : 'No WhatsApp'}</a>
+                  <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? 'Map' : 'No map'}</a>
                 </div>
               ) : null}
             </div>
@@ -774,16 +774,16 @@ function StudentProfileCard({ item, isAdmin, onUpdateProgress }) {
   const map = venue?.google_maps_link;
   const lowPackage = Number(activePackage?.remaining_lessons || 0) <= 1;
   return (
-    <article data-testid="student-profile-card" className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
+    <article data-testid="student-profile-card" className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h3 className="truncate text-base font-semibold text-slate-950">{student.display_name || 'Unnamed student'}</h3>
-          <p className="mt-1 text-sm text-slate-500">{customer?.display_name || 'Family not set'}{customer?.parent_name ? ` / ${customer.parent_name}` : ''}</p>
+          <h3 className="text-base font-semibold text-slate-950 ty-wrap">{student.display_name || 'Unnamed student'}</h3>
+          <p className="mt-1 text-sm text-slate-500 ty-wrap">{customer?.display_name || 'Family not set'}{customer?.parent_name ? ` / ${customer.parent_name}` : ''}</p>
         </div>
         <StudentLevelBadge student={student} data={item.data} />
       </div>
-      {student.safety_alert ? <p className="mt-3 rounded-lg bg-rose-50 p-2 text-sm font-semibold text-rose-700">{student.safety_alert}</p> : null}
-      <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+      {student.safety_alert ? <p className="mt-3 rounded-lg bg-rose-50 p-2 text-sm font-semibold text-rose-700 ty-wrap">{student.safety_alert}</p> : null}
+      <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
         <Info label="Coach" value={coach?.display_name || coach?.coach_code || 'Not set'} />
         <Info label="Class" value={primaryClass?.class_name || primaryClass?.class_type || 'Not set'} />
         <Info label="Package" value={<span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${lowPackage ? 'bg-amber-50 text-amber-700 ring-amber-100' : 'bg-emerald-50 text-emerald-700 ring-emerald-100'}`}>{activePackage ? `${activePackage.remaining_lessons} left` : 'No package'}</span>} />
@@ -796,10 +796,10 @@ function StudentProfileCard({ item, isAdmin, onUpdateProgress }) {
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         <Button onClick={() => go(`/students/${student.id}`)}>Open Profile</Button>
         <Button variant="soft" onClick={() => onUpdateProgress(student)}>Update Progress</Button>
-        <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? 'WhatsApp' : 'No WhatsApp'}</a>
-        <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${map ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={map || undefined} target="_blank" rel="noreferrer">{map ? 'Map' : 'No map'}</a>
+        <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? 'WhatsApp' : 'No WhatsApp'}</a>
+        <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${map ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={map || undefined} target="_blank" rel="noreferrer">{map ? 'Map' : 'No map'}</a>
       </div>
-      {isAdmin && customer?.internal_notes ? <p className="mt-3 rounded-lg bg-slate-50 p-2 text-xs leading-5 text-slate-500">Admin note: {customer.internal_notes}</p> : null}
+      {isAdmin && customer?.internal_notes ? <p className="mt-3 rounded-lg bg-slate-50 p-2 text-xs leading-5 text-slate-500 ty-wrap">Admin note: {customer.internal_notes}</p> : null}
     </article>
   );
 }
@@ -937,7 +937,7 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
             <div className="flex items-center justify-between gap-3 md:block">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Step {index + 1}</p>
-                <p className="font-semibold text-slate-950">{short}</p>
+                <p className="font-semibold text-slate-950 ty-wrap">{short}</p>
               </div>
               <span className={`text-sm font-semibold md:mt-2 md:block ${completedSteps[index] ? 'text-emerald-600' : step === index ? 'text-sky-700' : 'text-slate-300'}`}>{completedSteps[index] ? 'Done' : step === index ? 'Open' : 'Next'}</span>
             </div>
@@ -1067,7 +1067,7 @@ function StudentSetupWizard({ data, reload, toast, profile, onOpenAdvanced }) {
 }
 
 function WizardHeader({ title, body }) {
-  return <div><h3 className="font-semibold text-slate-950">{title}</h3><p className="mt-1 text-sm leading-6 text-slate-500">{body}</p></div>;
+  return <div><h3 className="font-semibold text-slate-950 ty-wrap">{title}</h3><p className="mt-1 text-sm leading-6 text-slate-500">{body}</p></div>;
 }
 
 function WizardActions({ primary, secondary, onSecondary }) {
@@ -1241,7 +1241,7 @@ function StudentProfilePage({ profile, pathInfo, data, reload, toast }) {
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="text-sm font-semibold text-sky-700">{formatDate(lesson.scheduled_date)} {lesson.start_time || ''}</p>
-                      <p className="mt-1 font-semibold text-slate-950">{cls?.class_name || lesson.lesson_code}</p>
+                      <p className="mt-1 font-semibold text-slate-950 ty-wrap">{cls?.class_name || lesson.lesson_code}</p>
                       <p className="mt-1 text-sm leading-6 text-slate-500">{lesson.coach_notes || 'No coach note yet.'}</p>
                     </div>
                     <div className="flex flex-wrap gap-2"><StatusBadge value={lesson.status}>{lesson.status}</StatusBadge><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{photos.length} photo{photos.length === 1 ? '' : 's'}</span></div>
@@ -1260,7 +1260,7 @@ function StudentProfilePage({ profile, pathInfo, data, reload, toast }) {
               {payments.map((payment) => (
                 <div key={payment.id} className="rounded-lg border border-slate-200 bg-white p-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div><p className="font-semibold text-slate-950">{formatMoney(payment.amount)}</p><p className="mt-1 text-sm text-slate-500">{formatDate(payment.payment_date)} / {payment.payment_method || '-'}</p></div>
+                    <div><p className="font-semibold text-slate-950 ty-wrap">{formatMoney(payment.amount)}</p><p className="mt-1 text-sm text-slate-500 ty-wrap">{formatDate(payment.payment_date)} / {payment.payment_method || '-'}</p></div>
                     <StatusBadge value={payment.payment_status}>{payment.payment_status}</StatusBadge>
                   </div>
                   <p className="mt-2 text-xs break-all text-slate-500">{payment.proof_storage_path ? `Proof path: ${payment.proof_storage_path}` : 'No proof uploaded yet'}</p>
@@ -1331,10 +1331,10 @@ function MoneyPage(props) {
       <Section title="Money">
         <p className="text-sm leading-6 text-slate-500">Admin-only monthly records. Payments are money received from customers, Payroll is coach salary to pay, Expenses are business costs, and Summary is the simple monthly view for records/accounting.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-4">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950">Summary</p><p className="mt-1 text-sm text-slate-500">Quick monthly picture.</p></div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950">Payments</p><p className="mt-1 text-sm text-slate-500">Money received from customers.</p></div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950">Payroll</p><p className="mt-1 text-sm text-slate-500">Coach salary to pay.</p></div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950">Expenses</p><p className="mt-1 text-sm text-slate-500">Business costs and receipts.</p></div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950 ty-wrap">Summary</p><p className="mt-1 text-sm text-slate-500 ty-wrap">Quick monthly picture.</p></div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950 ty-wrap">Payments</p><p className="mt-1 text-sm text-slate-500 ty-wrap">Money received from customers.</p></div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950 ty-wrap">Payroll</p><p className="mt-1 text-sm text-slate-500 ty-wrap">Coach salary to pay.</p></div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950 ty-wrap">Expenses</p><p className="mt-1 text-sm text-slate-500 ty-wrap">Business costs and receipts.</p></div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           {tabs.map(([key, label]) => <Button key={key} variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{label}</Button>)}
@@ -1375,15 +1375,15 @@ function MorePage(props) {
     <div data-testid="more-page" className="grid gap-5">
       <Section title="More">
         <p className="text-sm leading-6 text-slate-500">Advanced and occasional tools live here so the daily menu stays simple.</p>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-4 grid gap-2 lg:grid-cols-2 xl:grid-cols-3">
           {tools.map(([key, href, label]) => (
-            <button key={key} onClick={() => go(href)} className="flex min-h-14 items-center justify-between rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-sky-200 hover:bg-sky-50 sm:block sm:min-h-0 sm:p-4">
-              <p className="font-semibold text-slate-950">{!isAdmin && key === 'system-check' ? 'My Account Check' : label}</p>
-              <p className="hidden text-sm text-slate-500 sm:mt-1 sm:block">{moreToolDescription(key, isAdmin)}</p>
+            <button key={key} onClick={() => go(href)} className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-sky-200 hover:bg-sky-50 sm:block sm:min-h-0 sm:p-4">
+              <p className="font-semibold text-slate-950 ty-wrap">{!isAdmin && key === 'system-check' ? 'My Account Check' : label}</p>
+              <p className="hidden text-sm text-slate-500 sm:mt-1 sm:block ty-wrap">{moreToolDescription(key, isAdmin)}</p>
               <span className="text-slate-300 sm:hidden">›</span>
             </button>
           ))}
-          <button data-testid="sign-out-button" onClick={signOut} className="flex min-h-14 items-center justify-between rounded-lg border border-rose-100 bg-rose-50 p-3 text-left font-semibold text-rose-700 hover:bg-rose-100">
+          <button data-testid="sign-out-button" onClick={signOut} className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-lg border border-rose-100 bg-rose-50 p-3 text-left font-semibold text-rose-700 hover:bg-rose-100">
             Sign out / 登出
             <span className="text-rose-300">›</span>
           </button>
@@ -1443,7 +1443,7 @@ function HelpPage({ profile }) {
             ['Setup Check', 'Run this after setup, demo seed, or any permission issue. It tells you what passed, what needs attention, and the next action.'],
           ].map(([title, body]) => (
             <div key={title} className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="font-semibold text-slate-950">{title}</p>
+              <p className="font-semibold text-slate-950 ty-wrap">{title}</p>
               <p className="mt-1 text-sm leading-6 text-slate-500">{body}</p>
             </div>
           ))}
@@ -1458,7 +1458,7 @@ function HelpPage({ profile }) {
             ['My Pay', 'Coach sees only their own expected payroll from approved payable lessons, never other coaches or company finance.'],
           ].map(([title, body]) => (
             <div key={title} className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="font-semibold text-slate-950">{title}</p>
+              <p className="font-semibold text-slate-950 ty-wrap">{title}</p>
               <p className="mt-1 text-sm leading-6 text-slate-500">{body}</p>
             </div>
           ))}
@@ -1493,7 +1493,7 @@ function SkillLevelsPage({ profile, data, reload, toast }) {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-sky-700">Level {level.level}</p>
-                  <h3 className="mt-1 font-semibold text-slate-950">{level.title}</h3>
+                  <h3 className="mt-1 font-semibold text-slate-950 ty-wrap">{level.title}</h3>
                 </div>
                 <span className="rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white">{level.criteria.length} skills</span>
               </div>
@@ -1516,7 +1516,7 @@ function SkillLevelsPage({ profile, data, reload, toast }) {
       <Section title="Bonus / Optional Skills">
         <p className="mb-4 text-sm leading-6 text-slate-500">These are useful teaching tools but do not block the main level progression unless Admin decides.</p>
         <div className="grid gap-3 md:grid-cols-2">
-          {bonusSkills.map((item) => <div key={item.id} className="rounded-lg border border-slate-200 bg-white p-4"><p className="font-semibold text-slate-950">{item.title}</p><p className="mt-2 text-sm leading-6 text-slate-600">{item.notes}</p></div>)}
+          {bonusSkills.map((item) => <div key={item.id} className="rounded-lg border border-slate-200 bg-white p-4"><p className="font-semibold text-slate-950 ty-wrap">{item.title}</p><p className="mt-2 text-sm leading-6 text-slate-600">{item.notes}</p></div>)}
         </div>
       </Section>
       <Section title={isAdmin ? 'Student Progress' : 'My Student Progress'}>
@@ -1622,9 +1622,9 @@ function SystemCheckPage({ session, profile, data, tableErrors = {} }) {
   return (
     <div className="grid gap-5">
       <Section title="Setup Check" action={<Button variant="ghost" onClick={() => setShowDetails((value) => !value)}>{showDetails ? 'Hide advanced details' : 'Show advanced details'}</Button>}>
-        <div className={`rounded-lg border p-4 ${failCount ? 'border-rose-100 bg-rose-50' : warningCount ? 'border-amber-100 bg-amber-50' : 'border-emerald-100 bg-emerald-50'}`}>
-          <p className="text-lg font-semibold text-slate-950">{setupTitle}</p>
-          <p className="mt-2 text-sm leading-6 text-slate-700">{setupBody}</p>
+        <div className={`min-w-0 rounded-lg border p-4 ${failCount ? 'border-rose-100 bg-rose-50' : warningCount ? 'border-amber-100 bg-amber-50' : 'border-emerald-100 bg-emerald-50'}`}>
+          <p className="text-lg font-semibold text-slate-950 ty-wrap">{setupTitle}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-700 ty-wrap">{setupBody}</p>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <Card title="Passed" value={rows.filter((row) => row.status === 'pass').length} tone="green" />
@@ -1634,7 +1634,7 @@ function SystemCheckPage({ session, profile, data, tableErrors = {} }) {
       </Section>
       {showDetails ? (
         <Section title="Advanced Details">
-          <p className="mb-4 text-sm leading-6 text-slate-500">These details are useful for setup and support. They include connection settings, role checks, private storage, table access, demo data, and security checks.</p>
+          <p className="mb-4 text-sm leading-6 text-slate-500 ty-wrap">These details are useful for setup and support. They include connection settings, role checks, private storage, table access, demo data, and security checks.</p>
           <DataTable rows={rows} columns={[
             { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status}>{row.label}</StatusBadge> },
             { key: 'check', label: 'Check' },
@@ -1697,7 +1697,7 @@ function CoachCheckCard({ row }) {
   return (
     <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
-        <h3 className="font-semibold text-slate-950">{row.check}</h3>
+        <h3 className="font-semibold text-slate-950 ty-wrap">{row.check}</h3>
         <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${tone}`}>{label}</span>
       </div>
       <p className="mt-3 text-sm leading-6 text-slate-600">{row.detail}</p>
@@ -1899,8 +1899,8 @@ function StudentProgressCards({ students, data, onUpdate, lesson }) {
           <article key={student.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="font-semibold text-slate-950">{student.display_name}</h3>
-                <p className="mt-1 text-sm text-slate-500">{data.customers.find((item) => item.id === student.customer_id)?.display_name || 'Family not set'}</p>
+                <h3 className="font-semibold text-slate-950 ty-wrap">{student.display_name}</h3>
+                <p className="mt-1 text-sm text-slate-500 ty-wrap">{data.customers.find((item) => item.id === student.customer_id)?.display_name || 'Family not set'}</p>
               </div>
               <StudentLevelBadge student={student} data={data} />
             </div>
@@ -2047,7 +2047,7 @@ function StudentProgressModal({ student, data, profile, reload, toast, onClose, 
           <Field label="Level status"><Select value={levelStatus} onChange={(event) => setLevelStatus(event.target.value)}>{levelStatuses.map((item) => <option key={item} value={item}>{levelStatusLabels[item]}</option>)}</Select></Field>
         </div>
         <div className="rounded-lg border border-sky-100 bg-sky-50 p-3">
-          <p className="font-semibold text-slate-950">Level {level.level}: {level.title}</p>
+          <p className="font-semibold text-slate-950 ty-wrap">Level {level.level}: {level.title}</p>
           <p className="mt-1 text-sm leading-6 text-slate-600">{level.goal}</p>
           <p className="mt-2 text-xs font-semibold text-sky-700">{passedCount}/{level.criteria.length} passed</p>
           {readyForNext ? <p className="mt-2 rounded-lg bg-emerald-50 p-2 text-sm font-semibold text-emerald-700">Ready for next level. Admin should confirm level up before changing the student level.</p> : null}
@@ -2055,7 +2055,7 @@ function StudentProgressModal({ student, data, profile, reload, toast, onClose, 
         <div className="grid gap-3">
           {level.criteria.map(([criterionId, label]) => (
             <div key={criterionId} className="rounded-lg border border-slate-200 bg-white p-3">
-              <p className="font-semibold text-slate-950">{label}</p>
+              <p className="font-semibold text-slate-950 ty-wrap">{label}</p>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {progressStatuses.map((status) => (
                   <button key={status} type="button" onClick={() => setStatuses((current) => ({ ...current, [criterionId]: status }))} className={`min-h-10 rounded-lg border px-2 text-sm font-semibold ${statuses[criterionId] === status ? 'border-sky-500 bg-sky-600 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>
@@ -2264,18 +2264,18 @@ function LessonsPage({ profile, data, reload, toast }) {
 
   return (
     <div className="grid gap-5">
-      <Section title="Schedule" action={<div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">{activeMode === 'fixed_weekly' && isAdmin ? <Button onClick={() => setRecurring({})}>Generate Upcoming Lessons</Button> : null}{activeMode === 'flexible' ? <Button onClick={() => setFlexible({})}>Create Flexible Lesson</Button> : null}<Button variant="ghost" onClick={() => setShowFilters((value) => !value)}>{showFilters ? 'Hide advanced filters' : 'Advanced filters'}</Button></div>}>
-        <p className="text-sm leading-6 text-slate-500">Choose one mode at a time. Fixed Weekly is for regular weekly classes. Flexible is for lessons arranged by coach and customer.</p>
+      <Section title="Schedule" action={<div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">{activeMode === 'fixed_weekly' && isAdmin ? <Button onClick={() => setRecurring({})}>Generate Upcoming Lessons</Button> : null}{activeMode === 'flexible' ? <Button onClick={() => setFlexible({})}>Create Flexible Lesson</Button> : null}<Button variant="ghost" onClick={() => setShowFilters((value) => !value)}>{showFilters ? 'Hide advanced filters' : 'Advanced filters'}</Button></div>}>
+        <p className="text-sm leading-6 text-slate-500 ty-wrap">Choose one mode at a time. Fixed Weekly is for regular weekly classes. Flexible is for lessons arranged by coach and customer.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <button className={`rounded-lg border p-4 text-left ${activeMode === 'fixed_weekly' ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50'}`} onClick={() => setActiveMode('fixed_weekly')}>
-            <p className="font-semibold text-slate-950">Fixed Weekly</p>
-            <p className="mt-1 text-sm text-slate-600">Regular weekly classes. Rescheduling one lesson does not change the weekly pattern.</p>
-            <p className="mt-2 text-xs font-semibold text-sky-700">{fixedSchedules.length} schedule(s), {fixedLessons.length} lesson(s)</p>
+          <button className={`min-w-0 rounded-lg border p-4 text-left ${activeMode === 'fixed_weekly' ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50'}`} onClick={() => setActiveMode('fixed_weekly')}>
+            <p className="font-semibold text-slate-950 ty-wrap">Fixed Weekly</p>
+            <p className="mt-1 text-sm text-slate-600 ty-wrap">Regular weekly classes. Rescheduling one lesson does not change the weekly pattern.</p>
+            <p className="mt-2 text-xs font-semibold text-sky-700 ty-wrap">{fixedSchedules.length} schedule(s), {fixedLessons.length} lesson(s)</p>
           </button>
-          <button className={`rounded-lg border p-4 text-left ${activeMode === 'flexible' ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50'}`} onClick={() => setActiveMode('flexible')}>
-            <p className="font-semibold text-slate-950">Flexible / Coach-arranged</p>
-            <p className="mt-1 text-sm text-slate-600">Appointment-style lessons arranged with the customer in WhatsApp.</p>
-            <p className="mt-2 text-xs font-semibold text-sky-700">{flexibleClasses.length} class(es), {flexibleLessons.length} appointment(s)</p>
+          <button className={`min-w-0 rounded-lg border p-4 text-left ${activeMode === 'flexible' ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50'}`} onClick={() => setActiveMode('flexible')}>
+            <p className="font-semibold text-slate-950 ty-wrap">Flexible / Coach-arranged</p>
+            <p className="mt-1 text-sm text-slate-600 ty-wrap">Appointment-style lessons arranged with the customer in WhatsApp.</p>
+            <p className="mt-2 text-xs font-semibold text-sky-700 ty-wrap">{flexibleClasses.length} class(es), {flexibleLessons.length} appointment(s)</p>
           </button>
         </div>
       </Section>
@@ -2338,16 +2338,16 @@ function FixedScheduleCardList({ rows, data }) {
         const venue = data.venues.find((item) => item.id === row.venue_id);
         const nextLesson = data.lessons.filter((lesson) => lesson.recurring_schedule_id === row.id && lesson.scheduled_date >= todayISO()).sort((a, b) => String(a.scheduled_date).localeCompare(String(b.scheduled_date)))[0];
         return (
-          <article key={row.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div>
+          <article key={row.id} className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
                 <p className="text-sm font-semibold text-sky-700">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][row.day_of_week] || '-'} · {row.start_time || ''} - {row.end_time || ''}</p>
-                <h3 className="mt-1 font-semibold text-slate-950">{cls?.class_name || '-'}</h3>
-                <p className="mt-1 text-sm text-slate-500">{coach?.display_name || '-'} · {venue?.venue_name || venue?.area || 'Venue not set'}</p>
+                <h3 className="mt-1 font-semibold text-slate-950 ty-wrap">{cls?.class_name || '-'}</h3>
+                <p className="mt-1 text-sm text-slate-500 ty-wrap">{coach?.display_name || '-'} · {venue?.venue_name || venue?.area || 'Venue not set'}</p>
               </div>
               <StatusBadge value={row.status}>{row.status}</StatusBadge>
             </div>
-            <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">Next lesson: {nextLesson?.scheduled_date || '-'}</p>
+            <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600 ty-wrap">Next lesson: {nextLesson?.scheduled_date || '-'}</p>
           </article>
         );
       })}
@@ -2360,10 +2360,10 @@ function FlexibleClassCardList({ rows, data, onCreate }) {
   return (
     <div className="grid gap-3 md:hidden">
       {rows.map((row) => (
-        <article key={row.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="font-semibold text-slate-950">{row.class_name}</p>
-          <p className="mt-1 text-sm text-slate-500">{data.coaches.find((item) => item.id === row.assigned_coach_id)?.display_name || 'Coach not set'}</p>
-          <p className="mt-1 text-sm text-slate-600">{classStudentNames(row.id, data)}</p>
+        <article key={row.id} className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="font-semibold text-slate-950 ty-wrap">{row.class_name}</p>
+          <p className="mt-1 text-sm text-slate-500 ty-wrap">{data.coaches.find((item) => item.id === row.assigned_coach_id)?.display_name || 'Coach not set'}</p>
+          <p className="mt-1 text-sm text-slate-600 ty-wrap">{classStudentNames(row.id, data)}</p>
           <Button className="mt-4 w-full" onClick={onCreate}>Create appointment</Button>
         </article>
       ))}
@@ -2596,7 +2596,7 @@ function LessonDetail({ profile, pathInfo, data, reload, toast }) {
             const student = data.students.find((row) => row.id === item.student_id);
             return (
               <div key={item.student_id} className="grid gap-3 rounded-lg border border-slate-200 p-3 md:grid-cols-[1fr_160px_1.3fr_1.3fr]">
-                <div><p className="font-semibold text-slate-950">{student?.display_name}</p><p className="text-xs text-rose-600">{student?.safety_alert || student?.health_notes || student?.special_needs || ''}</p></div>
+                <div><p className="font-semibold text-slate-950 ty-wrap">{student?.display_name}</p><p className="text-xs text-rose-600">{student?.safety_alert || student?.health_notes || student?.special_needs || ''}</p></div>
                 <Select disabled={coachLocked} value={item.attendance} onChange={(event) => setParticipants(participants.map((row, rowIndex) => rowIndex === index ? { ...row, attendance: event.target.value } : row))}>{['present', 'absent', 'sick', 'late', 'no_show', 'not_applicable'].map((value) => <option key={value}>{value}</option>)}</Select>
                 <Textarea disabled={coachLocked} placeholder="Progress note" value={item.progress_note || ''} onChange={(event) => setParticipants(participants.map((row, rowIndex) => rowIndex === index ? { ...row, progress_note: event.target.value } : row))} />
                 <Textarea disabled={coachLocked} placeholder="Next focus" value={item.next_focus || ''} onChange={(event) => setParticipants(participants.map((row, rowIndex) => rowIndex === index ? { ...row, next_focus: event.target.value } : row))} />
@@ -2678,7 +2678,7 @@ function CoachLessonSubmission({ lesson, profile, cls, customer, venue, data, fo
               <div key={item.student_id} className="rounded-lg border border-slate-200 p-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="font-semibold text-slate-950">{student?.display_name}</p>
+                    <p className="font-semibold text-slate-950 ty-wrap">{student?.display_name}</p>
                     <p className="text-xs text-rose-600">{student?.safety_alert || student?.health_notes || student?.special_needs || ''}</p>
                   </div>
                   <Select disabled={coachLocked} value={item.attendance} onChange={(event) => setParticipants(participants.map((row, rowIndex) => rowIndex === index ? { ...row, attendance: event.target.value } : row))}>{['present', 'absent', 'sick', 'late', 'no_show', 'not_applicable'].map((value) => <option key={value}>{value}</option>)}</Select>
@@ -2696,7 +2696,7 @@ function CoachLessonSubmission({ lesson, profile, cls, customer, venue, data, fo
         <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="font-semibold text-slate-950">Update student progress</p>
+              <p className="font-semibold text-slate-950 ty-wrap">Update student progress</p>
               <p className="mt-1 text-sm leading-6 text-slate-500">Optional. Quickly update 1-2 current focus skills. Full checklist stays in Levels & Progress.</p>
             </div>
             <Button variant="ghost" onClick={() => go('/skill-levels')}>View full syllabus</Button>
@@ -2793,7 +2793,7 @@ function CoachQuickProgressCard({ student, lesson, data, profile, reload, toast,
     <article className="rounded-lg border border-slate-200 bg-white p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-semibold text-slate-950">{student.display_name}</p>
+          <p className="font-semibold text-slate-950 ty-wrap">{student.display_name}</p>
           <p className="text-sm text-slate-500">Level {level.level}: {level.title}</p>
         </div>
         <StudentLevelBadge student={student} data={data} />
@@ -2980,8 +2980,8 @@ function ReviewPage({ data, reload, toast }) {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-sky-700">{formatDate(lesson.scheduled_date)} {lesson.start_time || ''}</p>
-                      <h3 className="mt-1 font-semibold text-slate-950">{cls?.class_name || lesson.lesson_code}</h3>
-                      <p className="mt-1 text-sm text-slate-500">{classStudentNames(cls?.id, data)}</p>
+                      <h3 className="mt-1 font-semibold text-slate-950 ty-wrap">{cls?.class_name || lesson.lesson_code}</h3>
+                      <p className="mt-1 text-sm text-slate-500 ty-wrap">{classStudentNames(cls?.id, data)}</p>
                     </div>
                     <StatusBadge value={lesson.status} />
                   </div>
@@ -3094,11 +3094,11 @@ function PayrollPeriodCards({ rows, data, isAdmin, markPaid }) {
   return (
     <div className="grid gap-3 md:hidden">
       {rows.map((row) => (
-        <article key={row.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <article key={row.id} className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="font-semibold text-slate-950">{formatDate(row.period_month).slice(0, 7)}</p>
-              <p className="mt-1 text-sm text-slate-500">{data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-'}</p>
+              <p className="font-semibold text-slate-950 ty-wrap">{formatDate(row.period_month).slice(0, 7)}</p>
+              <p className="mt-1 text-sm text-slate-500 ty-wrap">{data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-'}</p>
             </div>
             <StatusBadge value={row.status}>{row.status}</StatusBadge>
           </div>
@@ -3118,16 +3118,16 @@ function PayrollItemCards({ rows, data }) {
   return (
     <div className="grid gap-3 md:hidden">
       {rows.map((row) => (
-        <article key={row.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <article key={row.id} className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="font-semibold text-slate-950">{data.lessons.find((item) => item.id === row.lesson_id)?.lesson_code || 'Lesson'}</p>
-              <p className="mt-1 text-sm text-slate-500">{data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-'}</p>
+              <p className="font-semibold text-slate-950 ty-wrap">{data.lessons.find((item) => item.id === row.lesson_id)?.lesson_code || 'Lesson'}</p>
+              <p className="mt-1 text-sm text-slate-500 ty-wrap">{data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-'}</p>
             </div>
             <StatusBadge value={row.status}>{row.status}</StatusBadge>
           </div>
           <p className="mt-3 text-xl font-semibold text-slate-950">{formatMoney(row.pay_amount)}</p>
-          <p className="mt-1 text-sm text-slate-500">Rate source: {row.rate_source || '-'}</p>
+          <p className="mt-1 text-sm text-slate-500 ty-wrap">Rate source: {row.rate_source || '-'}</p>
         </article>
       ))}
     </div>
@@ -3415,7 +3415,7 @@ function AuditLogPage({ data }) {
   return (
     <div className="grid gap-5">
       <Section title="Audit Logs">
-        <p className="text-sm leading-6 text-slate-500">Read-only history of important system actions. Use this when checking who changed a lesson, package, payroll, payment, expense, backup, or reversal.</p>
+        <p className="text-sm leading-6 text-slate-500 ty-wrap">Read-only history of important system actions. Use this when checking who changed a lesson, package, payroll, payment, expense, backup, or reversal.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-5">
           <Field label="From"><Input type="date" value={filters.from} onChange={(event) => setFilters({ ...filters, from: event.target.value })} /></Field>
           <Field label="To"><Input type="date" value={filters.to} onChange={(event) => setFilters({ ...filters, to: event.target.value })} /></Field>
@@ -3447,17 +3447,17 @@ function AuditLogPage({ data }) {
 
 function AuditLogCard({ row, data }) {
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
+    <article className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <p className="text-sm font-semibold text-sky-700">{formatDate(row.created_at)} {String(row.created_at || '').slice(11, 16)}</p>
-          <h3 className="mt-1 font-semibold text-slate-950">{row.action}</h3>
+          <h3 className="mt-1 font-semibold text-slate-950 ty-wrap">{row.action}</h3>
         </div>
         <StatusBadge value={row.entity_type}>{row.entity_type}</StatusBadge>
       </div>
-      <p className="mt-3 text-sm text-slate-600"><span className="font-semibold">Actor:</span> {actorName(row.actor_id, data)}</p>
-      <p className="mt-1 break-all text-sm text-slate-600"><span className="font-semibold">Record:</span> {entityLabel(row, data)}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-500">{auditSummary(row)}</p>
+      <p className="mt-3 text-sm text-slate-600 ty-wrap"><span className="font-semibold">Actor:</span> {actorName(row.actor_id, data)}</p>
+      <p className="mt-1 text-sm text-slate-600 ty-wrap"><span className="font-semibold">Record:</span> {entityLabel(row, data)}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-500 ty-wrap">{auditSummary(row)}</p>
     </article>
   );
 }
@@ -3695,7 +3695,7 @@ function StoragePreview({ bucket, path, image = false }) {
 }
 
 function Info({ label, value }) {
-  return <div className="rounded-lg bg-slate-50 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><div className="mt-1 text-sm font-medium text-slate-800">{value || '-'}</div></div>;
+  return <div className="min-w-0 rounded-lg bg-slate-50 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500 ty-wrap">{label}</p><div className="mt-1 text-sm font-medium text-slate-800 ty-wrap">{value || '-'}</div></div>;
 }
 
 function classStudentNames(classId, data) {
