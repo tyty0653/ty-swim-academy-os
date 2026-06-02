@@ -764,6 +764,7 @@ function StudentsHub(props) {
 }
 
 function StudentProfileDirectory({ data, profile, onUpdateProgress, onAddStudent }) {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('active');
   const [levelFilter, setLevelFilter] = useState('');
@@ -801,20 +802,20 @@ function StudentProfileDirectory({ data, profile, onUpdateProgress, onAddStudent
     ['missing-consent', 'Missing consent'],
   ];
   return (
-    <Section title={isAdmin ? 'Student / Family Profiles' : 'My Students'} action={isAdmin ? <Button onClick={onAddStudent || (() => go('/students'))}>Add Student / Family</Button> : null}>
-      <p className="text-sm leading-6 text-slate-500">{isAdmin ? 'Search families and open a clean profile with safety, lesson setup, package, progress, and recent lessons.' : 'Open a student profile for WhatsApp, map, safety notes, current level, progress, and lesson history.'}</p>
+    <Section title={isAdmin ? t('Student / Family Profiles') : t('My Students')} action={isAdmin ? <Button onClick={onAddStudent || (() => go('/students'))}>{t('Add Student / Family')}</Button> : null}>
+      <p className="text-sm leading-6 text-slate-500">{isAdmin ? t('Search families and open a clean profile with safety, lesson setup, package, progress, and recent lessons.') : t('Open a student profile for WhatsApp, map, safety notes, current level, progress, and lesson history.')}</p>
       <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto]">
-        <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search student, parent, phone, class, coach, area" />
+        <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Search student, parent, phone, class, coach, area')} />
         <Select value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)} className="lg:w-40">
-          <option value="">All levels</option>
-          {[1, 2, 3, 4, 5, 6].map((level) => <option key={level} value={level}>Level {level}</option>)}
+          <option value="">{t('All levels')}</option>
+          {[1, 2, 3, 4, 5, 6].map((level) => <option key={level} value={level}>{t('Level')} {level}</option>)}
         </Select>
       </div>
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-        {filterLabels.map(([key, label]) => <Button key={key} variant={filter === key ? 'primary' : 'ghost'} className="shrink-0" onClick={() => setFilter(key)}>{label}</Button>)}
+        {filterLabels.map(([key, label]) => <Button key={key} variant={filter === key ? 'primary' : 'ghost'} className="shrink-0" onClick={() => setFilter(key)}>{t(label)}</Button>)}
       </div>
       {rows.length === 0 ? (
-        <EmptyState title="No matching students" body={isAdmin ? 'Try a different search or start by adding a new family.' : 'Assigned students will appear after Admin links you to a class.'} action={isAdmin ? <Button onClick={onAddStudent || (() => go('/students'))}>Add Student / Family</Button> : null} />
+        <EmptyState title={t('No matching students')} body={isAdmin ? t('Try a different search or start by adding a new family.') : t('Assigned students will appear after Admin links you to a class.')} action={isAdmin ? <Button onClick={onAddStudent || (() => go('/students'))}>{t('Add Student / Family')}</Button> : null} />
       ) : (
         <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
           {rows.map((item) => <StudentProfileCard key={item.student.id} item={item} isAdmin={isAdmin} onUpdateProgress={onUpdateProgress} />)}
@@ -825,6 +826,7 @@ function StudentProfileDirectory({ data, profile, onUpdateProgress, onAddStudent
 }
 
 function StudentProfileCard({ item, isAdmin, onUpdateProgress }) {
+  const { t } = useI18n();
   const { student, customer, primaryClass, coach, venue, activePackage, skillProfile, missingItems } = item;
   const whatsapp = customer?.whatsapp;
   const map = venue?.google_maps_link;
@@ -833,29 +835,29 @@ function StudentProfileCard({ item, isAdmin, onUpdateProgress }) {
     <article data-testid="student-profile-card" className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h3 className="text-base font-semibold text-slate-950 ty-wrap">{student.display_name || 'Unnamed student'}</h3>
-          <p className="mt-1 text-sm text-slate-500 ty-wrap">{customer?.display_name || 'Family not set'}{customer?.parent_name ? ` / ${customer.parent_name}` : ''}</p>
+          <h3 className="text-base font-semibold text-slate-950 ty-wrap">{student.display_name || t('Unnamed student')}</h3>
+          <p className="mt-1 text-sm text-slate-500 ty-wrap">{customer?.display_name || t('Family not set')}{customer?.parent_name ? ` / ${customer.parent_name}` : ''}</p>
         </div>
         <StudentLevelBadge student={student} data={item.data} />
       </div>
       {student.safety_alert ? <p className="mt-3 rounded-lg bg-rose-50 p-2 text-sm font-semibold text-rose-700 ty-wrap">{student.safety_alert}</p> : null}
       <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-        <Info label="Coach" value={coach?.display_name || coach?.coach_code || 'Not set'} />
-        <Info label="Class" value={primaryClass?.class_name || primaryClass?.class_type || 'Not set'} />
-        <Info label="Package" value={<span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${lowPackage ? 'bg-amber-50 text-amber-700 ring-amber-100' : 'bg-emerald-50 text-emerald-700 ring-emerald-100'}`}>{activePackage ? `${activePackage.remaining_lessons} left` : 'No package'}</span>} />
-        <Info label="Focus" value={skillProfile.current_focus || student.learning_goal || 'Not set'} />
+        <Info label={t('Coach')} value={coach?.display_name || coach?.coach_code || t('Not set')} />
+        <Info label={t('Class')} value={primaryClass?.class_name || primaryClass?.class_type || t('Not set')} />
+        <Info label={t('Package')} value={<span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${lowPackage ? 'bg-amber-50 text-amber-700 ring-amber-100' : 'bg-emerald-50 text-emerald-700 ring-emerald-100'}`}>{activePackage ? `${activePackage.remaining_lessons} ${t('left')}` : t('No package')}</span>} />
+        <Info label={t('Focus')} value={skillProfile.current_focus || student.learning_goal || t('Not set')} />
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        {missingItems.slice(0, 4).map((label) => <span key={label} className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">{label}</span>)}
-        {missingItems.length > 4 ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">+{missingItems.length - 4} more</span> : null}
+        {missingItems.slice(0, 4).map((label) => <span key={label} className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">{t(label)}</span>)}
+        {missingItems.length > 4 ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">+{missingItems.length - 4} {t('more')}</span> : null}
       </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <Button onClick={() => go(`/students/${student.id}`)}>Open Profile</Button>
-        <Button variant="soft" onClick={() => onUpdateProgress(student)}>Update Progress</Button>
-        <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? 'WhatsApp' : 'No WhatsApp'}</a>
-        <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${map ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={map || undefined} target="_blank" rel="noreferrer">{map ? 'Map' : 'No map'}</a>
+        <Button onClick={() => go(`/students/${student.id}`)}>{t('Open Profile')}</Button>
+        <Button variant="soft" onClick={() => onUpdateProgress(student)}>{t('Update Progress')}</Button>
+        <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? t('WhatsApp') : t('No WhatsApp')}</a>
+        <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${map ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={map || undefined} target="_blank" rel="noreferrer">{map ? t('Map') : t('No map')}</a>
       </div>
-      {isAdmin && customer?.internal_notes ? <p className="mt-3 rounded-lg bg-slate-50 p-2 text-xs leading-5 text-slate-500 ty-wrap">Admin note: {customer.internal_notes}</p> : null}
+      {isAdmin && customer?.internal_notes ? <p className="mt-3 rounded-lg bg-slate-50 p-2 text-xs leading-5 text-slate-500 ty-wrap">{t('Admin note')}: {customer.internal_notes}</p> : null}
     </article>
   );
 }
@@ -1209,10 +1211,11 @@ function photoConsentLabel(value) {
 }
 
 function StudentProfilePage({ profile, pathInfo, data, reload, toast }) {
+  const { t } = useI18n();
   const isAdmin = profile.role === 'admin';
   const student = data.students.find((item) => item.id === pathInfo.id);
   const [progressStudent, setProgressStudent] = useState(null);
-  if (!student) return <Section title="Student not found" action={<Button variant="ghost" onClick={() => go('/students')}>Back to Students</Button>}><p className="text-sm text-slate-500">This student is not visible to your account or no longer exists.</p></Section>;
+  if (!student) return <Section title={t('Student not found')} action={<Button variant="ghost" onClick={() => go('/students')}>{t('Back to Students')}</Button>}><p className="text-sm text-slate-500">{t('This student is not visible to your account or no longer exists.')}</p></Section>;
   const item = buildStudentProfileContext(student, data);
   const { customer, primaryClass, coach, venue, activePackage, skillProfile, levelProgress, recentLessons, payments, missingItems } = item;
   const whatsapp = customer?.whatsapp;
@@ -1220,74 +1223,74 @@ function StudentProfilePage({ profile, pathInfo, data, reload, toast }) {
   const renewalWarning = activePackage && (Number(activePackage.remaining_lessons || 0) <= 1 || daysUntil(activePackage.expiry_date) <= 14);
   return (
     <div data-testid="student-profile-page" className="grid gap-5">
-      <Section title={student.display_name || 'Student Profile'} action={<Button variant="ghost" onClick={() => go('/students')}>Back</Button>}>
+      <Section title={student.display_name || t('Student Profile')} action={<Button variant="ghost" onClick={() => go('/students')}>{t('Back')}</Button>}>
         <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
           <div>
-            <p className="text-sm font-semibold text-sky-700">{customer?.display_name || 'Family not set'}</p>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-950">{student.display_name || 'Unnamed student'}</h1>
-            <p className="mt-2 text-sm leading-6 text-slate-500">Parent: {customer?.parent_name || '-'}{customer?.whatsapp ? ` / WhatsApp: ${customer.whatsapp}` : ''}</p>
+            <p className="text-sm font-semibold text-sky-700">{customer?.display_name || t('Family not set')}</p>
+            <h1 className="mt-1 text-2xl font-semibold text-slate-950">{student.display_name || t('Unnamed student')}</h1>
+            <p className="mt-2 text-sm leading-6 text-slate-500">{t('Parent')}: {customer?.parent_name || '-'}{customer?.whatsapp ? ` / WhatsApp: ${customer.whatsapp}` : ''}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <StudentLevelBadge student={student} data={data} />
-              <StatusBadge value={student.status}>{student.status || 'active'}</StatusBadge>
-              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${renewalWarning ? 'bg-amber-50 text-amber-700 ring-amber-100' : 'bg-emerald-50 text-emerald-700 ring-emerald-100'}`}>{activePackage ? `${activePackage.remaining_lessons} lessons left` : 'No package'}</span>
+              <StatusBadge value={student.status}>{t(student.status || 'active')}</StatusBadge>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${renewalWarning ? 'bg-amber-50 text-amber-700 ring-amber-100' : 'bg-emerald-50 text-emerald-700 ring-emerald-100'}`}>{activePackage ? `${activePackage.remaining_lessons} ${t('lessons left')}` : t('No package')}</span>
             </div>
           </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:min-w-60 lg:grid-cols-1">
-            <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? 'WhatsApp Parent' : 'No WhatsApp'}</a>
-            <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? 'Open Map' : 'No map link'}</a>
+            <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? t('WhatsApp Parent') : t('No WhatsApp')}</a>
+            <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? t('Open Map') : t('No map link')}</a>
           </div>
         </div>
       </Section>
       {missingItems.length ? (
-        <Section title="Missing Data">
-          <p className="mb-3 text-sm leading-6 text-slate-500">These items make daily operations smoother. Fill them when available.</p>
-          <div className="flex flex-wrap gap-2">{missingItems.map((label) => <span key={label} className="rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-700">{label}</span>)}</div>
+        <Section title={t('Missing Data')}>
+          <p className="mb-3 text-sm leading-6 text-slate-500">{t('These items make daily operations smoother. Fill them when available.')}</p>
+          <div className="flex flex-wrap gap-2">{missingItems.map((label) => <span key={label} className="rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-700">{t(label)}</span>)}</div>
         </Section>
       ) : null}
       <div className="grid gap-5 xl:grid-cols-2">
-        <Section title="Safety">
+        <Section title={t('Safety')}>
           <div className="grid gap-3">
-            {student.safety_alert ? <div className="rounded-lg border border-rose-100 bg-rose-50 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Safety alert</p><p className="mt-1 text-sm font-semibold leading-6 text-rose-800">{student.safety_alert}</p></div> : null}
-            <Info label="Health notes" value={student.health_notes || 'Not confirmed yet'} />
-            <Info label="Special needs / confidence" value={student.special_needs || '-'} />
-            <Info label="Photo consent" value={<StatusBadge value={student.photo_consent_status || 'unknown'}>{photoConsentLabel(student.photo_consent_status)}</StatusBadge>} />
-            {student.photo_consent_note ? <Info label="Consent note" value={student.photo_consent_note} /> : null}
+            {student.safety_alert ? <div className="rounded-lg border border-rose-100 bg-rose-50 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-rose-700">{t('Safety alert')}</p><p className="mt-1 text-sm font-semibold leading-6 text-rose-800">{student.safety_alert}</p></div> : null}
+            <Info label={t('Health notes')} value={student.health_notes || t('Not confirmed yet')} />
+            <Info label={t('Special needs / confidence')} value={student.special_needs || '-'} />
+            <Info label={t('Photo consent')} value={<StatusBadge value={student.photo_consent_status || 'unknown'}>{t(photoConsentLabel(student.photo_consent_status))}</StatusBadge>} />
+            {student.photo_consent_note ? <Info label={t('Consent note')} value={student.photo_consent_note} /> : null}
           </div>
         </Section>
-        <Section title="Lesson Setup">
+        <Section title={t('Lesson Setup')}>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Info label="Coach" value={coach?.display_name || coach?.coach_code || 'Not set'} />
-            <Info label="Class type" value={primaryClass?.class_type || '-'} />
-            <Info label="Schedule mode" value={primaryClass?.scheduling_mode === 'fixed_weekly' ? 'Fixed weekly' : primaryClass?.scheduling_mode === 'flexible' ? 'Flexible / Coach-arranged' : '-'} />
-            <Info label="Photo required" value={primaryClass?.photo_required ? 'Yes' : 'No'} />
-            <Info label="Venue" value={venue?.venue_name || venue?.area || '-'} />
-            <Info label="Address" value={venue?.full_address || '-'} />
-            <Info label="Access" value={venue?.access_instruction || '-'} />
-            <Info label="Parking / pool note" value={[venue?.parking_note, venue?.pool_depth_note].filter(Boolean).join(' / ') || '-'} />
+            <Info label={t('Coach')} value={coach?.display_name || coach?.coach_code || t('Not set')} />
+            <Info label={t('Class type')} value={primaryClass?.class_type || '-'} />
+            <Info label={t('Schedule mode')} value={primaryClass?.scheduling_mode === 'fixed_weekly' ? t('Fixed weekly') : primaryClass?.scheduling_mode === 'flexible' ? t('Flexible / Coach-arranged') : '-'} />
+            <Info label={t('Photo required')} value={primaryClass?.photo_required ? t('Yes') : t('No')} />
+            <Info label={t('Venue')} value={venue?.venue_name || venue?.area || '-'} />
+            <Info label={t('Address')} value={venue?.full_address || '-'} />
+            <Info label={t('Access')} value={venue?.access_instruction || '-'} />
+            <Info label={t('Parking / pool note')} value={[venue?.parking_note, venue?.pool_depth_note].filter(Boolean).join(' / ') || '-'} />
           </div>
         </Section>
-        <Section title="Package">
+        <Section title={t('Package')}>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Info label="Remaining" value={activePackage ? `${activePackage.remaining_lessons} lessons` : 'No package'} />
-            <Info label="Used" value={activePackage ? `${activePackage.used_lessons || 0} / ${activePackage.total_lessons || 0}` : '-'} />
-            <Info label="Expiry" value={activePackage?.expiry_date ? `${formatDate(activePackage.expiry_date)}${daysUntil(activePackage.expiry_date) < 0 ? ' (expired)' : ''}` : '-'} />
-            <Info label="Status" value={activePackage ? <StatusBadge value={activePackage.status}>{activePackage.status}</StatusBadge> : '-'} />
+            <Info label={t('Remaining')} value={activePackage ? `${activePackage.remaining_lessons} ${t('lessons')}` : t('No package')} />
+            <Info label={t('Used')} value={activePackage ? `${activePackage.used_lessons || 0} / ${activePackage.total_lessons || 0}` : '-'} />
+            <Info label={t('Expiry')} value={activePackage?.expiry_date ? `${formatDate(activePackage.expiry_date)}${daysUntil(activePackage.expiry_date) < 0 ? ` (${t('expired')})` : ''}` : '-'} />
+            <Info label={t('Status')} value={activePackage ? <StatusBadge value={activePackage.status}>{t(activePackage.status)}</StatusBadge> : '-'} />
           </div>
-          {renewalWarning ? <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-700">Renewal follow-up recommended.</p> : null}
+          {renewalWarning ? <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-700">{t('Renewal follow-up recommended.')}</p> : null}
         </Section>
-        <Section title="Progress" action={<Button variant="soft" onClick={() => setProgressStudent(student)}>Update Progress</Button>}>
+        <Section title={t('Progress')} action={<Button variant="soft" onClick={() => setProgressStudent(student)}>{t('Update Progress')}</Button>}>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Info label="Current level" value={`Level ${skillProfile.current_level}`} />
-            <Info label="Level status" value={levelStatusLabels[skillProfile.level_status] || skillProfile.level_status} />
-            <Info label="Current focus" value={skillProfile.current_focus || student.learning_goal || '-'} />
-            <Info label="Last assessed" value={formatDate(skillProfile.last_assessed_at)} />
-            <Info label="Passed criteria" value={`${levelProgress.passed}/${levelProgress.total}`} />
-            <Info label="Assessment note" value={skillProfile.assessment_note || '-'} />
+            <Info label={t('Current level')} value={`${t('Level')} ${skillProfile.current_level}`} />
+            <Info label={t('Level status')} value={t(levelStatusLabels[skillProfile.level_status] || skillProfile.level_status)} />
+            <Info label={t('Current focus')} value={skillProfile.current_focus || student.learning_goal || '-'} />
+            <Info label={t('Last assessed')} value={formatDate(skillProfile.last_assessed_at)} />
+            <Info label={t('Passed criteria')} value={`${levelProgress.passed}/${levelProgress.total}`} />
+            <Info label={t('Assessment note')} value={skillProfile.assessment_note || '-'} />
           </div>
         </Section>
       </div>
-      <Section title="Recent Lessons">
-        {recentLessons.length === 0 ? <EmptyState title="No lesson history yet" body="Scheduled and completed lessons will appear here after this student is linked to a class." /> : (
+      <Section title={t('Recent Lessons')}>
+        {recentLessons.length === 0 ? <EmptyState title={t('No lesson history yet')} body={t('Scheduled and completed lessons will appear here after this student is linked to a class.')} /> : (
           <div className="grid gap-3">
             {recentLessons.slice(0, 5).map((lesson) => {
               const cls = data.classes.find((row) => row.id === lesson.class_id);
@@ -1298,9 +1301,9 @@ function StudentProfilePage({ profile, pathInfo, data, reload, toast }) {
                     <div>
                       <p className="text-sm font-semibold text-sky-700">{formatDate(lesson.scheduled_date)} {lesson.start_time || ''}</p>
                       <p className="mt-1 font-semibold text-slate-950 ty-wrap">{cls?.class_name || lesson.lesson_code}</p>
-                      <p className="mt-1 text-sm leading-6 text-slate-500">{lesson.coach_notes || 'No coach note yet.'}</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-500">{lesson.coach_notes || t('No coach note yet.')}</p>
                     </div>
-                    <div className="flex flex-wrap gap-2"><StatusBadge value={lesson.status}>{lesson.status}</StatusBadge><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{photos.length} photo{photos.length === 1 ? '' : 's'}</span></div>
+                    <div className="flex flex-wrap gap-2"><StatusBadge value={lesson.status}>{t(lesson.status)}</StatusBadge><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{photos.length} {t(photos.length === 1 ? 'photo' : 'photos')}</span></div>
                   </div>
                 </button>
               );
@@ -1309,17 +1312,17 @@ function StudentProfilePage({ profile, pathInfo, data, reload, toast }) {
         )}
       </Section>
       {isAdmin ? (
-        <Section title="Admin-only Finance">
-          <p className="mb-3 text-sm leading-6 text-slate-500">This section is hidden from coaches. It contains customer price and payment records only.</p>
-          {payments.length === 0 ? <EmptyState title="No payment records" body="Payment records can be added from Money > Payments or during package setup." /> : (
+        <Section title={t('Admin-only Finance')}>
+          <p className="mb-3 text-sm leading-6 text-slate-500">{t('This section is hidden from coaches. It contains customer price and payment records only.')}</p>
+          {payments.length === 0 ? <EmptyState title={t('No payment records')} body={t('Payment records can be added from Money > Payments or during package setup.')} /> : (
             <div className="grid gap-3 md:grid-cols-2">
               {payments.map((payment) => (
                 <div key={payment.id} className="rounded-lg border border-slate-200 bg-white p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div><p className="font-semibold text-slate-950 ty-wrap">{formatMoney(payment.amount)}</p><p className="mt-1 text-sm text-slate-500 ty-wrap">{formatDate(payment.payment_date)} / {payment.payment_method || '-'}</p></div>
-                    <StatusBadge value={payment.payment_status}>{payment.payment_status}</StatusBadge>
+                    <StatusBadge value={payment.payment_status}>{t(payment.payment_status)}</StatusBadge>
                   </div>
-                  <p className="mt-2 text-xs break-all text-slate-500">{payment.proof_storage_path ? `Proof path: ${payment.proof_storage_path}` : 'No proof uploaded yet'}</p>
+                  <p className="mt-2 text-xs break-all text-slate-500">{payment.proof_storage_path ? `${t('Proof path')}: ${payment.proof_storage_path}` : t('No proof uploaded yet')}</p>
                 </div>
               ))}
             </div>
