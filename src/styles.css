@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html {
   background: #f8fafc;
   overflow-x: hidden;
@@ -19,6 +25,13 @@ body {
 #root {
   max-width: 100vw;
   overflow-x: hidden;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
 }
 
 button,

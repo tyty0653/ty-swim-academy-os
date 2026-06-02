@@ -305,7 +305,7 @@ function OsShell({ session, profile, pathInfo, data, tableErrors, reload, toast,
             </div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" onClick={() => go('/dashboard')}>Dashboard</Button>
-              <Button variant="ghost" onClick={signOut}>Sign out</Button>
+              <Button data-testid="sign-out-button" variant="ghost" onClick={signOut}>Sign out / 登出</Button>
             </div>
           </div>
         </header>
@@ -320,7 +320,7 @@ function OsShell({ session, profile, pathInfo, data, tableErrors, reload, toast,
 
 function MobileBottomNav({ nav, pathInfo }) {
   return (
-    <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-2 pb-[calc(0.35rem+env(safe-area-inset-bottom))] pt-2 shadow-xl shadow-slate-300/40 backdrop-blur lg:hidden">
+    <nav aria-label="Mobile navigation" data-testid="mobile-bottom-nav" className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-2 pb-[calc(0.35rem+env(safe-area-inset-bottom))] pt-2 shadow-xl shadow-slate-300/40 backdrop-blur lg:hidden">
       <div className="mx-auto grid max-w-md gap-1" style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0, 1fr))` }}>
         {nav.map(([key, href, label]) => {
           const active = activeNav(pathInfo, key) || (key === 'more' && ['money', 'payments', 'expenses'].includes(pathInfo.section));
@@ -571,7 +571,7 @@ function CoachTodayCards({ lessons, data }) {
                 <div className="mt-4 grid gap-2 sm:grid-cols-3">
                   <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? 'WhatsApp' : 'No WhatsApp'}</a>
                   <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? 'Map' : 'No map'}</a>
-                  <Button disabled={approved} onClick={() => go(`/lessons/${lesson.id}`)}>{approved ? 'Approved' : 'Submit Record'}</Button>
+                  <Button data-testid={!approved ? 'coach-submit-record-button' : undefined} disabled={approved} onClick={() => go(`/lessons/${lesson.id}`)}>{approved ? 'Approved' : 'Submit Record'}</Button>
                 </div>
               </article>
             );
@@ -648,7 +648,7 @@ function LessonCardList({ rows, data, empty, coachView = false }) {
               <StatusBadge value={lesson.status} />
             </div>
             <div className="mt-4 grid gap-2">
-              <Button onClick={() => go(`/lessons/${lesson.id}`)}>{coachView ? (approved ? 'Approved' : 'Submit / Open') : 'Open'}</Button>
+              <Button data-testid={coachView && !approved ? 'coach-submit-record-button' : undefined} onClick={() => go(`/lessons/${lesson.id}`)}>{coachView ? (approved ? 'Approved' : 'Submit / Open') : 'Open'}</Button>
               {coachView ? (
                 <div className="grid grid-cols-2 gap-2">
                   <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? 'WhatsApp' : 'No WhatsApp'}</a>
@@ -774,7 +774,7 @@ function StudentProfileCard({ item, isAdmin, onUpdateProgress }) {
   const map = venue?.google_maps_link;
   const lowPackage = Number(activePackage?.remaining_lessons || 0) <= 1;
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <article data-testid="student-profile-card" className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-base font-semibold text-slate-950">{student.display_name || 'Unnamed student'}</h3>
@@ -1163,7 +1163,7 @@ function StudentProfilePage({ profile, pathInfo, data, reload, toast }) {
   const mapsLink = venue?.google_maps_link;
   const renewalWarning = activePackage && (Number(activePackage.remaining_lessons || 0) <= 1 || daysUntil(activePackage.expiry_date) <= 14);
   return (
-    <div className="grid gap-5">
+    <div data-testid="student-profile-page" className="grid gap-5">
       <Section title={student.display_name || 'Student Profile'} action={<Button variant="ghost" onClick={() => go('/students')}>Back</Button>}>
         <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
           <div>
@@ -1372,7 +1372,7 @@ function MorePage(props) {
       : ['help', 'skill-levels', 'system-check'].includes(key))),
   ];
   return (
-    <div className="grid gap-5">
+    <div data-testid="more-page" className="grid gap-5">
       <Section title="More">
         <p className="text-sm leading-6 text-slate-500">Advanced and occasional tools live here so the daily menu stays simple.</p>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -1383,8 +1383,8 @@ function MorePage(props) {
               <span className="text-slate-300 sm:hidden">›</span>
             </button>
           ))}
-          <button onClick={signOut} className="flex min-h-14 items-center justify-between rounded-lg border border-rose-100 bg-rose-50 p-3 text-left font-semibold text-rose-700 hover:bg-rose-100">
-            Sign out
+          <button data-testid="sign-out-button" onClick={signOut} className="flex min-h-14 items-center justify-between rounded-lg border border-rose-100 bg-rose-50 p-3 text-left font-semibold text-rose-700 hover:bg-rose-100">
+            Sign out / 登出
             <span className="text-rose-300">›</span>
           </button>
         </div>
@@ -1674,7 +1674,7 @@ function CoachAccountCheck({ profile, ownCoach, data, assignedLessonCount, assig
       ? 'Your account works, but some assignments may not be added yet.'
       : 'You can see your assigned lessons and students. Finance and admin-only records are hidden for privacy.';
   return (
-    <div className="grid gap-5">
+    <div data-testid="account-check-page" className="grid gap-5">
       <Section title="My Account Check">
         <div className={`rounded-lg border p-4 ${failCount ? 'border-rose-100 bg-rose-50' : warningCount ? 'border-amber-100 bg-amber-50' : 'border-emerald-100 bg-emerald-50'}`}>
           <p className="text-lg font-semibold text-slate-950">{title}</p>
@@ -2705,7 +2705,7 @@ function CoachLessonSubmission({ lesson, profile, cls, customer, venue, data, fo
         </div>
         <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] mt-4 flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white/95 p-3 shadow-lg shadow-slate-200/70 backdrop-blur lg:bottom-3">
           <Button variant="ghost" onClick={saveLesson} disabled={coachLocked}>Save draft</Button>
-          <Button className="min-h-12 flex-1 text-base sm:flex-none" onClick={() => submitReview(outcome === 'cancelled' ? 'cancelled_pending_review' : 'completed_pending_review')} disabled={coachLocked}>Submit Record</Button>
+          <Button data-testid="coach-submit-record-button" className="min-h-12 flex-1 text-base sm:flex-none" onClick={() => submitReview(outcome === 'cancelled' ? 'cancelled_pending_review' : 'completed_pending_review')} disabled={coachLocked}>Submit Record</Button>
         </div>
       </Section>
     </div>
@@ -3057,7 +3057,7 @@ function PayrollPage({ profile, data, reload, toast }) {
     }
   };
   return (
-    <div className="grid gap-5">
+    <div data-testid={isAdmin ? 'payroll-page' : 'coach-pay-page'} className="grid gap-5">
       <div className="grid gap-3 sm:grid-cols-3">
         <Card title={isAdmin ? 'Payable now' : 'Expected pay'} value={formatMoney(unpaidItems.reduce((sum, item) => sum + Number(item.pay_amount || 0), 0))} tone="amber" />
         <Card title="Approved lessons" value={items.length} />

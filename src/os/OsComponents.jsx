@@ -10,27 +10,27 @@ export function Button({ children, variant = 'primary', className = '', ...props
     dark: 'bg-slate-950 text-white hover:bg-slate-800',
   };
   return (
-    <button {...props} className={cn('inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60', styles[variant], className)}>
+    <button {...props} className={cn('inline-flex min-h-10 max-w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-center text-sm font-semibold whitespace-normal disabled:cursor-not-allowed disabled:opacity-60', styles[variant], className)}>
       {children}
     </button>
   );
 }
 
 export function Input({ className = '', ...props }) {
-  return <input {...props} className={cn('min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100', className)} />;
+  return <input {...props} className={cn('min-h-10 w-full min-w-0 max-w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100', className)} />;
 }
 
 export function Select({ className = '', children, ...props }) {
-  return <select {...props} className={cn('min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100', className)}>{children}</select>;
+  return <select {...props} className={cn('min-h-10 w-full min-w-0 max-w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100', className)}>{children}</select>;
 }
 
 export function Textarea({ className = '', ...props }) {
-  return <textarea {...props} className={cn('min-h-24 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100', className)} />;
+  return <textarea {...props} className={cn('min-h-24 w-full min-w-0 max-w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100', className)} />;
 }
 
 export function Field({ label, children }) {
   return (
-    <label className="grid gap-1 text-sm">
+    <label className="grid min-w-0 gap-1 text-sm">
       <span className="font-medium text-slate-600">{label}</span>
       {children}
     </label>
@@ -68,12 +68,12 @@ export function StatusBadge({ value, children }) {
 
 export function Section({ title, action, children, className = '' }) {
   return (
-    <section className={cn('rounded-lg border border-slate-200 bg-white shadow-sm', className)}>
-      <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
-        {action}
+    <section className={cn('min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm', className)}>
+      <div className="flex min-w-0 flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="min-w-0 text-lg font-semibold text-slate-950">{title}</h2>
+        {action ? <div className="min-w-0 max-w-full">{action}</div> : null}
       </div>
-      <div className="p-4">{children}</div>
+      <div className="min-w-0 p-4">{children}</div>
     </section>
   );
 }
@@ -81,16 +81,16 @@ export function Section({ title, action, children, className = '' }) {
 export function DataTable({ columns, rows, empty = 'No records yet.', onRowClick, className = '' }) {
   return (
     <div className={cn('max-w-full overflow-x-auto rounded-lg border border-slate-200', className)}>
-      <table className="min-w-[680px] text-left text-sm md:min-w-full">
+      <table className="w-full min-w-0 table-fixed text-left text-sm">
         <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          <tr>{columns.map((column) => <th key={column.key} className="whitespace-nowrap px-3 py-3">{column.label}</th>)}</tr>
+          <tr>{columns.map((column) => <th key={column.key} className="break-words px-3 py-3 sm:whitespace-nowrap">{column.label}</th>)}</tr>
         </thead>
         <tbody>
           {rows.length === 0 ? (
             <tr><td className="px-3 py-8 text-center text-slate-500" colSpan={columns.length}>{empty}</td></tr>
           ) : rows.map((row) => (
             <tr key={row.id || row.key} className={cn('border-t border-slate-100 bg-white', onRowClick && 'cursor-pointer hover:bg-sky-50/60')} onClick={() => onRowClick?.(row)}>
-              {columns.map((column) => <td key={column.key} className="whitespace-nowrap px-3 py-3 align-top text-slate-700">{column.render ? column.render(row) : row[column.key]}</td>)}
+              {columns.map((column) => <td key={column.key} className="break-words px-3 py-3 align-top text-slate-700 sm:whitespace-nowrap">{column.render ? column.render(row) : row[column.key]}</td>)}
             </tr>
           ))}
         </tbody>

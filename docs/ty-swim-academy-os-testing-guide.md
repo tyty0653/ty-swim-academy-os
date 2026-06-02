@@ -102,6 +102,14 @@ Viewports checked:
 
 If `QA_ADMIN_EMAIL`, `QA_ADMIN_PASSWORD`, `QA_COACH_EMAIL`, or `QA_COACH_PASSWORD` are missing, the authenticated UI tests are skipped with a clear message. Add those values to `.env.local` or your shell to run the full check.
 
+When a UI check fails, Playwright saves a failure screenshot here:
+
+```text
+test-artifacts/ui-screenshots/failures/
+```
+
+Horizontal overflow failures include a short list of likely overflowing elements in the terminal output.
+
 ## 5. Screenshot Capture
 
 Run:
