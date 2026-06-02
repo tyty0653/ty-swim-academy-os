@@ -345,7 +345,7 @@ function OsShell({ session, profile, pathInfo, data, tableErrors, reload, toast,
             </div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" onClick={() => go('/dashboard')}>{t('Today')}</Button>
-              <Button data-testid="sign-out-button" variant="ghost" onClick={signOut}>{language === 'zh' ? t('Sign out') : 'Sign out / 登出'}</Button>
+              <Button data-testid="desktop-sign-out-button" aria-label={t('Sign out')} variant="ghost" onClick={signOut}>{language === 'zh' ? t('Sign out') : 'Sign out / 登出'}</Button>
             </div>
           </div>
         </header>
@@ -537,10 +537,15 @@ function AdminDashboard({ data }) {
   ];
 
   return (
-    <div className="grid gap-5">
+    <div data-testid="admin-today-page" className="grid min-w-0 max-w-full gap-4 overflow-hidden md:gap-5">
       <OnboardingChecklist data={data} />
-      <Section title={t('Today')} action={<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap">{quickActions.map(([label, href, variant]) => <Button key={label} className="w-full lg:w-auto" variant={variant} onClick={() => go(href)}>{t(label)}</Button>)}</div>}>
+      <Section title={t('Today')}>
         <p className="mb-4 text-sm leading-6 text-slate-500 ty-wrap">{t('A simple daily view for lessons, coach submissions, schedule changes, and renewal follow-ups.')}</p>
+        <div className="mb-4 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap">
+          {quickActions.map(([label, href, variant]) => (
+            <Button key={label} className="w-full lg:w-auto" variant={variant} onClick={() => go(href)}>{t(label)}</Button>
+          ))}
+        </div>
         <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {primaryCards.map(([title, value, note, href, tone]) => (
             <button key={title} onClick={() => go(href)} className="min-w-0 max-w-full text-left">
@@ -549,7 +554,7 @@ function AdminDashboard({ data }) {
           ))}
         </div>
       </Section>
-      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+      <div className="grid min-w-0 max-w-full gap-4 overflow-hidden xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] xl:gap-5">
         <LessonList title={t('Today and This Week')} rows={weekLessons} data={data} empty={t('No scheduled lessons in this view.')} />
         <NextActionList rows={nextActions} />
       </div>
@@ -567,8 +572,8 @@ function CoachDashboard({ profile, data }) {
   const todayDone = today.length > 0 && today.every((lesson) => ['completed_pending_review', 'cancelled_pending_review', 'approved', 'rejected', 'archived', 'void'].includes(lesson.status));
 
   return (
-    <div className="grid gap-5">
-      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div data-testid="coach-today-page" className="grid min-w-0 max-w-full gap-4 overflow-hidden md:gap-5">
+      <div className="grid min-w-0 max-w-full grid-cols-2 gap-3 xl:grid-cols-4">
         <Card title={t("Today's lessons")} value={today.length} />
         <Card title={t('This week')} value={ownLessons.filter((lesson) => daysUntil(lesson.scheduled_date) >= 0 && daysUntil(lesson.scheduled_date) <= 7).length} />
         <Card title={t('Pending records')} value={pending.length} tone="amber" />
@@ -1418,7 +1423,7 @@ function MorePage(props) {
   const recordTools = [['customers', '/customers', 'Customers / Families'], ['venues', '/venues', 'Venues'], ['classes', '/classes', 'Classes / Groups'], ['packages', '/packages', 'Packages'], ['lessons', '/lessons', 'Lesson History']];
   const adminTools = [['money', '/money', 'Money'], ['audit-logs', '/audit-logs', 'Audit Logs'], ['import', '/import', 'CSV Import'], ['cleanup', '/data-cleanup', 'Data Cleanup'], ['reports', '/reports', 'Reports'], ['settings', '/settings', 'Settings']];
   return (
-    <div data-testid="more-page" className="grid gap-5">
+    <div data-testid="more-page" className="grid min-w-0 max-w-full gap-4 overflow-hidden md:gap-5">
       <Section title={t('Account')}>
         <div className="grid gap-3">
           <div className="rounded-xl border border-sky-100 bg-sky-50 p-4">
@@ -1431,9 +1436,9 @@ function MorePage(props) {
               <p className="font-semibold text-slate-950">{t('Language')}</p>
               <p className="text-sm text-slate-500">English / 中文</p>
             </div>
-            <LanguageToggle language={language} setLanguage={setLanguage} />
+            <LanguageToggle language={language} setLanguage={setLanguage} compact />
           </div>
-          <button data-testid="sign-out-button" onClick={signOut} className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-xl border border-rose-100 bg-rose-50 p-4 text-left font-semibold text-rose-700 hover:bg-rose-100">
+          <button data-testid="sign-out-button" aria-label={t('Sign out')} onClick={signOut} className="flex min-h-14 min-w-0 max-w-full items-center justify-between gap-3 rounded-xl border border-rose-100 bg-rose-50 p-4 text-left font-semibold text-rose-700 hover:bg-rose-100">
             <span>{language === 'zh' ? t('Sign out') : 'Sign out / 登出'}</span>
             <span className="shrink-0 text-rose-300">›</span>
           </button>
@@ -1459,7 +1464,7 @@ function MoreGroup({ title, tools, isAdmin, t, extra }) {
             <span className="shrink-0 text-slate-300">›</span>
           </button>
         ))}
-        {extra ? <div className="pt-2">{extra}</div> : null}
+        {extra ? <div className="grid min-w-0 pt-2">{extra}</div> : null}
       </div>
     </Section>
   );

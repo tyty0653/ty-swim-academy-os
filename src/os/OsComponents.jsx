@@ -71,9 +71,9 @@ export function StatusBadge({ value, children }) {
 export function Section({ title, action, children, className = '' }) {
   return (
     <section className={cn('min-w-0 max-w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm', className)}>
-      <div className="flex min-w-0 flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center lg:justify-between">
         <h2 className="min-w-0 text-lg font-semibold text-slate-950 ty-wrap">{title}</h2>
-        {action ? <div className="w-full min-w-0 max-w-full sm:w-auto sm:max-w-[70%]">{action}</div> : null}
+        {action ? <div className="w-full min-w-0 max-w-full lg:w-auto lg:max-w-[70%]">{action}</div> : null}
       </div>
       <div className="min-w-0 p-4">{children}</div>
     </section>
