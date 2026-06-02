@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { Component, createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { hasSupabaseConfig, supabase } from '../lib/supabaseClient.js';
 import { Button, Card, DataTable, EmptySetup, Field, Input, Modal, Section, Select, StatusBadge, Textarea, Toasts } from './OsComponents.jsx';
 import { adminNav, classTypes, coachNav, expenseCategories, packageTypes, paymentMethods } from './osConstants.js';
@@ -37,6 +37,40 @@ const coachTableNames = allTableNames.filter((name) => !['package_financials', '
 const initialData = Object.fromEntries(allTableNames.map((name) => [name, []]));
 const requiredStorageBuckets = ['lesson-photos', 'payment-proofs', 'expense-receipts'];
 const LanguageContext = createContext({ language: 'en', setLanguage: () => {}, t: (value, fallback) => fallback || value });
+const LOGIN_TIMEOUT_MS = 12000;
+const DATA_TABLE_TIMEOUT_MS = 10000;
+const LONG_LOADING_MS = 15000;
+
+class AppErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="grid min-h-screen place-items-center bg-slate-50 px-4 text-slate-700">
+          <div className="max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-sm font-semibold text-sky-700">TY Swim Academy OS</p>
+            <h1 className="mt-2 text-xl font-semibold text-slate-950">The OS could not open this page</h1>
+            <p className="mt-2 text-sm leading-6">Login may have succeeded, but this page hit a display error. Please refresh or contact Admin.</p>
+            <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-500 ty-wrap">{this.state.error?.message || 'Unknown page error'}</p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button className="min-h-10 rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => window.location.assign('/dashboard')}>Open Today</button>
+              <button className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700" onClick={() => window.location.reload()}>Refresh</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function useI18n() {
   return useContext(LanguageContext);
@@ -62,13 +96,12 @@ function makeId(prefix) {
   return `${prefix}-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)}`;
 }
 
-function withTimeout(promise, label, ms = 12000) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      window.setTimeout(() => reject(new Error(`${label} took too long. Please check your internet connection and Supabase settings.`)), ms);
-    }),
-  ]);
+function withTimeout(promise, label, ms = LOGIN_TIMEOUT_MS) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(`${label} took too long. Please check your internet connection and Supabase settings.`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
 }
 
 async function loadProfileForUser(userId) {
@@ -80,6 +113,30 @@ async function loadProfileForUser(userId) {
       .maybeSingle(),
     'Staff profile check'
   );
+}
+
+async function loadRoleTables(role) {
+  const tablesToLoad = role === 'admin' ? allTableNames : coachTableNames;
+  const results = await Promise.all(tablesToLoad.map(async (name) => {
+    try {
+      const result = await withTimeout(
+        supabase.from(name).select('*').limit(1000),
+        `Loading ${name}`,
+        DATA_TABLE_TIMEOUT_MS
+      );
+      if (result.error) return { name, data: [], error: result.error.message || `Could not load ${name}.` };
+      return { name, data: result.data || [], error: '' };
+    } catch (error) {
+      return { name, data: [], error: error.message || `Could not load ${name}.` };
+    }
+  }));
+  const next = { ...initialData };
+  const nextTableErrors = {};
+  results.forEach((result) => {
+    next[result.name] = result.data;
+    if (result.error) nextTableErrors[result.name] = result.error;
+  });
+  return { next, nextTableErrors };
 }
 
 function getProfileIssue(profileRow, profileError) {
@@ -126,7 +183,7 @@ export default function OsApp() {
 
   return (
     <LanguageContext.Provider value={i18n}>
-      {!hasSupabaseConfig ? <EmptySetup /> : pathInfo.path === '/login' ? <LoginPage /> : <ProtectedOs pathInfo={pathInfo} />}
+      {!hasSupabaseConfig ? <EmptySetup /> : pathInfo.path === '/login' ? <LoginPage /> : <AppErrorBoundary key={pathInfo.path}><ProtectedOs pathInfo={pathInfo} /></AppErrorBoundary>}
     </LanguageContext.Provider>
   );
 }
@@ -137,32 +194,44 @@ function LoginPage() {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const attemptRef = useRef(0);
 
   const submit = async (event) => {
     event.preventDefault();
+    const attempt = attemptRef.current + 1;
+    attemptRef.current = attempt;
     setLoading(true);
     setMessage('');
+    const slowTimer = window.setTimeout(() => {
+      if (attempt !== attemptRef.current) return;
+      setMessage(t('Login is taking too long. Please refresh or contact Admin.'));
+      setLoading(false);
+    }, LONG_LOADING_MS);
     try {
       const { data: authData, error } = await withTimeout(
         supabase.auth.signInWithPassword({ email, password }),
         'Login'
       );
       if (error) {
-        setMessage('Login failed. Please check your email and password.');
+        if (attempt !== attemptRef.current) return;
+        setMessage(t('Login failed. Please check your email and password.'));
         return;
       }
       const { data: profileRow, error: profileError } = await loadProfileForUser(authData.user.id);
       const issue = getProfileIssue(profileRow, profileError);
       if (issue) {
         await supabase.auth.signOut();
-        setMessage(`${issue.title} ${issue.body}`);
+        if (attempt !== attemptRef.current) return;
+        setMessage(`${t(issue.title)} ${t(issue.body)}`);
         return;
       }
-      go('/dashboard');
+      if (attempt === attemptRef.current) go('/dashboard');
     } catch (error) {
-      setMessage(error.message || 'Login failed. Please try again.');
+      if (attempt !== attemptRef.current) return;
+      setMessage(error.message || t('Login failed. Please try again.'));
     } finally {
-      setLoading(false);
+      window.clearTimeout(slowTimer);
+      if (attempt === attemptRef.current) setLoading(false);
     }
   };
 
@@ -194,6 +263,7 @@ function ProtectedOs({ pathInfo }) {
   const [data, setData] = useState(initialData);
   const [tableErrors, setTableErrors] = useState({});
   const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false);
   const [accessIssue, setAccessIssue] = useState(null);
   const [toasts, setToasts] = useState([]);
 
@@ -204,13 +274,16 @@ function ProtectedOs({ pathInfo }) {
   };
 
   async function reload() {
-    setLoading(true);
+    const initialLoad = !session && !profile;
+    if (initialLoad) setLoading(true);
+    else setDataLoading(true);
     setAccessIssue(null);
     setTableErrors({});
     try {
       const { data: auth } = await withTimeout(supabase.auth.getSession(), 'Session check');
       if (!auth.session) {
         setLoading(false);
+        setDataLoading(false);
         go('/login');
         return;
       }
@@ -221,21 +294,13 @@ function ProtectedOs({ pathInfo }) {
         setProfile(profileRow || null);
         setAccessIssue(issue);
         setLoading(false);
+        setDataLoading(false);
         return;
       }
       setProfile(profileRow);
-      const tablesToLoad = profileRow.role === 'admin' ? allTableNames : coachTableNames;
-      const tableResults = await withTimeout(
-        Promise.all(tablesToLoad.map((name) => supabase.from(name).select('*').limit(1000))),
-        'Loading OS data',
-        18000
-      );
-      const next = { ...initialData };
-      const nextTableErrors = {};
-      tableResults.forEach((result, index) => {
-        if (!result.error) next[tablesToLoad[index]] = result.data || [];
-        else nextTableErrors[tablesToLoad[index]] = result.error.message;
-      });
+      setLoading(false);
+      setDataLoading(true);
+      const { next, nextTableErrors } = await loadRoleTables(profileRow.role);
       setData(next);
       setTableErrors(nextTableErrors);
     } catch (error) {
@@ -245,25 +310,54 @@ function ProtectedOs({ pathInfo }) {
       });
     } finally {
       setLoading(false);
+      setDataLoading(false);
     }
   }
 
   useEffect(() => {
     reload();
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (!nextSession) go('/login');
+      if (!nextSession) {
+        setSession(null);
+        setProfile(null);
+        setLoading(false);
+        setDataLoading(false);
+        go('/login');
+      }
     });
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  if (loading) return <div className="grid min-h-screen place-items-center bg-slate-50 text-slate-600">Loading TY Swim Academy OS...</div>;
+  if (loading) return <LoadingScreen />;
   if (accessIssue) return <StaffAccessIssue issue={accessIssue} />;
   if (!session || !profile) return <LoginPage />;
 
   return (
-    <OsShell session={session} profile={profile} pathInfo={pathInfo} data={data} tableErrors={tableErrors} reload={reload} toast={toast}>
+    <OsShell session={session} profile={profile} pathInfo={pathInfo} data={data} dataLoading={dataLoading} tableErrors={tableErrors} reload={reload} toast={toast}>
       <Toasts toasts={toasts} />
     </OsShell>
+  );
+}
+
+function LoadingScreen() {
+  const { t } = useI18n();
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setSlow(true), LONG_LOADING_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+  return (
+    <div className="grid min-h-screen place-items-center bg-slate-50 px-4 text-slate-600">
+      <div className="max-w-md rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+        <p className="text-sm font-semibold text-sky-700">TY Swim Academy OS</p>
+        <p className="mt-2 font-semibold text-slate-950">{t('Loading your staff workspace...')}</p>
+        {slow ? (
+          <div className="mt-4 rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-800">
+            {t('Login is taking too long. Please refresh or contact Admin.')}
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -302,7 +396,7 @@ function LanguageToggle({ language, setLanguage, compact = false }) {
   );
 }
 
-function OsShell({ session, profile, pathInfo, data, tableErrors, reload, toast, children }) {
+function OsShell({ session, profile, pathInfo, data, dataLoading = false, tableErrors, reload, toast, children }) {
   const { language, t } = useI18n();
   const isAdmin = profile.role === 'admin';
   const nav = isAdmin ? adminNav : coachNav;
@@ -350,6 +444,7 @@ function OsShell({ session, profile, pathInfo, data, tableErrors, reload, toast,
           </div>
         </header>
         <main className="mx-auto min-w-0 max-w-7xl overflow-x-hidden p-3 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:p-4 sm:pb-[calc(6rem+env(safe-area-inset-bottom))] lg:p-6">
+          {dataLoading ? <div className="mb-4 rounded-lg border border-sky-100 bg-sky-50 p-3 text-sm font-semibold text-sky-700">{t('Refreshing OS data...')}</div> : null}
           <RoutePage session={session} profile={profile} pathInfo={pathInfo} data={data} tableErrors={tableErrors} reload={reload} toast={toast} signOut={signOut} />
         </main>
         <MobileBottomNav nav={mobileNav} pathInfo={pathInfo} />

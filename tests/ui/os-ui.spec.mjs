@@ -235,9 +235,28 @@ async function attemptLogin(page, creds, role) {
   await page.getByTestId('login-email').fill(creds.email);
   await page.getByTestId('login-password').fill(creds.password);
   await page.getByTestId('login-submit-button').click();
-  await page.waitForFunction(() => window.location.pathname !== '/login' || document.body.textContent.includes('Login failed') || document.body.textContent.includes('missing or inactive') || document.body.textContent.includes('invalid') || document.body.textContent.includes('inactive'));
+  try {
+    await page.waitForFunction(
+      () => window.location.pathname !== '/login'
+        || document.body.textContent.includes('Login failed')
+        || document.body.textContent.includes('missing or inactive')
+        || document.body.textContent.includes('invalid')
+        || document.body.textContent.includes('inactive')
+        || document.body.textContent.includes('taking too long'),
+      { timeout: 16_000 },
+    );
+  } catch {
+    const buttonText = await page.getByTestId('login-submit-button').innerText().catch(() => 'unknown');
+    return {
+      ok: false,
+      message: `${role} QA login timed out for ${creds.email}. Password was not printed. The login button text was "${buttonText}". Check Supabase Auth, profiles, network access, and whether the app shows "Login is taking too long."`,
+    };
+  }
   const body = await page.locator('body').innerText();
   const prefix = `${role} QA login failed for ${creds.email}.`;
+  if (body.includes('taking too long')) {
+    return { ok: false, message: `${prefix} The app reported that login is taking too long. Check Supabase Auth/profile connectivity and table loading warnings. Password was not printed.` };
+  }
   if (body.includes('Login failed')) {
     return { ok: false, message: `${prefix} Check QA_${role.toUpperCase()}_EMAIL / QA_${role.toUpperCase()}_PASSWORD. Password was not printed.` };
   }
