@@ -108,6 +108,7 @@ test.describe('Admin UI quality', () => {
     await login(page, adminCreds, 'Admin');
     await openRoute(page, '/more');
     await expect(page.getByTestId('more-page')).toBeVisible();
+    await expect(page.getByTestId('account-section')).toBeVisible();
     await expect(page.getByTestId('more-page').getByTestId('sign-out-button')).toBeVisible();
   });
 });
@@ -169,9 +170,10 @@ test.describe('Coach UI quality', () => {
     await login(page, coachCreds, 'Coach');
     await openRoute(page, '/more');
     await expect(page.getByTestId('more-page')).toBeVisible();
+    await expect(page.getByTestId('account-section')).toBeVisible();
     await expect(page.getByTestId('more-page').getByTestId('sign-out-button')).toBeVisible();
-    await expect(page.getByText('Expenses')).toHaveCount(0);
-    await expect(page.getByText('Audit Logs')).toHaveCount(0);
+    await expect(page.getByTestId('admin-tools-section')).toHaveCount(0);
+    await expect(page.getByTestId('records-section')).toHaveCount(0);
   });
 });
 
@@ -264,7 +266,7 @@ async function openRoute(page, route) {
 async function openFirstProfile(page) {
   const card = page.getByTestId('student-profile-card');
   if (await card.count() === 0) return false;
-  const button = card.first().getByRole('button', { name: 'Open Profile' });
+  const button = card.first().getByTestId('open-student-profile-button');
   if (await button.count() === 0) return false;
   await button.click();
   await page.waitForFunction(() => window.location.pathname.includes('/students/'));

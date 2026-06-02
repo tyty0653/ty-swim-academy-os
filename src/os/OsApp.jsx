@@ -852,7 +852,7 @@ function StudentProfileCard({ item, isAdmin, onUpdateProgress }) {
         {missingItems.length > 4 ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">+{missingItems.length - 4} {t('more')}</span> : null}
       </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <Button onClick={() => go(`/students/${student.id}`)}>{t('Open Profile')}</Button>
+        <Button data-testid="open-student-profile-button" onClick={() => go(`/students/${student.id}`)}>{t('Open Profile')}</Button>
         <Button variant="soft" onClick={() => onUpdateProgress(student)}>{t('Update Progress')}</Button>
         <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? t('WhatsApp') : t('No WhatsApp')}</a>
         <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${map ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={map || undefined} target="_blank" rel="noreferrer">{map ? t('Map') : t('No map')}</a>
@@ -1431,7 +1431,7 @@ function MorePage(props) {
   const adminTools = [['money', '/money', 'Money'], ['audit-logs', '/audit-logs', 'Audit Logs'], ['import', '/import', 'CSV Import'], ['cleanup', '/data-cleanup', 'Data Cleanup'], ['reports', '/reports', 'Reports'], ['settings', '/settings', 'Settings']];
   return (
     <div data-testid="more-page" className="grid min-w-0 max-w-full gap-4 overflow-hidden md:gap-5">
-      <Section title={t('Account')}>
+      <Section title={t('Account')} data-testid="account-section">
         <div className="grid gap-3">
           <div className="rounded-xl border border-sky-100 bg-sky-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">{t('Current user')}</p>
@@ -1451,16 +1451,16 @@ function MorePage(props) {
           </button>
         </div>
       </Section>
-      <MoreGroup title={t('Help & Setup')} tools={helpTools} isAdmin={isAdmin} t={t} />
-      {isAdmin ? <MoreGroup title={t('Admin Tools')} tools={adminTools} isAdmin={isAdmin} t={t} extra={<Button variant="ghost" onClick={() => exportAllDataBackup(data, profile, toast)}>{t('Export All Data JSON')}</Button>} /> : null}
-      {isAdmin ? <MoreGroup title={t('Records')} tools={recordTools} isAdmin={isAdmin} t={t} /> : null}
+      <MoreGroup testId="help-setup-section" title={t('Help & Setup')} tools={helpTools} isAdmin={isAdmin} t={t} />
+      {isAdmin ? <MoreGroup testId="admin-tools-section" title={t('Admin Tools')} tools={adminTools} isAdmin={isAdmin} t={t} extra={<Button variant="ghost" onClick={() => exportAllDataBackup(data, profile, toast)}>{t('Export All Data JSON')}</Button>} /> : null}
+      {isAdmin ? <MoreGroup testId="records-section" title={t('Records')} tools={recordTools} isAdmin={isAdmin} t={t} /> : null}
     </div>
   );
 }
 
-function MoreGroup({ title, tools, isAdmin, t, extra }) {
+function MoreGroup({ title, tools, isAdmin, t, extra, testId }) {
   return (
-    <Section title={title}>
+    <Section title={title} data-testid={testId}>
       <div className="grid gap-2">
         {tools.map(([key, href, label]) => (
           <button key={key} onClick={() => go(href)} className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left hover:border-sky-200 hover:bg-sky-50">
@@ -3006,6 +3006,7 @@ function AuditPanels({ lesson, data }) {
 }
 
 function ReviewPage({ data, reload, toast }) {
+  const { t } = useI18n();
   const [active, setActive] = useState('pending');
   const [showTable, setShowTable] = useState(false);
   const groups = {
@@ -3036,9 +3037,9 @@ function ReviewPage({ data, reload, toast }) {
     }
   };
   return (
-    <div className="grid gap-5">
-      <Section title="Review">
-        <p className="text-sm leading-6 text-slate-500">Use this like an approval inbox. Each card shows what Admin needs before approving, requesting an edit, or rejecting.</p>
+    <div className="grid min-w-0 max-w-full gap-5 overflow-hidden">
+      <Section title={t('Review')}>
+        <p className="text-sm leading-6 text-slate-500 ty-wrap">{t('Use this like an approval inbox. Each card shows what Admin needs before approving, requesting an edit, or rejecting.')}</p>
         <div className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible">
           {[
             ['pending', 'Pending lesson records'],
@@ -3046,12 +3047,12 @@ function ReviewPage({ data, reload, toast }) {
             ['cancelled', 'Cancelled lessons'],
             ['needs_edit', 'Needs edit'],
             ['missing_photos', 'Missing required photos'],
-          ].map(([key, label]) => <Button key={key} className="whitespace-nowrap" variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{label} ({groups[key].length})</Button>)}
+          ].map(([key, label]) => <Button key={key} className="whitespace-nowrap" variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{t(label)} ({groups[key].length})</Button>)}
         </div>
       </Section>
-      <Section title="Approval Inbox" action={<Button variant="ghost" onClick={() => setShowTable((value) => !value)}>{showTable ? 'Hide detailed records' : 'Show detailed records'}</Button>}>
-        {rows.length === 0 ? <EmptyState title="No review needed" body="This category is clear. New coach submissions and schedule changes will appear here." /> : (
-          <div className="grid gap-3 lg:grid-cols-2">
+      <Section title={t('Approval Inbox')} action={<Button variant="ghost" onClick={() => setShowTable((value) => !value)}>{showTable ? t('Hide detailed records') : t('Show detailed records')}</Button>}>
+        {rows.length === 0 ? <EmptyState title={t('No review needed')} body={t('This category is clear. New coach submissions and schedule changes will appear here.')} /> : (
+          <div className="grid min-w-0 max-w-full gap-3 lg:grid-cols-2">
             {rows.map((lesson) => {
               const cls = data.classes.find((item) => item.id === lesson.class_id);
               const coach = data.coaches.find((item) => item.id === lesson.coach_id);
@@ -3059,9 +3060,9 @@ function ReviewPage({ data, reload, toast }) {
               const photoCount = (data.lesson_photos || []).filter((photo) => photo.lesson_id === lesson.id).length;
               const photoRequired = cls?.photo_required && photoCount === 0;
               return (
-                <article key={lesson.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
+                <article key={lesson.id} className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
                       <p className="text-sm font-semibold text-sky-700">{formatDate(lesson.scheduled_date)} {lesson.start_time || ''}</p>
                       <h3 className="mt-1 font-semibold text-slate-950 ty-wrap">{cls?.class_name || lesson.lesson_code}</h3>
                       <p className="mt-1 text-sm text-slate-500 ty-wrap">{classStudentNames(cls?.id, data)}</p>
@@ -3069,17 +3070,17 @@ function ReviewPage({ data, reload, toast }) {
                     <StatusBadge value={lesson.status} />
                   </div>
                   <div className="mt-4 grid gap-2 text-sm text-slate-600">
-                    <p><span className="font-semibold text-slate-800">Coach:</span> {coach?.display_name || '-'}</p>
-                    <p><span className="font-semibold text-slate-800">Package:</span> {pkg?.package_code || 'No linked package'}{pkg ? `, ${pkg.remaining_lessons} lesson(s) left` : ''}</p>
-                    <p><span className="font-semibold text-slate-800">Notes:</span> {lesson.coach_notes || 'No coach note'}</p>
-                    <p><span className="font-semibold text-slate-800">Photos:</span> {photoRequired ? <StatusBadge value="needs_edit">Missing required photo</StatusBadge> : `${photoCount} uploaded`}</p>
+                    <p className="ty-wrap"><span className="font-semibold text-slate-800">{t('Coach')}:</span> {coach?.display_name || '-'}</p>
+                    <p className="ty-wrap"><span className="font-semibold text-slate-800">{t('Package')}:</span> {pkg?.package_code || t('No linked package')}{pkg ? `, ${pkg.remaining_lessons} ${t('lesson(s) left')}` : ''}</p>
+                    <p className="ty-wrap"><span className="font-semibold text-slate-800">{t('Notes')}:</span> {lesson.coach_notes || t('No coach note')}</p>
+                    <p className="ty-wrap"><span className="font-semibold text-slate-800">{t('Photos')}:</span> {photoRequired ? <StatusBadge value="needs_edit">{t('Missing required photo')}</StatusBadge> : `${photoCount} ${t('uploaded')}`}</p>
                   </div>
-                  <p className={`mt-4 rounded-lg p-3 text-sm font-medium ${lesson.status === 'cancelled_pending_review' ? 'bg-amber-50 text-amber-800' : 'bg-sky-50 text-sky-800'}`}>{approvalImpactText(lesson)}</p>
+                  <p className={`mt-4 rounded-lg p-3 text-sm font-medium ty-wrap ${lesson.status === 'cancelled_pending_review' ? 'bg-amber-50 text-amber-800' : 'bg-sky-50 text-sky-800'}`}>{approvalImpactText(lesson, t)}</p>
                   <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:flex xl:flex-wrap">
-                    <Button className="w-full xl:w-auto" onClick={() => approve(lesson)}>Approve</Button>
-                    <Button className="w-full xl:w-auto" variant="soft" onClick={() => updateStatus(lesson, 'needs_edit')}>Request edit</Button>
-                    <Button className="w-full xl:w-auto" variant="danger" onClick={() => updateStatus(lesson, 'rejected')}>Reject</Button>
-                    <Button className="w-full xl:w-auto" variant="ghost" onClick={() => go(`/lessons/${lesson.id}`)}>Open</Button>
+                    <Button className="w-full xl:w-auto" onClick={() => approve(lesson)}>{t('Approve')}</Button>
+                    <Button className="w-full xl:w-auto" variant="soft" onClick={() => updateStatus(lesson, 'needs_edit')}>{t('Request edit')}</Button>
+                    <Button className="w-full xl:w-auto" variant="danger" onClick={() => updateStatus(lesson, 'rejected')}>{t('Reject')}</Button>
+                    <Button className="w-full xl:w-auto" variant="ghost" onClick={() => go(`/lessons/${lesson.id}`)}>{t('Open')}</Button>
                   </div>
                 </article>
               );
@@ -3088,17 +3089,17 @@ function ReviewPage({ data, reload, toast }) {
         )}
         {showTable ? (
           <div className="mt-4">
-            <DataTable rows={rows} empty="No pending review in this category." onRowClick={(row) => go(`/lessons/${row.id}`)} columns={[
-              { key: 'lesson_code', label: 'Lesson' },
-              { key: 'date', label: 'Date', render: (row) => `${row.scheduled_date} ${row.start_time || ''}` },
-              { key: 'class', label: 'Class', render: (row) => data.classes.find((cls) => cls.id === row.class_id)?.class_name || '-' },
-              { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status} /> },
-              { key: 'photo', label: 'Photo', render: (row) => {
+            <DataTable rows={rows} empty={t('No pending review in this category.')} onRowClick={(row) => go(`/lessons/${row.id}`)} columns={[
+              { key: 'lesson_code', label: t('Lesson') },
+              { key: 'date', label: t('Date'), render: (row) => `${row.scheduled_date} ${row.start_time || ''}` },
+              { key: 'class', label: t('Class'), render: (row) => data.classes.find((cls) => cls.id === row.class_id)?.class_name || '-' },
+              { key: 'status', label: t('Status'), render: (row) => <StatusBadge value={row.status} /> },
+              { key: 'photo', label: t('Photo'), render: (row) => {
                 const cls = data.classes.find((item) => item.id === row.class_id);
                 const count = (data.lesson_photos || []).filter((photo) => photo.lesson_id === row.id).length;
-                return cls?.photo_required && count === 0 ? <StatusBadge value="needs_edit">Missing required</StatusBadge> : count;
+                return cls?.photo_required && count === 0 ? <StatusBadge value="needs_edit">{t('Missing required')}</StatusBadge> : count;
               } },
-              { key: 'action', label: 'Actions', render: (row) => <div className="flex flex-wrap gap-2"><Button onClick={(event) => { event.stopPropagation(); approve(row); }}>Approve</Button><Button variant="soft" onClick={(event) => { event.stopPropagation(); updateStatus(row, 'needs_edit'); }}>Request edit</Button><Button variant="danger" onClick={(event) => { event.stopPropagation(); updateStatus(row, 'rejected'); }}>Reject</Button></div> },
+              { key: 'action', label: t('Actions'), render: (row) => <div className="flex flex-wrap gap-2"><Button onClick={(event) => { event.stopPropagation(); approve(row); }}>{t('Approve')}</Button><Button variant="soft" onClick={(event) => { event.stopPropagation(); updateStatus(row, 'needs_edit'); }}>{t('Request edit')}</Button><Button variant="danger" onClick={(event) => { event.stopPropagation(); updateStatus(row, 'rejected'); }}>{t('Reject')}</Button></div> },
             ]} />
           </div>
         ) : null}
@@ -3107,11 +3108,11 @@ function ReviewPage({ data, reload, toast }) {
   );
 }
 
-function approvalImpactText(lesson) {
-  const packageText = lesson.count_package_lesson ? 'deduct 1 lesson from the package' : 'not deduct a package lesson';
-  const payrollText = lesson.coach_payable ? 'create one coach payroll item' : 'not create a coach payroll item';
-  if (lesson.status === 'cancelled_pending_review') return `Approving this cancellation will ${packageText} and ${payrollText}, based on the current lesson flags.`;
-  return `Approving this lesson will ${packageText} and ${payrollText}.`;
+function approvalImpactText(lesson, t = (value) => value) {
+  const packageText = lesson.count_package_lesson ? t('deduct 1 lesson from the package') : t('not deduct a package lesson');
+  const payrollText = lesson.coach_payable ? t('create one coach payroll item') : t('not create a coach payroll item');
+  if (lesson.status === 'cancelled_pending_review') return `${t('Approving this cancellation will')} ${packageText} ${t('and')} ${payrollText}, ${t('based on the current lesson flags.')}`;
+  return `${t('Approving this lesson will')} ${packageText} ${t('and')} ${payrollText}.`;
 }
 
 function PayrollPage({ profile, data, reload, toast }) {

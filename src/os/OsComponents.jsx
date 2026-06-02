@@ -68,9 +68,9 @@ export function StatusBadge({ value, children }) {
   return <span className={cn('inline-flex max-w-full rounded-full px-2.5 py-1 text-center text-xs font-semibold leading-5 whitespace-normal ring-1 ty-wrap', styles[tone])}>{label}</span>;
 }
 
-export function Section({ title, action, children, className = '' }) {
+export function Section({ title, action, children, className = '', ...props }) {
   return (
-    <section className={cn('min-w-0 max-w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm', className)}>
+    <section {...props} className={cn('min-w-0 max-w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm', className)}>
       <div className="flex min-w-0 flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center lg:justify-between">
         <h2 className="min-w-0 text-lg font-semibold text-slate-950 ty-wrap">{title}</h2>
         {action ? <div className="w-full min-w-0 max-w-full lg:w-auto lg:max-w-[70%]">{action}</div> : null}
