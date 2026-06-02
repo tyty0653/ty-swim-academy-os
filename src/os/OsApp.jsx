@@ -591,7 +591,7 @@ function CoachTodayCards({ lessons, data }) {
   return (
     <Section title={t('Today')} action={<Button variant="ghost" onClick={() => go('/system-check')}>{t('My Account Check')}</Button>}>
       {lessons.length === 0 ? (
-        <EmptyState title={t('No lessons today')} body="Assigned lessons will appear here with contact, map, safety alerts, and a fast submit button." />
+        <EmptyState title={t('No lessons today')} body={t('Assigned lessons will appear here with contact, map, safety alerts, and a fast submit button.')} />
       ) : (
         <div className="grid min-w-0 gap-3 lg:grid-cols-2">
           {lessons.map((lesson) => {
@@ -607,10 +607,10 @@ function CoachTodayCards({ lessons, data }) {
               <article key={lesson.id} className="min-w-0 max-w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-sky-700">{lesson.start_time || 'Time TBC'} - {lesson.end_time || ''}</p>
+                    <p className="text-sm font-semibold text-sky-700">{lesson.start_time || t('Time TBC')} - {lesson.end_time || ''}</p>
                     <h3 className="mt-1 text-lg font-semibold text-slate-950 ty-wrap">{cls?.class_name || lesson.lesson_code}</h3>
                     <p className="mt-1 text-sm text-slate-700 ty-wrap">{classStudentNames(cls?.id, data)}</p>
-                    <p className="mt-1 text-sm text-slate-500 ty-wrap">{venue?.full_address || venue?.area || venue?.venue_name || 'Venue not set'}</p>
+                    <p className="mt-1 text-sm text-slate-500 ty-wrap">{venue?.full_address || venue?.area || venue?.venue_name || t('Venue not set')}</p>
                     {focus ? <p className="mt-2 rounded-lg bg-sky-50 p-2 text-sm font-medium text-sky-800 ty-wrap">{t('Current focus')}: {focus}</p> : null}
                   </div>
                   <div className="flex flex-wrap gap-2 sm:grid sm:justify-items-end">
@@ -679,7 +679,7 @@ function LessonList({ title, rows, data, coachView = false, empty = 'No lessons 
 
 function LessonCardList({ rows, data, empty, coachView = false }) {
   const { t } = useI18n();
-  if (rows.length === 0) return <EmptyState title="No lessons found" body={empty} />;
+  if (rows.length === 0) return <EmptyState title={t('No lessons found')} body={empty} />;
   return (
     <div className="grid min-w-0 gap-3 lg:grid-cols-2">
       {rows.map((lesson) => {
@@ -718,6 +718,7 @@ function LessonCardList({ rows, data, empty, coachView = false }) {
 
 function StudentsHub(props) {
   const { data, reload, toast, profile } = props;
+  const { t } = useI18n();
   const [active, setActive] = useState('customers');
   const [advanced, setAdvanced] = useState(false);
   const [mode, setMode] = useState(data.students.length ? 'profiles' : 'add');
@@ -731,20 +732,20 @@ function StudentsHub(props) {
   ];
   return (
     <div className="grid gap-5">
-      <Section title="Students" action={<div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"><Button variant={mode === 'profiles' ? 'primary' : 'ghost'} onClick={() => setMode('profiles')}>Student Profiles</Button><Button variant={mode === 'add' ? 'primary' : 'soft'} onClick={() => setMode('add')}>Add Student / Family</Button></div>}>
-        <p className="text-sm leading-6 text-slate-500">Use Student Profiles for daily view and follow-up. Use Add Student / Family when a new family joins, then fill the missing pieces step by step.</p>
+      <Section title={t('Students')} action={<div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"><Button variant={mode === 'profiles' ? 'primary' : 'ghost'} onClick={() => setMode('profiles')}>{t('Student Profiles')}</Button><Button variant={mode === 'add' ? 'primary' : 'soft'} onClick={() => setMode('add')}>{t('Add Student / Family')}</Button></div>}>
+        <p className="text-sm leading-6 text-slate-500">{t('Use Student Profiles for daily view and follow-up. Use Add Student / Family when a new family joins, then fill the missing pieces step by step.')}</p>
       </Section>
       {mode === 'add' ? <StudentSetupWizard data={data} reload={reload} toast={toast} profile={profile} onOpenAdvanced={(key) => { setActive(key); setAdvanced(true); }} /> : null}
       {mode === 'profiles' ? <StudentProfileDirectory data={data} profile={profile} onUpdateProgress={setProgressStudent} onAddStudent={() => setMode('add')} /> : null}
-      <Section title="Advanced records" action={<Button variant="ghost" onClick={() => setAdvanced((value) => !value)}>{advanced ? 'Hide advanced records' : 'Show advanced records'}</Button>}>
-        <p className="text-sm leading-6 text-slate-500">Use these only for detailed corrections, CSV export, or unusual records. The profile cards and guided setup are the normal daily workflow.</p>
+      <Section title={t('Advanced records')} action={<Button variant="ghost" onClick={() => setAdvanced((value) => !value)}>{advanced ? t('Hide advanced records') : t('Show advanced records')}</Button>}>
+        <p className="text-sm leading-6 text-slate-500">{t('Use these only for detailed corrections, CSV export, or unusual records. The profile cards and guided setup are the normal daily workflow.')}</p>
       </Section>
       {advanced ? (
         <>
-          <Section title="Advanced Records">
+          <Section title={t('Advanced Records')}>
             <div className="flex flex-wrap gap-2">
               {tabs.map(([key, label]) => (
-                <Button key={key} variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{label}</Button>
+                <Button key={key} variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{t(label)}</Button>
               ))}
             </div>
           </Section>
@@ -1367,6 +1368,7 @@ function CustomersPage({ profile, data, reload, toast }) {
 }
 
 function MoneyPage(props) {
+  const { t } = useI18n();
   const [active, setActive] = useState('summary');
   const tabs = [
     ['summary', 'Summary'],
@@ -1381,30 +1383,30 @@ function MoneyPage(props) {
   const salary = data.payroll_items.filter((row) => row.status !== 'void' && row.status !== 'paid').reduce((sum, row) => sum + Number(row.pay_amount || 0), 0);
   return (
     <div className="grid gap-5">
-      <Section title="Money">
-        <p className="text-sm leading-6 text-slate-500">Admin-only monthly records. Payments are money received from customers, Payroll is coach salary to pay, Expenses are business costs, and Summary is the simple monthly view for records/accounting.</p>
+      <Section title={t('Money')}>
+        <p className="text-sm leading-6 text-slate-500">{t('Admin-only monthly records. Payments are money received from customers, Payroll is coach salary to pay, Expenses are business costs, and Summary is the simple monthly view for records/accounting.')}</p>
         <div className="mt-4 grid gap-3 md:grid-cols-4">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950 ty-wrap">Summary</p><p className="mt-1 text-sm text-slate-500 ty-wrap">Quick monthly picture.</p></div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950 ty-wrap">Payments</p><p className="mt-1 text-sm text-slate-500 ty-wrap">Money received from customers.</p></div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950 ty-wrap">Payroll</p><p className="mt-1 text-sm text-slate-500 ty-wrap">Coach salary to pay.</p></div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950 ty-wrap">Expenses</p><p className="mt-1 text-sm text-slate-500 ty-wrap">Business costs and receipts.</p></div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950 ty-wrap">{t('Summary')}</p><p className="mt-1 text-sm text-slate-500 ty-wrap">{t('Quick monthly picture.')}</p></div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950 ty-wrap">{t('Payments')}</p><p className="mt-1 text-sm text-slate-500 ty-wrap">{t('Money received from customers.')}</p></div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950 ty-wrap">{t('Payroll')}</p><p className="mt-1 text-sm text-slate-500 ty-wrap">{t('Coach salary to pay.')}</p></div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950 ty-wrap">{t('Expenses')}</p><p className="mt-1 text-sm text-slate-500 ty-wrap">{t('Business costs and receipts.')}</p></div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          {tabs.map(([key, label]) => <Button key={key} variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{label}</Button>)}
+          {tabs.map(([key, label]) => <Button key={key} variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{t(label)}</Button>)}
         </div>
       </Section>
       {active === 'summary' ? (
-        <Section title={`Accounting Summary ${month}`}>
+        <Section title={`${t('Accounting Summary')} ${month}`}>
           <div className="grid gap-3 md:grid-cols-4">
-            <Card title="Payments collected" value={formatMoney(payments)} tone="green" />
-            <Card title="Expenses" value={formatMoney(expenses)} tone="rose" />
-            <Card title="Coach salary payable" value={formatMoney(salary)} tone="amber" />
-            <Card title="Estimated net" value={formatMoney(payments - expenses - salary)} />
+            <Card title={t('Payments collected')} value={formatMoney(payments)} tone="green" />
+            <Card title={t('Expenses')} value={formatMoney(expenses)} tone="rose" />
+            <Card title={t('Coach salary payable')} value={formatMoney(salary)} tone="amber" />
+            <Card title={t('Estimated net')} value={formatMoney(payments - expenses - salary)} />
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button variant="ghost" onClick={() => downloadCsv(`ty-payments-${month}.csv`, data.package_financials)}>Export payments</Button>
-            <Button variant="ghost" onClick={() => downloadCsv(`ty-expenses-${month}.csv`, data.expenses)}>Export expenses</Button>
-            <Button variant="ghost" onClick={() => downloadCsv(`ty-payroll-items-${month}.csv`, data.payroll_items)}>Export payroll</Button>
+            <Button variant="ghost" onClick={() => downloadCsv(`ty-payments-${month}.csv`, data.package_financials)}>{t('Export payments')}</Button>
+            <Button variant="ghost" onClick={() => downloadCsv(`ty-expenses-${month}.csv`, data.expenses)}>{t('Export expenses')}</Button>
+            <Button variant="ghost" onClick={() => downloadCsv(`ty-payroll-items-${month}.csv`, data.payroll_items)}>{t('Export payroll')}</Button>
           </div>
         </Section>
       ) : null}
@@ -2316,6 +2318,7 @@ function PackagesPage({ profile, data, reload, toast }) {
 }
 
 function LessonsPage({ profile, data, reload, toast }) {
+  const { t } = useI18n();
   const isAdmin = profile.role === 'admin';
   const coach = data.coaches.find((item) => item.profile_id === profile.id);
   const [activeMode, setActiveMode] = useState('fixed_weekly');
@@ -2339,62 +2342,62 @@ function LessonsPage({ profile, data, reload, toast }) {
 
   return (
     <div className="grid gap-5">
-      <Section title="Schedule" action={<div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">{activeMode === 'fixed_weekly' && isAdmin ? <Button onClick={() => setRecurring({})}>Generate Upcoming Lessons</Button> : null}{activeMode === 'flexible' ? <Button onClick={() => setFlexible({})}>Create Flexible Lesson</Button> : null}<Button variant="ghost" onClick={() => setShowFilters((value) => !value)}>{showFilters ? 'Hide advanced filters' : 'Advanced filters'}</Button></div>}>
-        <p className="text-sm leading-6 text-slate-500 ty-wrap">Choose one mode at a time. Fixed Weekly is for regular weekly classes. Flexible is for lessons arranged by coach and customer.</p>
+      <Section title={t('Schedule')} action={<div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">{activeMode === 'fixed_weekly' && isAdmin ? <Button onClick={() => setRecurring({})}>{t('Generate Upcoming Lessons')}</Button> : null}{activeMode === 'flexible' ? <Button onClick={() => setFlexible({})}>{t('Create Flexible Lesson')}</Button> : null}<Button variant="ghost" onClick={() => setShowFilters((value) => !value)}>{showFilters ? t('Hide advanced filters') : t('Advanced filters')}</Button></div>}>
+        <p className="text-sm leading-6 text-slate-500 ty-wrap">{t('Choose one mode at a time. Fixed Weekly is for regular weekly classes. Flexible is for lessons arranged by coach and customer.')}</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <button className={`min-w-0 rounded-lg border p-4 text-left ${activeMode === 'fixed_weekly' ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50'}`} onClick={() => setActiveMode('fixed_weekly')}>
-            <p className="font-semibold text-slate-950 ty-wrap">Fixed Weekly</p>
-            <p className="mt-1 text-sm text-slate-600 ty-wrap">Regular weekly classes. Rescheduling one lesson does not change the weekly pattern.</p>
-            <p className="mt-2 text-xs font-semibold text-sky-700 ty-wrap">{fixedSchedules.length} schedule(s), {fixedLessons.length} lesson(s)</p>
+            <p className="font-semibold text-slate-950 ty-wrap">{t('Fixed Weekly')}</p>
+            <p className="mt-1 text-sm text-slate-600 ty-wrap">{t('Regular weekly classes. Rescheduling one lesson does not change the weekly pattern.')}</p>
+            <p className="mt-2 text-xs font-semibold text-sky-700 ty-wrap">{fixedSchedules.length} {t('schedule(s)')}, {fixedLessons.length} {t('lesson(s)')}</p>
           </button>
           <button className={`min-w-0 rounded-lg border p-4 text-left ${activeMode === 'flexible' ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50'}`} onClick={() => setActiveMode('flexible')}>
-            <p className="font-semibold text-slate-950 ty-wrap">Flexible / Coach-arranged</p>
-            <p className="mt-1 text-sm text-slate-600 ty-wrap">Appointment-style lessons arranged with the customer in WhatsApp.</p>
-            <p className="mt-2 text-xs font-semibold text-sky-700 ty-wrap">{flexibleClasses.length} class(es), {flexibleLessons.length} appointment(s)</p>
+            <p className="font-semibold text-slate-950 ty-wrap">{t('Flexible / Coach-arranged')}</p>
+            <p className="mt-1 text-sm text-slate-600 ty-wrap">{t('Appointment-style lessons arranged with the customer in WhatsApp.')}</p>
+            <p className="mt-2 text-xs font-semibold text-sky-700 ty-wrap">{flexibleClasses.length} {t('class(es)')}, {flexibleLessons.length} {t('appointment(s)')}</p>
           </button>
         </div>
       </Section>
-      {showFilters ? <Section title="Advanced Filters">
+      {showFilters ? <Section title={t('Advanced Filters')}>
         <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-7">
-          <Field label="From"><Input type="date" value={filters.dateFrom} onChange={(event) => setFilters({ ...filters, dateFrom: event.target.value })} /></Field>
-          <Field label="To"><Input type="date" value={filters.dateTo} onChange={(event) => setFilters({ ...filters, dateTo: event.target.value })} /></Field>
-          <Field label="Coach"><Select value={filters.coach} onChange={(event) => setFilters({ ...filters, coach: event.target.value })}><option value="">All</option>{data.coaches.map((item) => <option key={item.id} value={item.id}>{item.display_name}</option>)}</Select></Field>
-          <Field label="Class"><Select value={filters.classId} onChange={(event) => setFilters({ ...filters, classId: event.target.value })}><option value="">All</option>{data.classes.map((item) => <option key={item.id} value={item.id}>{item.class_name}</option>)}</Select></Field>
-          <Field label="Status"><Select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option value="">All</option>{['scheduled', 'rescheduled', 'completed_pending_review', 'cancelled_pending_review', 'needs_edit', 'approved', 'rejected', 'archived', 'void'].map((item) => <option key={item} value={item}>{item}</option>)}</Select></Field>
-          <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={filters.pending} onChange={(event) => setFilters({ ...filters, pending: event.target.checked })} /> Pending review</label>
-          <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={filters.replacement} onChange={(event) => setFilters({ ...filters, replacement: event.target.checked })} /> Replacement</label>
+          <Field label={t('From')}><Input type="date" value={filters.dateFrom} onChange={(event) => setFilters({ ...filters, dateFrom: event.target.value })} /></Field>
+          <Field label={t('To')}><Input type="date" value={filters.dateTo} onChange={(event) => setFilters({ ...filters, dateTo: event.target.value })} /></Field>
+          <Field label={t('Coach')}><Select value={filters.coach} onChange={(event) => setFilters({ ...filters, coach: event.target.value })}><option value="">{t('All')}</option>{data.coaches.map((item) => <option key={item.id} value={item.id}>{item.display_name}</option>)}</Select></Field>
+          <Field label={t('Class')}><Select value={filters.classId} onChange={(event) => setFilters({ ...filters, classId: event.target.value })}><option value="">{t('All')}</option>{data.classes.map((item) => <option key={item.id} value={item.id}>{item.class_name}</option>)}</Select></Field>
+          <Field label={t('Status')}><Select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option value="">{t('All')}</option>{['scheduled', 'rescheduled', 'completed_pending_review', 'cancelled_pending_review', 'needs_edit', 'approved', 'rejected', 'archived', 'void'].map((item) => <option key={item} value={item}>{t(item)}</option>)}</Select></Field>
+          <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={filters.pending} onChange={(event) => setFilters({ ...filters, pending: event.target.checked })} /> {t('Pending review')}</label>
+          <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={filters.replacement} onChange={(event) => setFilters({ ...filters, replacement: event.target.checked })} /> {t('Replacement')}</label>
         </div>
       </Section> : null}
       {activeMode === 'fixed_weekly' ? (
         <>
-          <Section title="Fixed Weekly Schedules">
-            <p className="mb-4 text-sm leading-6 text-slate-500">Use this for families/classes with the same usual day and time every week. Generated lesson occurrences can still be rescheduled one by one.</p>
+          <Section title={t('Fixed Weekly Schedules')}>
+            <p className="mb-4 text-sm leading-6 text-slate-500">{t('Use this for families/classes with the same usual day and time every week. Generated lesson occurrences can still be rescheduled one by one.')}</p>
             <FixedScheduleCardList rows={fixedSchedules} data={data} />
             <DataTable className="hidden" rows={fixedSchedules} empty="No fixed weekly schedule yet." columns={[
-              { key: 'class', label: 'Class', render: (row) => data.classes.find((cls) => cls.id === row.class_id)?.class_name || '-' },
-              { key: 'day', label: 'Day', render: (row) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][row.day_of_week] || '-' },
-              { key: 'time', label: 'Time', render: (row) => `${row.start_time || ''} - ${row.end_time || ''}` },
-              { key: 'coach', label: 'Coach', render: (row) => data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-' },
-              { key: 'venue', label: 'Venue', render: (row) => data.venues.find((item) => item.id === row.venue_id)?.venue_name || data.venues.find((item) => item.id === row.venue_id)?.area || '-' },
-              { key: 'next', label: 'Next lesson', render: (row) => data.lessons.filter((lesson) => lesson.recurring_schedule_id === row.id && lesson.scheduled_date >= todayISO()).sort((a, b) => String(a.scheduled_date).localeCompare(String(b.scheduled_date)))[0]?.scheduled_date || '-' },
+              { key: 'class', label: t('Class'), render: (row) => data.classes.find((cls) => cls.id === row.class_id)?.class_name || '-' },
+              { key: 'day', label: t('Day'), render: (row) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][row.day_of_week] || '-' },
+              { key: 'time', label: t('Time'), render: (row) => `${row.start_time || ''} - ${row.end_time || ''}` },
+              { key: 'coach', label: t('Coach'), render: (row) => data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-' },
+              { key: 'venue', label: t('Venue'), render: (row) => data.venues.find((item) => item.id === row.venue_id)?.venue_name || data.venues.find((item) => item.id === row.venue_id)?.area || '-' },
+              { key: 'next', label: t('Next lesson'), render: (row) => data.lessons.filter((lesson) => lesson.recurring_schedule_id === row.id && lesson.scheduled_date >= todayISO()).sort((a, b) => String(a.scheduled_date).localeCompare(String(b.scheduled_date)))[0]?.scheduled_date || '-' },
             ]} />
           </Section>
-          <LessonList title="Upcoming Fixed Weekly Lessons" rows={fixedLessons} data={data} coachView={!isAdmin} empty="No fixed weekly lessons in this view." />
+          <LessonList title={t('Upcoming Fixed Weekly Lessons')} rows={fixedLessons} data={data} coachView={!isAdmin} empty={t('No fixed weekly lessons in this view.')} />
         </>
       ) : null}
       {activeMode === 'flexible' ? (
         <>
-          <Section title="Flexible Classes Needing Appointment" action={<Button onClick={() => setFlexible({})}>Create Flexible Lesson</Button>}>
-            <p className="mb-4 text-sm leading-6 text-slate-500">Use this for classes where coach and customer arrange each lesson time directly. Coach-created or rescheduled appointments appear for Admin attention.</p>
+          <Section title={t('Flexible Classes Needing Appointment')} action={<Button onClick={() => setFlexible({})}>{t('Create Flexible Lesson')}</Button>}>
+            <p className="mb-4 text-sm leading-6 text-slate-500">{t('Use this for classes where coach and customer arrange each lesson time directly. Coach-created or rescheduled appointments appear for Admin attention.')}</p>
             <FlexibleClassCardList rows={flexibleClasses} data={data} onCreate={() => setFlexible({})} />
             <DataTable className="hidden" rows={flexibleClasses} empty="No flexible classes." columns={[
-              { key: 'class_name', label: 'Class / Group' },
-              { key: 'coach', label: 'Coach', render: (row) => data.coaches.find((item) => item.id === row.assigned_coach_id)?.display_name || '-' },
-              { key: 'students', label: 'Students', render: (row) => classStudentNames(row.id, data) },
-              { key: 'action', label: 'Action', render: () => <Button onClick={(event) => { event.stopPropagation(); setFlexible({}); }}>Create appointment</Button> },
+              { key: 'class_name', label: t('Class / Group') },
+              { key: 'coach', label: t('Coach'), render: (row) => data.coaches.find((item) => item.id === row.assigned_coach_id)?.display_name || '-' },
+              { key: 'students', label: t('Students'), render: (row) => classStudentNames(row.id, data) },
+              { key: 'action', label: t('Action'), render: () => <Button onClick={(event) => { event.stopPropagation(); setFlexible({}); }}>{t('Create appointment')}</Button> },
             ]} />
           </Section>
-          <LessonList title="Upcoming Flexible Lessons" rows={flexibleLessons} data={data} coachView={!isAdmin} empty="No flexible lessons in this view." />
+          <LessonList title={t('Upcoming Flexible Lessons')} rows={flexibleLessons} data={data} coachView={!isAdmin} empty={t('No flexible lessons in this view.')} />
         </>
       ) : null}
       {recurring ? <RecurringModal data={data} reload={reload} toast={toast} onClose={() => setRecurring(null)} /> : null}
@@ -3135,12 +3138,12 @@ function PayrollPage({ profile, data, reload, toast }) {
   return (
     <div data-testid={isAdmin ? 'payroll-page' : 'coach-pay-page'} className="grid gap-5">
       <div className="grid min-w-0 gap-3 sm:grid-cols-3">
-        <Card title={isAdmin ? 'Payable now' : t('Expected payroll')} value={formatMoney(unpaidItems.reduce((sum, item) => sum + Number(item.pay_amount || 0), 0))} tone="amber" />
+        <Card title={isAdmin ? t('Payable now') : t('Expected payroll')} value={formatMoney(unpaidItems.reduce((sum, item) => sum + Number(item.pay_amount || 0), 0))} tone="amber" />
         <Card title={t('Approved lessons')} value={items.length} />
         <Card title={t('Paid items')} value={paidItems.length} tone="green" />
       </div>
-      <Section title={isAdmin ? 'Generate Payroll' : t('My Pay')} action={isAdmin ? <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]"><Input type="month" value={month} onChange={(event) => setMonth(event.target.value)} /><Button onClick={generate}>Generate</Button><Button variant="ghost" onClick={() => downloadCsv(`ty-payroll-${month}.csv`, items)}>Export CSV</Button></div> : null}>
-        {!isAdmin ? <p className="mb-4 text-sm leading-6 text-slate-500">This shows approved lessons that count toward your pay. Payments marked paid will appear as paid here.</p> : null}
+      <Section title={isAdmin ? t('Generate Payroll') : t('My Pay')} action={isAdmin ? <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]"><Input type="month" value={month} onChange={(event) => setMonth(event.target.value)} /><Button onClick={generate}>{t('Generate')}</Button><Button variant="ghost" onClick={() => downloadCsv(`ty-payroll-${month}.csv`, items)}>{t('Export CSV')}</Button></div> : null}>
+        {!isAdmin ? <p className="mb-4 text-sm leading-6 text-slate-500">{t('This shows approved lessons that count toward your pay. Payments marked paid will appear as paid here.')}</p> : null}
         <PayrollPeriodCards rows={periods} data={data} isAdmin={isAdmin} markPaid={markPaid} />
         <DataTable className="hidden xl:block" rows={periods} columns={[
           { key: 'coach', label: 'Coach', render: (row) => data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-' },
@@ -3151,7 +3154,7 @@ function PayrollPage({ profile, data, reload, toast }) {
           { key: 'action', label: 'Action', render: (row) => isAdmin && row.status !== 'paid' ? <Button onClick={() => markPaid(row)}>Mark paid</Button> : '-' },
         ]} />
       </Section>
-      <Section title="Payroll Items">
+      <Section title={t('Payroll Items')}>
         <PayrollItemCards rows={items} data={data} />
         <DataTable className="hidden xl:block" rows={items} columns={[
           { key: 'lesson', label: 'Lesson', render: (row) => data.lessons.find((item) => item.id === row.lesson_id)?.lesson_code || '-' },
@@ -3166,7 +3169,8 @@ function PayrollPage({ profile, data, reload, toast }) {
 }
 
 function PayrollPeriodCards({ rows, data, isAdmin, markPaid }) {
-  if (rows.length === 0) return <EmptyState title="No payroll yet" body="Approved payable lessons will appear here after payroll is generated." />;
+  const { t } = useI18n();
+  if (rows.length === 0) return <EmptyState title={t('No payroll yet')} body={t('Approved payable lessons will appear here after payroll is generated.')} />;
   return (
     <div className="grid min-w-0 gap-3 lg:grid-cols-2">
       {rows.map((row) => (
@@ -3176,13 +3180,13 @@ function PayrollPeriodCards({ rows, data, isAdmin, markPaid }) {
               <p className="font-semibold text-slate-950 ty-wrap">{formatDate(row.period_month).slice(0, 7)}</p>
               <p className="mt-1 text-sm text-slate-500 ty-wrap">{data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-'}</p>
             </div>
-            <StatusBadge value={row.status}>{row.status}</StatusBadge>
+            <StatusBadge value={row.status}>{t(row.status)}</StatusBadge>
           </div>
           <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-            <Info label="Lessons" value={row.total_lessons} />
-            <Info label="Amount" value={formatMoney(row.total_amount)} />
+            <Info label={t('Lessons')} value={row.total_lessons} />
+            <Info label={t('Amount')} value={formatMoney(row.total_amount)} />
           </div>
-          {isAdmin && row.status !== 'paid' ? <Button className="mt-3 w-full" onClick={() => markPaid(row)}>Mark paid</Button> : null}
+          {isAdmin && row.status !== 'paid' ? <Button className="mt-3 w-full" onClick={() => markPaid(row)}>{t('Mark paid')}</Button> : null}
         </article>
       ))}
     </div>
@@ -3190,7 +3194,8 @@ function PayrollPeriodCards({ rows, data, isAdmin, markPaid }) {
 }
 
 function PayrollItemCards({ rows, data }) {
-  if (rows.length === 0) return <EmptyState title="No payroll items yet" body="Approved payable lessons will show here." />;
+  const { t } = useI18n();
+  if (rows.length === 0) return <EmptyState title={t('No payroll items yet')} body={t('Approved payable lessons will show here.')} />;
   return (
     <div className="grid min-w-0 gap-3 lg:grid-cols-2">
       {rows.map((row) => (
@@ -3200,10 +3205,10 @@ function PayrollItemCards({ rows, data }) {
               <p className="font-semibold text-slate-950 ty-wrap">{data.lessons.find((item) => item.id === row.lesson_id)?.lesson_code || 'Lesson'}</p>
               <p className="mt-1 text-sm text-slate-500 ty-wrap">{data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-'}</p>
             </div>
-            <StatusBadge value={row.status}>{row.status}</StatusBadge>
+            <StatusBadge value={row.status}>{t(row.status)}</StatusBadge>
           </div>
           <p className="mt-3 text-xl font-semibold text-slate-950">{formatMoney(row.pay_amount)}</p>
-          <p className="mt-1 text-sm text-slate-500 ty-wrap">Rate source: {row.rate_source || '-'}</p>
+          <p className="mt-1 text-sm text-slate-500 ty-wrap">{t('Rate source')}: {row.rate_source || '-'}</p>
         </article>
       ))}
     </div>
