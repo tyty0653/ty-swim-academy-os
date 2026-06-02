@@ -37,7 +37,7 @@ test.describe('Public login UI quality', () => {
     await page.reload();
     if (await page.getByTestId('login-email').count() === 0) {
       await expect(page.getByText('Supabase setup required')).toBeVisible();
-      await expectNoHorizontalOverflow(page);
+      await expectNoHorizontalOverflow(page, testInfo);
       await capture(page, testInfo, 'public-login-setup-required');
       return;
     }
@@ -45,7 +45,7 @@ test.describe('Public login UI quality', () => {
     await expect(page.getByTestId('login-password')).toBeVisible();
     await expect(page.getByTestId('login-submit-button')).toBeVisible();
     await expect(page.getByTestId('language-toggle')).toBeVisible();
-    await expectNoHorizontalOverflow(page);
+    await expectNoHorizontalOverflow(page, testInfo);
 
     await page.getByTestId('language-option-zh').click();
     await expect(page.getByTestId('language-option-zh')).toHaveAttribute('aria-pressed', 'true');
@@ -53,7 +53,7 @@ test.describe('Public login UI quality', () => {
     await expect(page.evaluate(() => window.localStorage.getItem('tyswim-os-language'))).resolves.toBe('zh');
     await page.reload();
     await expect(page.getByTestId('language-option-zh')).toHaveAttribute('aria-pressed', 'true');
-    await expectNoHorizontalOverflow(page);
+    await expectNoHorizontalOverflow(page, testInfo);
     await capture(page, testInfo, 'public-login');
   });
 });
@@ -86,7 +86,7 @@ test.describe('Admin UI quality', () => {
       await openRoute(page, route);
       await expectNoAccessMessage(page, false);
       await expectMobileShell(page, testInfo);
-      await expectNoHorizontalOverflow(page);
+      await expectNoHorizontalOverflow(page, testInfo);
       await capture(page, testInfo, `admin-${slug}`);
     });
   }
@@ -97,7 +97,7 @@ test.describe('Admin UI quality', () => {
     await openRoute(page, '/students');
     const opened = await openFirstProfile(page);
     test.skip(!opened, 'No student profile card is available. Run demo seed or add a student first.');
-    await expectNoHorizontalOverflow(page);
+    await expectNoHorizontalOverflow(page, testInfo);
     await expect(page.getByTestId('student-profile-page')).toBeVisible();
     await expect(page.getByText('Safety').first()).toBeVisible();
     await capture(page, testInfo, 'admin-student-profile');
@@ -129,7 +129,7 @@ test.describe('Coach UI quality', () => {
       await login(page, coachCreds, 'Coach');
       await openRoute(page, route);
       await expectMobileShell(page, testInfo);
-      await expectNoHorizontalOverflow(page);
+      await expectNoHorizontalOverflow(page, testInfo);
       await capture(page, testInfo, `coach-${slug}`);
     });
   }
@@ -143,7 +143,7 @@ test.describe('Coach UI quality', () => {
     await expect(page.getByTestId('student-profile-page')).toBeVisible();
     await expect(page.getByText('Safety').first()).toBeVisible();
     await expect(page.getByText('Admin-only Finance')).toHaveCount(0);
-    await expectNoHorizontalOverflow(page);
+    await expectNoHorizontalOverflow(page, testInfo);
     await capture(page, testInfo, 'coach-student-profile');
   });
 
@@ -160,7 +160,7 @@ test.describe('Coach UI quality', () => {
     await fallbackSubmitButton.first().click();
     await page.waitForFunction(() => window.location.pathname.includes('/lessons/'));
     await expect(page.getByTestId('coach-submit-record-button').first()).toBeVisible();
-    await expectNoHorizontalOverflow(page);
+    await expectNoHorizontalOverflow(page, testInfo);
     await capture(page, testInfo, 'coach-submit-record');
   });
 
@@ -287,7 +287,7 @@ async function expectMobileShell(page, testInfo) {
   }
 }
 
-async function expectNoHorizontalOverflow(page) {
+async function expectNoHorizontalOverflow(page, testInfo) {
   const result = await page.evaluate(() => {
     const root = document.documentElement;
     const body = document.body;
@@ -346,6 +346,14 @@ async function expectNoHorizontalOverflow(page) {
       offenders,
     };
   });
+  if (result.overflow > 2 && testInfo) {
+    const directory = path.join('test-artifacts', 'ui-overflow-diagnostics', testInfo.project.name);
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(
+      path.join(directory, `${safeFileName(testInfo.title)}.json`),
+      JSON.stringify(result, null, 2),
+    );
+  }
   expect(
     result.overflow,
     `Horizontal overflow on ${result.url}\nViewport: ${result.viewportWidth}x${result.viewportHeight}\nDocument width: ${result.documentWidth} (root ${result.rootScrollWidth}, body ${result.bodyScrollWidth})\nOverflow: ${result.overflow}px\nLikely overflowing elements:\n${JSON.stringify(result.offenders, null, 2)}`,

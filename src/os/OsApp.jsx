@@ -531,6 +531,9 @@ function AdminDashboard({ data }) {
   ];
   const quickActions = [
     ['Add Family', '/students', 'primary'],
+    ['Add Student', '/students', 'soft'],
+    ['Add Class', '/students', 'ghost'],
+    ['Add Package', '/students', 'ghost'],
     ['Schedule Lesson', '/schedule', 'soft'],
     ['Review Lessons', '/review', 'ghost'],
     ['Setup Check', '/system-check', 'ghost'],
@@ -541,9 +544,9 @@ function AdminDashboard({ data }) {
       <OnboardingChecklist data={data} />
       <Section title={t('Today')}>
         <p className="mb-4 text-sm leading-6 text-slate-500 ty-wrap">{t('A simple daily view for lessons, coach submissions, schedule changes, and renewal follow-ups.')}</p>
-        <div className="mb-4 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap">
+        <div className="mb-4 grid min-w-0 grid-cols-2 gap-2 md:grid-cols-3 xl:flex xl:flex-wrap">
           {quickActions.map(([label, href, variant]) => (
-            <Button key={label} className="w-full lg:w-auto" variant={variant} onClick={() => go(href)}>{t(label)}</Button>
+            <Button key={label} className="w-full xl:w-auto" variant={variant} onClick={() => go(href)}>{t(label)}</Button>
           ))}
         </div>
         <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -581,7 +584,6 @@ function CoachDashboard({ profile, data }) {
       </div>
       {todayDone ? <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700 ty-wrap">{t('Approved — no further action needed.', "All today's lesson records submitted.")}</div> : null}
       <CoachTodayCards lessons={today.length ? today : ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 5)} data={data} />
-      <LessonList title={t('My Schedule')} rows={ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 10)} data={data} coachView empty={t('No upcoming assigned lessons.')} />
     </div>
   );
 }
@@ -604,7 +606,7 @@ function CoachTodayCards({ lessons, data }) {
             const photoRequired = Boolean(cls?.photo_required || lesson.photo_required);
             const focus = currentFocusForClass(cls, data);
             return (
-              <article key={lesson.id} className="min-w-0 max-w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <article key={lesson.id} data-testid="coach-today-lesson-card" className="min-w-0 max-w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-sky-700">{lesson.start_time || t('Time TBC')} - {lesson.end_time || ''}</p>
@@ -618,7 +620,7 @@ function CoachTodayCards({ lessons, data }) {
                     {photoRequired ? <StatusBadge value="needs_edit">{t('Photo required today')}</StatusBadge> : null}
                   </div>
                 </div>
-                {studentAlerts(cls, data) ? <p className="mt-3 rounded-lg bg-rose-50 p-3 text-sm font-medium text-rose-700 ty-wrap">{studentAlerts(cls, data)}</p> : null}
+                {studentAlerts(cls, data) ? <p className="mt-3 rounded-lg bg-rose-50 p-3 text-sm font-medium text-rose-700 ty-wrap"><span className="font-semibold">{t('Safety alert')}:</span> {studentAlerts(cls, data)}</p> : null}
                 <div className="mt-4 grid min-w-0 gap-2 lg:grid-cols-3">
                   <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? t('WhatsApp') : t('No WhatsApp')}</a>
                   <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? t('Map') : t('No map')}</a>
@@ -690,7 +692,7 @@ function LessonCardList({ rows, data, empty, coachView = false }) {
         const mapsLink = venue?.google_maps_link || '';
         const approved = lesson.status === 'approved';
         return (
-          <article key={lesson.id} className="min-w-0 max-w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <article key={lesson.id} data-testid="lesson-card" className="min-w-0 max-w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-sky-700">{formatDate(lesson.scheduled_date)} {lesson.start_time || ''}</p>
