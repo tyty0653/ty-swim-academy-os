@@ -525,7 +525,7 @@ function CoachDashboard({ profile, data }) {
 
   return (
     <div className="grid gap-5">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
         <Card title="Today's lessons" value={today.length} />
         <Card title="This week" value={ownLessons.filter((lesson) => daysUntil(lesson.scheduled_date) >= 0 && daysUntil(lesson.scheduled_date) <= 7).length} />
         <Card title="Pending records" value={pending.length} tone="amber" />
@@ -544,7 +544,7 @@ function CoachTodayCards({ lessons, data }) {
       {lessons.length === 0 ? (
         <EmptyState title="No lessons today" body="Assigned lessons will appear here with contact, map, safety alerts, and a fast submit button." />
       ) : (
-        <div className="grid min-w-0 gap-3 md:grid-cols-2">
+        <div className="grid min-w-0 gap-3 lg:grid-cols-2">
           {lessons.map((lesson) => {
             const cls = data.classes.find((item) => item.id === lesson.class_id);
             const customer = data.customers.find((item) => item.id === cls?.customer_id);
@@ -604,7 +604,7 @@ function LessonList({ title, rows, data, coachView = false, empty = 'No lessons 
     <Section title={title}>
       <LessonCardList rows={rows} data={data} empty={empty} coachView={coachView} />
       <DataTable
-        className="hidden md:block"
+        className="hidden"
         rows={rows}
         empty={empty}
         onRowClick={(row) => go(`/lessons/${row.id}`)}
@@ -628,7 +628,7 @@ function LessonList({ title, rows, data, coachView = false, empty = 'No lessons 
 function LessonCardList({ rows, data, empty, coachView = false }) {
   if (rows.length === 0) return <EmptyState title="No lessons found" body={empty} />;
   return (
-    <div className="grid gap-3 md:hidden">
+    <div className="grid gap-3 lg:grid-cols-2">
       {rows.map((lesson) => {
         const cls = data.classes.find((item) => item.id === lesson.class_id);
         const customer = data.customers.find((item) => item.id === cls?.customer_id);
@@ -1379,7 +1379,7 @@ function MorePage(props) {
           {tools.map(([key, href, label]) => (
             <button key={key} onClick={() => go(href)} className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-sky-200 hover:bg-sky-50 sm:block sm:min-h-0 sm:p-4">
               <p className="font-semibold text-slate-950 ty-wrap">{!isAdmin && key === 'system-check' ? 'My Account Check' : label}</p>
-              <p className="hidden text-sm text-slate-500 sm:mt-1 sm:block ty-wrap">{moreToolDescription(key, isAdmin)}</p>
+              <p className="hidden text-sm text-slate-500 lg:mt-1 lg:block ty-wrap">{moreToolDescription(key, isAdmin)}</p>
               <span className="text-slate-300 sm:hidden">›</span>
             </button>
           ))}
@@ -1391,7 +1391,7 @@ function MorePage(props) {
       </Section>
       {isAdmin ? <Section title="Admin Tools">
         <p className="text-sm leading-6 text-slate-500">Use these before real operations or when checking sensitive changes.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 grid gap-2 lg:flex lg:flex-wrap">
           <Button onClick={() => go('/settings')}>Open Settings</Button>
           <Button variant="ghost" onClick={() => go('/audit-logs')}>Audit Logs</Button>
           <Button variant="ghost" onClick={() => exportAllDataBackup(data, profile, toast)}>Export All Data JSON</Button>
@@ -1426,7 +1426,7 @@ function HelpPage({ profile }) {
     <div className="grid gap-5">
       <Section title="Help Guide">
         <p className="text-sm leading-6 text-slate-500">Use this page when you are unsure where to start. The OS is designed around daily work first: lessons today, coach submissions, student setup, schedule, and money.</p>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="mt-4 grid gap-3 lg:grid-cols-3">
           <Card title="1. Start Today" value={isAdmin ? 'Admin' : 'Coach'} note={isAdmin ? 'Check pending lessons, reschedules, renewals, and missing data.' : 'Check class time, WhatsApp, map, safety notes, and submit records.'} />
           <Card title="2. Keep Records Current" value="Students" note={isAdmin ? 'Add the family, student, venue, class, package, then first lesson.' : 'Review your assigned students, contacts, venues, and health notes.'} />
           <Card title="3. Review Before Money" value="Review" note="Lessons only affect package counts and payroll after Admin approval." tone="amber" />
@@ -1644,7 +1644,7 @@ function SystemCheckPage({ session, profile, data, tableErrors = {} }) {
         </Section>
       ) : null}
       <Section title="Basic Data Counts">
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           {counts.map(([label, value]) => <Card key={label} title={label} value={value} tone={value > 0 ? 'sky' : 'amber'} />)}
         </div>
       </Section>
@@ -2295,7 +2295,7 @@ function LessonsPage({ profile, data, reload, toast }) {
           <Section title="Fixed Weekly Schedules">
             <p className="mb-4 text-sm leading-6 text-slate-500">Use this for families/classes with the same usual day and time every week. Generated lesson occurrences can still be rescheduled one by one.</p>
             <FixedScheduleCardList rows={fixedSchedules} data={data} />
-            <DataTable className="hidden md:block" rows={fixedSchedules} empty="No fixed weekly schedule yet." columns={[
+            <DataTable className="hidden" rows={fixedSchedules} empty="No fixed weekly schedule yet." columns={[
               { key: 'class', label: 'Class', render: (row) => data.classes.find((cls) => cls.id === row.class_id)?.class_name || '-' },
               { key: 'day', label: 'Day', render: (row) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][row.day_of_week] || '-' },
               { key: 'time', label: 'Time', render: (row) => `${row.start_time || ''} - ${row.end_time || ''}` },
@@ -2312,7 +2312,7 @@ function LessonsPage({ profile, data, reload, toast }) {
           <Section title="Flexible Classes Needing Appointment" action={<Button onClick={() => setFlexible({})}>Create Flexible Lesson</Button>}>
             <p className="mb-4 text-sm leading-6 text-slate-500">Use this for classes where coach and customer arrange each lesson time directly. Coach-created or rescheduled appointments appear for Admin attention.</p>
             <FlexibleClassCardList rows={flexibleClasses} data={data} onCreate={() => setFlexible({})} />
-            <DataTable className="hidden md:block" rows={flexibleClasses} empty="No flexible classes." columns={[
+            <DataTable className="hidden" rows={flexibleClasses} empty="No flexible classes." columns={[
               { key: 'class_name', label: 'Class / Group' },
               { key: 'coach', label: 'Coach', render: (row) => data.coaches.find((item) => item.id === row.assigned_coach_id)?.display_name || '-' },
               { key: 'students', label: 'Students', render: (row) => classStudentNames(row.id, data) },
@@ -2329,9 +2329,9 @@ function LessonsPage({ profile, data, reload, toast }) {
 }
 
 function FixedScheduleCardList({ rows, data }) {
-  if (rows.length === 0) return <div className="md:hidden"><EmptyState title="No fixed weekly schedule yet" body="Create one when a class has a regular weekly day and time." /></div>;
+  if (rows.length === 0) return <EmptyState title="No fixed weekly schedule yet" body="Create one when a class has a regular weekly day and time." />;
   return (
-    <div className="grid gap-3 md:hidden">
+    <div className="grid gap-3 lg:grid-cols-2">
       {rows.map((row) => {
         const cls = data.classes.find((item) => item.id === row.class_id);
         const coach = data.coaches.find((item) => item.id === row.coach_id);
@@ -2356,9 +2356,9 @@ function FixedScheduleCardList({ rows, data }) {
 }
 
 function FlexibleClassCardList({ rows, data, onCreate }) {
-  if (rows.length === 0) return <div className="md:hidden"><EmptyState title="No flexible classes" body="Flexible classes will appear here when they need appointments." /></div>;
+  if (rows.length === 0) return <EmptyState title="No flexible classes" body="Flexible classes will appear here when they need appointments." />;
   return (
-    <div className="grid gap-3 md:hidden">
+    <div className="grid gap-3 lg:grid-cols-2">
       {rows.map((row) => (
         <article key={row.id} className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <p className="font-semibold text-slate-950 ty-wrap">{row.class_name}</p>
@@ -3416,7 +3416,7 @@ function AuditLogPage({ data }) {
     <div className="grid gap-5">
       <Section title="Audit Logs">
         <p className="text-sm leading-6 text-slate-500 ty-wrap">Read-only history of important system actions. Use this when checking who changed a lesson, package, payroll, payment, expense, backup, or reversal.</p>
-        <div className="mt-4 grid gap-3 md:grid-cols-5">
+        <div className="mt-4 grid gap-3 lg:grid-cols-5">
           <Field label="From"><Input type="date" value={filters.from} onChange={(event) => setFilters({ ...filters, from: event.target.value })} /></Field>
           <Field label="To"><Input type="date" value={filters.to} onChange={(event) => setFilters({ ...filters, to: event.target.value })} /></Field>
           <Field label="Actor"><Select value={filters.actor} onChange={(event) => setFilters({ ...filters, actor: event.target.value })}><option value="">All actors</option>{actors.map((id) => <option key={id} value={id}>{actorName(id, data)}</option>)}</Select></Field>
@@ -3427,10 +3427,10 @@ function AuditLogPage({ data }) {
       <Section title="Recent Activity">
         {rows.length === 0 ? <EmptyState title="No audit logs found" body="Actions will appear here after Admin updates important records." /> : (
           <>
-            <div className="grid gap-3 md:hidden">
+            <div className="grid gap-3 xl:grid-cols-2">
               {rows.map((row) => <AuditLogCard key={row.id} row={row} data={data} />)}
             </div>
-            <DataTable className="hidden md:block" rows={rows} columns={[
+            <DataTable className="hidden" rows={rows} columns={[
               { key: 'created_at', label: 'When', render: (row) => `${formatDate(row.created_at)} ${String(row.created_at || '').slice(11, 16)}` },
               { key: 'actor', label: 'Actor', render: (row) => actorName(row.actor_id, data) },
               { key: 'action', label: 'Action' },

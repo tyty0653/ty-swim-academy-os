@@ -265,26 +265,65 @@ async function expectNoHorizontalOverflow(page) {
   const result = await page.evaluate(() => {
     const root = document.documentElement;
     const body = document.body;
-    const width = Math.max(root.scrollWidth, body.scrollWidth);
-    const overflow = Math.max(0, width - root.clientWidth);
+    const viewportWidth = root.clientWidth;
+    const documentWidth = Math.max(root.scrollWidth, body.scrollWidth);
+    const overflow = Math.max(0, documentWidth - viewportWidth);
+    function selectorFor(element) {
+      const parts = [];
+      let current = element;
+      while (current && current.nodeType === Node.ELEMENT_NODE && parts.length < 5) {
+        const tag = current.tagName.toLowerCase();
+        const testId = current.getAttribute('data-testid');
+        const id = current.id ? `#${current.id}` : '';
+        const className = String(current.getAttribute('class') || '')
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 3)
+          .map((item) => `.${CSS.escape(item)}`)
+          .join('');
+        parts.unshift(testId ? `${tag}[data-testid="${testId}"]` : `${tag}${id}${className}`);
+        current = current.parentElement;
+      }
+      return parts.join(' > ');
+    }
     const offenders = [...document.querySelectorAll('body *')]
       .map((element) => {
         const rect = element.getBoundingClientRect();
+        const computed = window.getComputedStyle(element);
         return {
+          selector: selectorFor(element),
           tag: element.tagName.toLowerCase(),
           testId: element.getAttribute('data-testid') || '',
           className: String(element.getAttribute('class') || '').slice(0, 120),
+          position: computed.position,
+          overflowX: computed.overflowX,
           right: Math.round(rect.right),
           left: Math.round(rect.left),
           width: Math.round(rect.width),
-          text: String(element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80),
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          offsetWidth: element.offsetWidth,
+          text: String(element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120),
         };
       })
-      .filter((item) => item.right > root.clientWidth + 2 || item.left < -2)
-      .slice(0, 8);
-    return { overflow, clientWidth: root.clientWidth, scrollWidth: width, offenders };
+      .filter((item) => item.right > viewportWidth + 2 || item.left < -2 || item.scrollWidth > item.clientWidth + 2)
+      .sort((a, b) => Math.max(b.right - viewportWidth, b.scrollWidth - b.clientWidth) - Math.max(a.right - viewportWidth, a.scrollWidth - a.clientWidth))
+      .slice(0, 10);
+    return {
+      url: window.location.href,
+      viewportWidth,
+      viewportHeight: window.innerHeight,
+      documentWidth,
+      rootScrollWidth: root.scrollWidth,
+      bodyScrollWidth: body.scrollWidth,
+      overflow,
+      offenders,
+    };
   });
-  expect(result.overflow, `Page has ${result.overflow}px horizontal overflow: ${JSON.stringify(result.offenders)}`).toBeLessThanOrEqual(2);
+  expect(
+    result.overflow,
+    `Horizontal overflow on ${result.url}\nViewport: ${result.viewportWidth}x${result.viewportHeight}\nDocument width: ${result.documentWidth} (root ${result.rootScrollWidth}, body ${result.bodyScrollWidth})\nOverflow: ${result.overflow}px\nLikely overflowing elements:\n${JSON.stringify(result.offenders, null, 2)}`,
+  ).toBeLessThanOrEqual(2);
 }
 
 async function capture(page, testInfo, slug) {
