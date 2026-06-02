@@ -457,6 +457,7 @@ function EmptyState({ title, body, action }) {
 }
 
 function OnboardingChecklist({ data }) {
+  const { t } = useI18n();
   const hasCoachSubmission = data.lessons.some((lesson) => ['completed_pending_review', 'cancelled_pending_review', 'approved'].includes(lesson.status));
   const hasApprovedLesson = data.lessons.some((lesson) => lesson.status === 'approved');
   const steps = [
@@ -472,13 +473,13 @@ function OnboardingChecklist({ data }) {
   ];
   if (steps.every(([, done]) => done)) return null;
   return (
-    <Section title="Setup Checklist">
+    <Section title={t('Setup Checklist')}>
       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
         {steps.map(([label, done, href], index) => (
-          <button key={label} onClick={() => go(href)} className={`rounded-lg border p-3 text-left ${done ? 'border-emerald-100 bg-emerald-50' : 'border-slate-200 bg-white hover:border-sky-200'}`}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step {index + 1}</p>
-            <p className="mt-1 font-semibold text-slate-950 ty-wrap">{label}</p>
-            <p className={`mt-2 text-xs font-semibold ${done ? 'text-emerald-700' : 'text-sky-700'}`}>{done ? 'Done' : 'Open'}</p>
+          <button key={label} onClick={() => go(href)} className={`min-w-0 rounded-lg border p-3 text-left ${done ? 'border-emerald-100 bg-emerald-50' : 'border-slate-200 bg-white hover:border-sky-200'}`}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('Step')} {index + 1}</p>
+            <p className="mt-1 font-semibold text-slate-950 ty-wrap">{t(label)}</p>
+            <p className={`mt-2 text-xs font-semibold ${done ? 'text-emerald-700' : 'text-sky-700'}`}>{done ? t('Done') : t('Open')}</p>
           </button>
         ))}
       </div>
@@ -491,6 +492,7 @@ function Dashboard({ profile, data }) {
 }
 
 function AdminDashboard({ data }) {
+  const { t } = useI18n();
   const now = todayISO();
   const lessonsToday = data.lessons.filter((lesson) => lesson.scheduled_date === now);
   const weekLessons = data.lessons.filter((lesson) => lesson.scheduled_date >= now).slice(0, 12);
@@ -535,18 +537,18 @@ function AdminDashboard({ data }) {
   return (
     <div className="grid gap-5">
       <OnboardingChecklist data={data} />
-      <Section title="Today" action={<div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">{quickActions.map(([label, href, variant]) => <Button key={label} variant={variant} onClick={() => go(href)}>{label}</Button>)}</div>}>
-        <p className="mb-4 text-sm leading-6 text-slate-500">A simple daily view for lessons, coach submissions, schedule changes, and renewal follow-ups.</p>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <Section title={t('Today')} action={<div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap">{quickActions.map(([label, href, variant]) => <Button key={label} className="w-full lg:w-auto" variant={variant} onClick={() => go(href)}>{t(label)}</Button>)}</div>}>
+        <p className="mb-4 text-sm leading-6 text-slate-500 ty-wrap">{t('A simple daily view for lessons, coach submissions, schedule changes, and renewal follow-ups.')}</p>
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {primaryCards.map(([title, value, note, href, tone]) => (
-            <button key={title} onClick={() => go(href)} className="text-left">
-              <Card title={title} value={value} note={note} tone={tone} />
+            <button key={title} onClick={() => go(href)} className="min-w-0 max-w-full text-left">
+              <Card title={t(title)} value={value} note={t(note)} tone={tone} />
             </button>
           ))}
         </div>
       </Section>
-      <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-        <LessonList title="Today and This Week" rows={weekLessons} data={data} empty="No scheduled lessons in this view." />
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+        <LessonList title={t('Today and This Week')} rows={weekLessons} data={data} empty={t('No scheduled lessons in this view.')} />
         <NextActionList rows={nextActions} />
       </div>
     </div>
@@ -564,7 +566,7 @@ function CoachDashboard({ profile, data }) {
 
   return (
     <div className="grid gap-5">
-      <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Card title={t("Today's lessons")} value={today.length} />
         <Card title={t('This week')} value={ownLessons.filter((lesson) => daysUntil(lesson.scheduled_date) >= 0 && daysUntil(lesson.scheduled_date) <= 7).length} />
         <Card title={t('Pending records')} value={pending.length} tone="amber" />
@@ -572,7 +574,7 @@ function CoachDashboard({ profile, data }) {
       </div>
       {todayDone ? <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700 ty-wrap">{t('Approved — no further action needed.', "All today's lesson records submitted.")}</div> : null}
       <CoachTodayCards lessons={today.length ? today : ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 5)} data={data} />
-      <LessonList title="My Schedule" rows={ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 10)} data={data} coachView empty="No upcoming assigned lessons." />
+      <LessonList title={t('My Schedule')} rows={ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 10)} data={data} coachView empty={t('No upcoming assigned lessons.')} />
     </div>
   );
 }
@@ -593,14 +595,16 @@ function CoachTodayCards({ lessons, data }) {
             const whatsapp = customer?.whatsapp || '';
             const approved = lesson.status === 'approved';
             const photoRequired = Boolean(cls?.photo_required || lesson.photo_required);
+            const focus = currentFocusForClass(cls, data);
             return (
-              <article key={lesson.id} className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <article key={lesson.id} className="min-w-0 max-w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-sky-700">{lesson.start_time || 'Time TBC'} - {lesson.end_time || ''}</p>
                     <h3 className="mt-1 text-lg font-semibold text-slate-950 ty-wrap">{cls?.class_name || lesson.lesson_code}</h3>
                     <p className="mt-1 text-sm text-slate-700 ty-wrap">{classStudentNames(cls?.id, data)}</p>
                     <p className="mt-1 text-sm text-slate-500 ty-wrap">{venue?.full_address || venue?.area || venue?.venue_name || 'Venue not set'}</p>
+                    {focus ? <p className="mt-2 rounded-lg bg-sky-50 p-2 text-sm font-medium text-sky-800 ty-wrap">{t('Current focus')}: {focus}</p> : null}
                   </div>
                   <div className="flex flex-wrap gap-2 sm:grid sm:justify-items-end">
                     <StatusBadge value={lesson.status} />
@@ -608,7 +612,7 @@ function CoachTodayCards({ lessons, data }) {
                   </div>
                 </div>
                 {studentAlerts(cls, data) ? <p className="mt-3 rounded-lg bg-rose-50 p-3 text-sm font-medium text-rose-700 ty-wrap">{studentAlerts(cls, data)}</p> : null}
-                <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                <div className="mt-4 grid min-w-0 gap-2 lg:grid-cols-3">
                   <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? t('WhatsApp') : t('No WhatsApp')}</a>
                   <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? t('Map') : t('No map')}</a>
                   <Button data-testid={!approved ? 'coach-submit-record-button' : undefined} disabled={approved} onClick={() => go(`/lessons/${lesson.id}`)}>{approved ? t('Approved') : t('Submit Record')}</Button>
@@ -623,15 +627,16 @@ function CoachTodayCards({ lessons, data }) {
 }
 
 function NextActionList({ rows }) {
+  const { t } = useI18n();
   const activeRows = rows.filter(([, value]) => Number(value) > 0);
   return (
-    <Section title="Next Actions">
-      <div className="grid gap-2">
-        {activeRows.length === 0 ? <EmptyState title="Nothing urgent right now" body="No review, renewal, replacement, or missing data items need action." /> : null}
+    <Section title={t('Next Actions')}>
+      <div className="grid min-w-0 gap-2">
+        {activeRows.length === 0 ? <EmptyState title={t('Nothing urgent right now')} body={t('No review, renewal, replacement, or missing data items need action.')} /> : null}
         {activeRows.map(([label, value, href]) => (
-          <button key={label} onClick={() => go(href)} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-left hover:border-sky-200 hover:bg-sky-50">
-            <span className="font-medium text-slate-700">{label}</span>
-            <span className="text-lg font-semibold text-slate-950">{value}</span>
+          <button key={label} onClick={() => go(href)} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-left hover:border-sky-200 hover:bg-sky-50">
+            <span className="min-w-0 font-medium text-slate-700 ty-wrap">{t(label)}</span>
+            <span className="shrink-0 text-lg font-semibold text-slate-950">{value}</span>
           </button>
         ))}
       </div>
@@ -1433,7 +1438,7 @@ function MorePage(props) {
         </div>
       </Section>
       <MoreGroup title={t('Help & Setup')} tools={helpTools} isAdmin={isAdmin} t={t} />
-      {isAdmin ? <MoreGroup title={t('Admin Tools')} tools={adminTools} isAdmin={isAdmin} t={t} extra={<Button variant="ghost" onClick={() => exportAllDataBackup(data, profile, toast)}>Export All Data JSON</Button>} /> : null}
+      {isAdmin ? <MoreGroup title={t('Admin Tools')} tools={adminTools} isAdmin={isAdmin} t={t} extra={<Button variant="ghost" onClick={() => exportAllDataBackup(data, profile, toast)}>{t('Export All Data JSON')}</Button>} /> : null}
       {isAdmin ? <MoreGroup title={t('Records')} tools={recordTools} isAdmin={isAdmin} t={t} /> : null}
     </div>
   );
@@ -1447,7 +1452,7 @@ function MoreGroup({ title, tools, isAdmin, t, extra }) {
           <button key={key} onClick={() => go(href)} className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left hover:border-sky-200 hover:bg-sky-50">
             <span className="min-w-0">
               <span className="block font-semibold text-slate-950 ty-wrap">{t(label)}</span>
-              <span className="mt-1 hidden text-sm text-slate-500 lg:block ty-wrap">{moreToolDescription(key, isAdmin)}</span>
+              <span className="mt-1 hidden text-sm text-slate-500 lg:block ty-wrap">{t(moreToolDescription(key, isAdmin))}</span>
             </span>
             <span className="shrink-0 text-slate-300">›</span>
           </button>
@@ -3783,6 +3788,20 @@ function studentAlerts(cls, data) {
     const student = data.students.find((item) => item.id === id);
     return [student?.safety_alert, student?.health_notes, student?.special_needs].filter(Boolean).join(' / ');
   }).filter(Boolean).join(' | ');
+}
+
+function currentFocusForClass(cls, data) {
+  if (!cls) return '';
+  const ids = data.class_students.filter((item) => item.class_id === cls.id && item.active !== false).map((item) => item.student_id);
+  return ids
+    .map((id) => {
+      const student = data.students.find((item) => item.id === id);
+      if (!student) return '';
+      return getStudentSkillProfile(student, data).current_focus || student.learning_goal || '';
+    })
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(' / ');
 }
 
 function daysUntil(dateText) {
