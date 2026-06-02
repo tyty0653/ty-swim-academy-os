@@ -285,10 +285,12 @@ function StaffAccessIssue({ issue }) {
 
 function LanguageToggle({ language, setLanguage, compact = false }) {
   return (
-    <div className={`inline-flex rounded-xl border border-slate-200 bg-white p-1 ${compact ? 'shrink-0' : ''}`}>
+    <div data-testid="language-toggle" className={`inline-flex rounded-xl border border-slate-200 bg-white p-1 ${compact ? 'shrink-0' : ''}`}>
       {languages.map((item) => (
         <button
           key={item.code}
+          data-testid={`language-option-${item.code}`}
+          aria-pressed={language === item.code}
           type="button"
           onClick={() => setLanguage(item.code)}
           className={`min-h-9 rounded-lg px-3 text-sm font-semibold ${language === item.code ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-sky-50 hover:text-sky-700'}`}

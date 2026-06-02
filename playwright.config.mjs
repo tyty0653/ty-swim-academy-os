@@ -2,12 +2,14 @@ import { defineConfig } from '@playwright/test';
 
 const port = Number(process.env.PLAYWRIGHT_PORT || 5174);
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || `http://127.0.0.1:${port}`;
+const workers = Number(process.env.PLAYWRIGHT_WORKERS || 1);
 
 export default defineConfig({
   testDir: './tests/ui',
   globalSetup: './tests/ui/auth-preflight.mjs',
   timeout: 45_000,
   expect: { timeout: 8_000 },
+  workers,
   fullyParallel: false,
   retries: 0,
   reporter: [['list'], ['html', { outputFolder: 'test-artifacts/playwright-report', open: 'never' }]],

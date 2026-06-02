@@ -30,6 +30,34 @@ const coachPages = [
   ['my-account-check', '/system-check', 'My Account Check'],
 ];
 
+test.describe('Public login UI quality', () => {
+  test('Login loads, fits, and saves language choice', async ({ page }, testInfo) => {
+    await page.goto('/login');
+    await page.evaluate(() => window.localStorage.removeItem('tyswim-os-language'));
+    await page.reload();
+    if (await page.getByTestId('login-email').count() === 0) {
+      await expect(page.getByText('Supabase setup required')).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+      await capture(page, testInfo, 'public-login-setup-required');
+      return;
+    }
+    await expect(page.getByTestId('login-email')).toBeVisible();
+    await expect(page.getByTestId('login-password')).toBeVisible();
+    await expect(page.getByTestId('login-submit-button')).toBeVisible();
+    await expect(page.getByTestId('language-toggle')).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    await page.getByTestId('language-option-zh').click();
+    await expect(page.getByTestId('language-option-zh')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('login-submit-button')).toContainText('登录');
+    await expect(page.evaluate(() => window.localStorage.getItem('tyswim-os-language'))).resolves.toBe('zh');
+    await page.reload();
+    await expect(page.getByTestId('language-option-zh')).toHaveAttribute('aria-pressed', 'true');
+    await expectNoHorizontalOverflow(page);
+    await capture(page, testInfo, 'public-login');
+  });
+});
+
 test.afterEach(async ({ page }, testInfo) => {
   if (testInfo.status === testInfo.expectedStatus) return;
   const directory = path.join('test-artifacts', 'ui-screenshots', 'failures', testInfo.project.name);
