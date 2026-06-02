@@ -320,7 +320,7 @@ function OsShell({ session, profile, pathInfo, data, tableErrors, reload, toast,
 
 function MobileBottomNav({ nav, pathInfo }) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-2 pb-[calc(0.35rem+env(safe-area-inset-bottom))] pt-2 shadow-xl shadow-slate-300/40 backdrop-blur lg:hidden">
+    <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-2 pb-[calc(0.35rem+env(safe-area-inset-bottom))] pt-2 shadow-xl shadow-slate-300/40 backdrop-blur lg:hidden">
       <div className="mx-auto grid max-w-md gap-1" style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0, 1fr))` }}>
         {nav.map(([key, href, label]) => {
           const active = activeNav(pathInfo, key) || (key === 'more' && ['money', 'payments', 'expenses'].includes(pathInfo.section));
@@ -1383,7 +1383,7 @@ function MorePage(props) {
               <span className="text-slate-300 sm:hidden">›</span>
             </button>
           ))}
-          <button onClick={signOut} className="flex min-h-14 items-center justify-between rounded-lg border border-rose-100 bg-rose-50 p-3 text-left font-semibold text-rose-700 hover:bg-rose-100 sm:hidden">
+          <button onClick={signOut} className="flex min-h-14 items-center justify-between rounded-lg border border-rose-100 bg-rose-50 p-3 text-left font-semibold text-rose-700 hover:bg-rose-100">
             Sign out
             <span className="text-rose-300">›</span>
           </button>

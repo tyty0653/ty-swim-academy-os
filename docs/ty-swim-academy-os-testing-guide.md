@@ -11,6 +11,7 @@ npm install
 npm run build
 npm run smoke:routes
 npm run qa:check
+npm run ui:check
 ```
 
 Expected:
@@ -19,6 +20,13 @@ Expected:
 - Build completes without errors.
 - Smoke routes return `PASS 200` for core routes.
 - Live QA either runs against Supabase test credentials or clearly reports which `.env.local` values are missing.
+- UI checks either run Admin/Coach mobile/desktop checks or clearly skip when QA login credentials are missing.
+
+If Playwright says browser binaries are missing, run:
+
+```bash
+npx playwright install chromium
+```
 
 ## 2. Supabase Test Project
 
@@ -49,6 +57,10 @@ Create `.env.local`:
 ```bash
 VITE_SUPABASE_URL=your-test-project-url
 VITE_SUPABASE_ANON_KEY=your-test-project-anon-key
+QA_ADMIN_EMAIL=admin-test-email
+QA_ADMIN_PASSWORD=admin-test-password
+QA_COACH_EMAIL=coach-test-email
+QA_COACH_PASSWORD=coach-test-password
 ```
 
 Run:
@@ -59,7 +71,89 @@ npm run dev
 
 Open `/login`.
 
-## 4. Login Troubleshooting
+The QA passwords are read only by local scripts and must not be committed. `.env.local` is ignored by git.
+
+## 4. Automated UI And Mobile Checks
+
+The repository includes Playwright checks so you do not need to inspect every page manually.
+
+Run the mobile/desktop UI quality checks:
+
+```bash
+npm run ui:check
+```
+
+This starts the local Vite app, logs in with the QA Admin and QA Coach accounts, and checks:
+
+- key Admin pages load: Today, Students, Student Profile, Schedule, Review, Money, More, Setup Check, Audit Logs
+- key Coach pages load: Today, Schedule, Students, Student Profile, Submit Record, My Pay, My Account Check
+- mobile viewports do not have horizontal overflow
+- mobile bottom navigation appears below desktop width
+- Sign out is visible in More
+- Coach profile pages do not show Admin-only finance cards
+
+Viewports checked:
+
+- 375 x 812
+- 390 x 844
+- 430 x 932
+- 768 x 1024
+- 1440 x 900
+
+If `QA_ADMIN_EMAIL`, `QA_ADMIN_PASSWORD`, `QA_COACH_EMAIL`, or `QA_COACH_PASSWORD` are missing, the authenticated UI tests are skipped with a clear message. Add those values to `.env.local` or your shell to run the full check.
+
+## 5. Screenshot Capture
+
+Run:
+
+```bash
+npm run ui:screenshots
+```
+
+Screenshots are saved to:
+
+```text
+test-artifacts/ui-screenshots/
+```
+
+The folder is ignored by git. Screenshots are grouped by viewport, for example:
+
+```text
+test-artifacts/ui-screenshots/mobile-390/admin-students.png
+test-artifacts/ui-screenshots/mobile-390/coach-today.png
+```
+
+The screenshot command uses the same QA login credentials as `npm run ui:check`.
+
+## 6. Lighthouse Mobile Report
+
+Run:
+
+```bash
+npm run quality:lighthouse
+```
+
+By default this starts the local app and audits `/login` with mobile settings. Reports are saved to:
+
+```text
+test-artifacts/lighthouse/
+```
+
+To audit a deployed preview instead:
+
+```bash
+LIGHTHOUSE_URL=https://your-preview-url.vercel.app/login npm run quality:lighthouse
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:LIGHTHOUSE_URL="https://your-preview-url.vercel.app/login"; npm run quality:lighthouse
+```
+
+Lighthouse focuses on mobile performance, accessibility, and best practices. Minor score issues do not affect `npm run build`; use the report as guidance before deployment.
+
+## 7. Login Troubleshooting
 
 If login does not work, use these messages:
 
@@ -71,7 +165,7 @@ If login does not work, use these messages:
 
 The sign-in button should always stop loading after success, failure, or timeout.
 
-## 5. Admin Test Script
+## 8. Admin Test Script
 
 Sign in as Admin.
 
@@ -97,7 +191,7 @@ Flow:
 6. Mark payroll paid.
 7. Mark paid again must not create duplicate coach salary expense.
 
-## 6. Coach Test Script
+## 9. Coach Test Script
 
 Sign in as Coach.
 
@@ -112,7 +206,7 @@ Check:
 - Coach sees own payroll only.
 - Coach does not see payment amount, customer price, expenses, profit, or other coach payroll.
 
-## 7. Storage Checks
+## 10. Storage Checks
 
 In Supabase Storage:
 
@@ -129,7 +223,7 @@ As Admin:
 
 - Confirm Admin can manage lesson photos, payment proofs, and expense receipts.
 
-## 8. Vercel Later
+## 11. Vercel Later
 
 Before Vercel, complete the live Supabase checklist in `docs/ty-swim-academy-os-live-qa.md`.
 
@@ -144,7 +238,7 @@ Never add a Supabase `service_role` key to Vercel frontend env variables.
 
 Recommended future URL: `os.tyswimacademy.com`.
 
-## 9. Do Not Deploy Yet
+## 12. Do Not Deploy Yet
 
 Keep this in local/test Supabase QA until:
 

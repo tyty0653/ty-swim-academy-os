@@ -8,7 +8,10 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "smoke:routes": "node scripts/smoke-routes.mjs",
-    "qa:check": "node scripts/live-qa.mjs"
+    "qa:check": "node scripts/live-qa.mjs",
+    "ui:check": "playwright test tests/ui/os-ui.spec.mjs --reporter=list",
+    "ui:screenshots": "node scripts/run-ui-screenshots.mjs",
+    "quality:lighthouse": "node scripts/lighthouse-report.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",
@@ -20,5 +23,9 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.0.2",
     "vite": "^7.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "lighthouse": "^13.3.0"
   }
 }
