@@ -175,7 +175,7 @@ function credsFor(role) {
     };
   }
   const preflight = authPreflight?.[role.toLowerCase()];
-  if (preflight && !preflight.ok) {
+  if (preflight && !preflight.ok && ['missing-qa-credentials', 'missing-supabase-env'].includes(preflight.reasonCode)) {
     return {
       ready: false,
       email,
