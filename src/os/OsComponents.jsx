@@ -1,4 +1,5 @@
 import { statusLabels, statusTones } from './osConstants.js';
+import { statusText } from './i18n.js';
 import { cn } from './osUtils.js';
 
 export function Button({ children, variant = 'primary', className = '', ...props }) {
@@ -10,7 +11,7 @@ export function Button({ children, variant = 'primary', className = '', ...props
     dark: 'bg-slate-950 text-white hover:bg-slate-800',
   };
   return (
-    <button {...props} className={cn('inline-flex min-h-10 max-w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-center text-sm font-semibold whitespace-normal break-words disabled:cursor-not-allowed disabled:opacity-60', styles[variant], className)}>
+    <button {...props} className={cn('inline-flex min-h-10 min-w-0 max-w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-center text-sm font-semibold whitespace-normal break-words disabled:cursor-not-allowed disabled:opacity-60', styles[variant], className)}>
       {children}
     </button>
   );
@@ -63,7 +64,8 @@ export function StatusBadge({ value, children }) {
     rose: 'bg-rose-50 text-rose-700 ring-rose-100',
     slate: 'bg-slate-100 text-slate-600 ring-slate-200',
   };
-  return <span className={cn('inline-flex max-w-full rounded-full px-2.5 py-1 text-center text-xs font-semibold leading-5 whitespace-normal ring-1 ty-wrap', styles[tone])}>{children || statusLabels[value] || value || '-'}</span>;
+  const label = typeof children === 'string' ? statusText(value, children) : children || statusText(value, statusLabels[value] || value || '-');
+  return <span className={cn('inline-flex max-w-full rounded-full px-2.5 py-1 text-center text-xs font-semibold leading-5 whitespace-normal ring-1 ty-wrap', styles[tone])}>{label}</span>;
 }
 
 export function Section({ title, action, children, className = '' }) {
@@ -71,7 +73,7 @@ export function Section({ title, action, children, className = '' }) {
     <section className={cn('min-w-0 max-w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm', className)}>
       <div className="flex min-w-0 flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="min-w-0 text-lg font-semibold text-slate-950 ty-wrap">{title}</h2>
-        {action ? <div className="w-full min-w-0 max-w-full sm:w-auto">{action}</div> : null}
+        {action ? <div className="w-full min-w-0 max-w-full sm:w-auto sm:max-w-[70%]">{action}</div> : null}
       </div>
       <div className="min-w-0 p-4">{children}</div>
     </section>
@@ -80,7 +82,7 @@ export function Section({ title, action, children, className = '' }) {
 
 export function DataTable({ columns, rows, empty = 'No records yet.', onRowClick, className = '' }) {
   return (
-    <div className={cn('max-w-full overflow-x-auto rounded-lg border border-slate-200', className)}>
+    <div className={cn('ty-safe-scroll max-w-full rounded-lg border border-slate-200', className)}>
       <table className="w-full min-w-full table-fixed text-left text-sm">
         <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
           <tr>{columns.map((column) => <th key={column.key} className="px-3 py-3 align-top ty-wrap">{column.label}</th>)}</tr>
@@ -102,7 +104,7 @@ export function DataTable({ columns, rows, empty = 'No records yet.', onRowClick
 export function Modal({ title, children, onClose, wide = false }) {
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/40 p-4">
-      <div className={cn('max-h-[90vh] w-full overflow-auto rounded-xl bg-white shadow-2xl', wide ? 'max-w-6xl' : 'max-w-2xl')}>
+      <div className={cn('max-h-[90vh] w-full min-w-0 max-w-[calc(100vw-2rem)] overflow-auto rounded-xl bg-white shadow-2xl', wide ? 'lg:max-w-6xl' : 'lg:max-w-2xl')}>
         <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-100 bg-white p-4">
           <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
           <Button variant="ghost" onClick={onClose}>Close</Button>

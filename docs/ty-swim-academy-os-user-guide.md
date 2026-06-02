@@ -64,6 +64,10 @@ Notes fields support Chinese/English mixed input. 简短备注可以中英混合
 
 Open the app and sign in at `/login`.
 
+### Language
+
+The OS supports English and 中文. Use the language toggle on the login page or in More -> Account. The choice is saved in the same browser, so Admin and Coach can keep the interface in the language they prefer. Notes, health information, lesson progress, and internal comments can still mix Chinese and English freely.
+
 ### Admin Login
 
 Admin signs in with the Admin email and password created in Supabase Auth. The Auth user must also have a matching row in the `profiles` table:

@@ -90,6 +90,7 @@ This starts the local Vite app, logs in with the QA Admin and QA Coach accounts,
 - mobile viewports do not have horizontal overflow
 - mobile bottom navigation appears below desktop width
 - Sign out is visible in More
+- the English / 中文 language toggle is available on login and More -> Account
 - Coach profile pages do not show Admin-only finance cards
 
 Viewports checked:
@@ -121,6 +122,8 @@ test-artifacts/ui-screenshots/failures/
 ```
 
 Horizontal overflow failures include a short list of likely overflowing elements in the terminal output.
+
+To review the Chinese interface manually, switch the language toggle to 中文 on the login page or More -> Account, then run `npm run ui:screenshots` after signing in locally. The automated login tests start from the default English labels so credentials and selectors stay stable.
 
 ## 5. Screenshot Capture
 

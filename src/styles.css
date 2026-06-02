@@ -32,6 +32,17 @@ body {
   min-width: 0;
 }
 
+.ty-app-frame :where(section, article, div, form, label, p, h1, h2, h3, h4, span, a, button, input, select, textarea) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.ty-safe-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 img,
 svg,
 video,

@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { hasSupabaseConfig, supabase } from '../lib/supabaseClient.js';
 import { Button, Card, DataTable, EmptySetup, Field, Input, Modal, Section, Select, StatusBadge, Textarea, Toasts } from './OsComponents.jsx';
-import { adminNav, classTypes, coachNav, expenseCategories, legacyAdminRoutes, packageTypes, paymentMethods } from './osConstants.js';
+import { adminNav, classTypes, coachNav, expenseCategories, packageTypes, paymentMethods } from './osConstants.js';
 import { bonusSkills, getSkillLevel, levelStatusLabels, levelStatuses, progressStatusLabels, progressStatuses, skillLevels } from './skillLevels.js';
+import { getStoredLanguage, languages, setStoredLanguage, tx } from './i18n.js';
 import { derivePackageExpiry, downloadCsv, formatDate, formatMoney, getMapped, parseCsv, placeholder, todayISO } from './osUtils.js';
 
 const allTableNames = [
@@ -35,6 +36,11 @@ const allTableNames = [
 const coachTableNames = allTableNames.filter((name) => !['package_financials', 'expenses', 'import_batches', 'audit_logs'].includes(name));
 const initialData = Object.fromEntries(allTableNames.map((name) => [name, []]));
 const requiredStorageBuckets = ['lesson-photos', 'payment-proofs', 'expense-receipts'];
+const LanguageContext = createContext({ language: 'en', setLanguage: () => {}, t: (value, fallback) => fallback || value });
+
+function useI18n() {
+  return useContext(LanguageContext);
+}
 
 function getPathInfo() {
   const rawPath = window.location.pathname.replace(/\/$/, '') || '/dashboard';
@@ -106,18 +112,27 @@ function getProfileIssue(profileRow, profileError) {
 
 export default function OsApp() {
   const [pathInfo, setPathInfo] = useState(getPathInfo);
+  const [language, setLanguageState] = useState(getStoredLanguage);
+  const i18n = useMemo(() => ({
+    language,
+    setLanguage: (nextLanguage) => setLanguageState(setStoredLanguage(nextLanguage)),
+    t: (value, fallback = value) => tx(value, fallback, language),
+  }), [language]);
   useEffect(() => {
     const update = () => setPathInfo(getPathInfo());
     window.addEventListener('popstate', update);
     return () => window.removeEventListener('popstate', update);
   }, []);
 
-  if (!hasSupabaseConfig) return <EmptySetup />;
-  if (pathInfo.path === '/login') return <LoginPage />;
-  return <ProtectedOs pathInfo={pathInfo} />;
+  return (
+    <LanguageContext.Provider value={i18n}>
+      {!hasSupabaseConfig ? <EmptySetup /> : pathInfo.path === '/login' ? <LoginPage /> : <ProtectedOs pathInfo={pathInfo} />}
+    </LanguageContext.Provider>
+  );
 }
 
 function LoginPage() {
+  const { language, setLanguage, t } = useI18n();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
@@ -154,13 +169,18 @@ function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white px-4 py-16 text-slate-700">
       <div className="mx-auto max-w-md rounded-xl border border-sky-100 bg-white p-6 shadow-xl shadow-sky-100/70">
-        <p className="text-sm font-semibold text-sky-700">TY Swim Academy OS</p>
-        <h1 className="mt-2 text-2xl font-semibold text-slate-950">Admin / Coach Login</h1>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-sky-700">TY Swim Academy OS</p>
+            <h1 className="mt-2 text-2xl font-semibold text-slate-950">{t('Admin / Coach Login')}</h1>
+          </div>
+          <LanguageToggle compact language={language} setLanguage={setLanguage} />
+        </div>
         <form className="mt-6 grid gap-4" onSubmit={submit}>
-          <Field label="Email"><Input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
-          <Field label="Password"><Input type="password" required value={password} onChange={(event) => setPassword(event.target.value)} /></Field>
+          <Field label={t('Email')}><Input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
+          <Field label={t('Password')}><Input type="password" required value={password} onChange={(event) => setPassword(event.target.value)} /></Field>
           {message ? <p className="rounded-lg bg-rose-50 p-3 text-sm font-medium leading-6 text-rose-700">{message}</p> : null}
-          <Button disabled={loading}>{loading ? 'Signing in...' : 'Sign in'}</Button>
+          <Button disabled={loading}>{loading ? t('Signing in...') : t('Sign in')}</Button>
         </form>
         <p className="mt-5 text-sm leading-6 text-slate-500">If login succeeds but the profile is missing, ask Admin to create or activate your staff profile in Supabase.</p>
       </div>
@@ -263,7 +283,25 @@ function StaffAccessIssue({ issue }) {
   );
 }
 
+function LanguageToggle({ language, setLanguage, compact = false }) {
+  return (
+    <div className={`inline-flex rounded-xl border border-slate-200 bg-white p-1 ${compact ? 'shrink-0' : ''}`}>
+      {languages.map((item) => (
+        <button
+          key={item.code}
+          type="button"
+          onClick={() => setLanguage(item.code)}
+          className={`min-h-9 rounded-lg px-3 text-sm font-semibold ${language === item.code ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-sky-50 hover:text-sky-700'}`}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function OsShell({ session, profile, pathInfo, data, tableErrors, reload, toast, children }) {
+  const { t } = useI18n();
   const isAdmin = profile.role === 'admin';
   const nav = isAdmin ? adminNav : coachNav;
   const mobileNav = isAdmin
@@ -276,7 +314,7 @@ function OsShell({ session, profile, pathInfo, data, tableErrors, reload, toast,
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-700">
+    <div className="ty-app-frame min-h-screen bg-slate-50 text-slate-700">
       {children}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-slate-200 bg-white p-4 lg:block">
         <button className="text-left" onClick={() => go('/dashboard')}>
@@ -285,7 +323,7 @@ function OsShell({ session, profile, pathInfo, data, tableErrors, reload, toast,
         </button>
         <nav className="mt-6 grid gap-1">
           {nav.map(([key, href, label]) => (
-            <button key={key} onClick={() => go(href)} className={`rounded-lg px-3 py-2 text-left text-sm font-semibold ${activeNav(pathInfo, key) ? 'bg-sky-50 text-sky-700' : 'text-slate-600 hover:bg-slate-50'}`}>{label}</button>
+            <button key={key} onClick={() => go(href)} className={`rounded-lg px-3 py-2 text-left text-sm font-semibold ${activeNav(pathInfo, key) ? 'bg-sky-50 text-sky-700' : 'text-slate-600 hover:bg-slate-50'}`}>{t(label)}</button>
           ))}
         </nav>
       </aside>
@@ -293,19 +331,19 @@ function OsShell({ session, profile, pathInfo, data, tableErrors, reload, toast,
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:px-6">
           <div className="flex min-w-0 items-center justify-between gap-3 lg:hidden">
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-sky-700">TY Swim OS · {isAdmin ? 'Admin' : 'Coach'}</p>
-              <h2 className="text-lg font-semibold leading-tight text-slate-950 ty-wrap">{pageTitle(pathInfo, profile)}</h2>
+              <p className="text-xs font-semibold text-sky-700">TY Swim OS · {t(isAdmin ? 'Admin' : 'Coach')}</p>
+              <h2 className="text-lg font-semibold leading-tight text-slate-950 ty-wrap">{t(pageTitle(pathInfo, profile))}</h2>
             </div>
-            <Button className="shrink-0" variant="ghost" onClick={() => go('/more')}>More</Button>
+            <Button className="shrink-0" variant="ghost" onClick={() => go('/more')}>{t('More')}</Button>
           </div>
           <div className="hidden items-center justify-between gap-3 lg:flex">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">{profile.role}</p>
-              <h2 className="text-xl font-semibold text-slate-950">{pageTitle(pathInfo, profile)}</h2>
+              <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">{t(profile.role === 'admin' ? 'Admin' : 'Coach')}</p>
+              <h2 className="text-xl font-semibold text-slate-950">{t(pageTitle(pathInfo, profile))}</h2>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" onClick={() => go('/dashboard')}>Dashboard</Button>
-              <Button data-testid="sign-out-button" variant="ghost" onClick={signOut}>Sign out / 登出</Button>
+              <Button variant="ghost" onClick={() => go('/dashboard')}>{t('Today')}</Button>
+              <Button data-testid="sign-out-button" variant="ghost" onClick={signOut}>{t('Sign out')}</Button>
             </div>
           </div>
         </header>
@@ -324,7 +362,7 @@ function MobileBottomNav({ nav, pathInfo }) {
       <div className="mx-auto grid max-w-md gap-1" style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0, 1fr))` }}>
         {nav.map(([key, href, label]) => {
           const active = activeNav(pathInfo, key) || (key === 'more' && ['money', 'payments', 'expenses'].includes(pathInfo.section));
-          const shortLabel = label.replace('My ', '');
+          const shortLabel = t(label).replace('我的', '').replace('My ', '');
           return (
             <button key={key} onClick={() => go(href)} className={`min-h-12 rounded-xl px-1 text-xs font-semibold ${active ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-sky-50 hover:text-sky-700'}`}>
               {shortLabel}
@@ -516,6 +554,7 @@ function AdminDashboard({ data }) {
 }
 
 function CoachDashboard({ profile, data }) {
+  const { t } = useI18n();
   const coach = data.coaches.find((item) => item.profile_id === profile.id);
   const ownLessons = data.lessons.filter((lesson) => lesson.coach_id === coach?.id);
   const today = ownLessons.filter((lesson) => lesson.scheduled_date === todayISO());
@@ -526,12 +565,12 @@ function CoachDashboard({ profile, data }) {
   return (
     <div className="grid gap-5">
       <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
-        <Card title="Today's lessons" value={today.length} />
-        <Card title="This week" value={ownLessons.filter((lesson) => daysUntil(lesson.scheduled_date) >= 0 && daysUntil(lesson.scheduled_date) <= 7).length} />
-        <Card title="Pending records" value={pending.length} tone="amber" />
-        <Card title="Expected payroll" value={formatMoney(payroll.reduce((sum, item) => sum + Number(item.pay_amount || 0), 0))} tone="green" />
+        <Card title={t("Today's lessons")} value={today.length} />
+        <Card title={t('This week')} value={ownLessons.filter((lesson) => daysUntil(lesson.scheduled_date) >= 0 && daysUntil(lesson.scheduled_date) <= 7).length} />
+        <Card title={t('Pending records')} value={pending.length} tone="amber" />
+        <Card title={t('Expected payroll')} value={formatMoney(payroll.reduce((sum, item) => sum + Number(item.pay_amount || 0), 0))} tone="green" />
       </div>
-      {todayDone ? <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">All today's lesson records submitted.</div> : null}
+      {todayDone ? <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700 ty-wrap">{t('Approved — no further action needed.', "All today's lesson records submitted.")}</div> : null}
       <CoachTodayCards lessons={today.length ? today : ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 5)} data={data} />
       <LessonList title="My Schedule" rows={ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 10)} data={data} coachView empty="No upcoming assigned lessons." />
     </div>
@@ -539,10 +578,11 @@ function CoachDashboard({ profile, data }) {
 }
 
 function CoachTodayCards({ lessons, data }) {
+  const { t } = useI18n();
   return (
-    <Section title="Today" action={<Button variant="ghost" onClick={() => go('/system-check')}>My Account Check</Button>}>
+    <Section title={t('Today')} action={<Button variant="ghost" onClick={() => go('/system-check')}>{t('My Account Check')}</Button>}>
       {lessons.length === 0 ? (
-        <EmptyState title="No lessons today" body="Assigned lessons will appear here with contact, map, safety alerts, and a fast submit button." />
+        <EmptyState title={t('No lessons today')} body="Assigned lessons will appear here with contact, map, safety alerts, and a fast submit button." />
       ) : (
         <div className="grid min-w-0 gap-3 lg:grid-cols-2">
           {lessons.map((lesson) => {
@@ -564,14 +604,14 @@ function CoachTodayCards({ lessons, data }) {
                   </div>
                   <div className="flex flex-wrap gap-2 sm:grid sm:justify-items-end">
                     <StatusBadge value={lesson.status} />
-                    {photoRequired ? <StatusBadge value="needs_edit">Photo required today</StatusBadge> : null}
+                    {photoRequired ? <StatusBadge value="needs_edit">{t('Photo required today')}</StatusBadge> : null}
                   </div>
                 </div>
                 {studentAlerts(cls, data) ? <p className="mt-3 rounded-lg bg-rose-50 p-3 text-sm font-medium text-rose-700 ty-wrap">{studentAlerts(cls, data)}</p> : null}
                 <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                  <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? 'WhatsApp' : 'No WhatsApp'}</a>
-                  <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? 'Map' : 'No map'}</a>
-                  <Button data-testid={!approved ? 'coach-submit-record-button' : undefined} disabled={approved} onClick={() => go(`/lessons/${lesson.id}`)}>{approved ? 'Approved' : 'Submit Record'}</Button>
+                  <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? t('WhatsApp') : t('No WhatsApp')}</a>
+                  <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? t('Map') : t('No map')}</a>
+                  <Button data-testid={!approved ? 'coach-submit-record-button' : undefined} disabled={approved} onClick={() => go(`/lessons/${lesson.id}`)}>{approved ? t('Approved') : t('Submit Record')}</Button>
                 </div>
               </article>
             );
@@ -626,9 +666,10 @@ function LessonList({ title, rows, data, coachView = false, empty = 'No lessons 
 }
 
 function LessonCardList({ rows, data, empty, coachView = false }) {
+  const { t } = useI18n();
   if (rows.length === 0) return <EmptyState title="No lessons found" body={empty} />;
   return (
-    <div className="grid gap-3 lg:grid-cols-2">
+    <div className="grid min-w-0 gap-3 lg:grid-cols-2">
       {rows.map((lesson) => {
         const cls = data.classes.find((item) => item.id === lesson.class_id);
         const customer = data.customers.find((item) => item.id === cls?.customer_id);
@@ -637,7 +678,7 @@ function LessonCardList({ rows, data, empty, coachView = false }) {
         const mapsLink = venue?.google_maps_link || '';
         const approved = lesson.status === 'approved';
         return (
-          <article key={lesson.id} className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <article key={lesson.id} className="min-w-0 max-w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-sky-700">{formatDate(lesson.scheduled_date)} {lesson.start_time || ''}</p>
@@ -647,12 +688,12 @@ function LessonCardList({ rows, data, empty, coachView = false }) {
               </div>
               <StatusBadge value={lesson.status} />
             </div>
-            <div className="mt-4 grid gap-2">
-              <Button data-testid={coachView && !approved ? 'coach-submit-record-button' : undefined} onClick={() => go(`/lessons/${lesson.id}`)}>{coachView ? (approved ? 'Approved' : 'Submit / Open') : 'Open'}</Button>
+            <div className="mt-4 grid min-w-0 gap-2">
+              <Button data-testid={coachView && !approved ? 'coach-submit-record-button' : undefined} onClick={() => go(`/lessons/${lesson.id}`)}>{coachView ? (approved ? t('Approved') : t('Submit / Open')) : t('Open')}</Button>
               {coachView ? (
-                <div className="grid grid-cols-2 gap-2">
-                  <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? 'WhatsApp' : 'No WhatsApp'}</a>
-                  <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? 'Map' : 'No map'}</a>
+                <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
+                  <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? t('WhatsApp') : t('No WhatsApp')}</a>
+                  <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? t('Map') : t('No map')}</a>
                 </div>
               ) : null}
             </div>
@@ -1364,40 +1405,56 @@ function MoneyPage(props) {
 
 function MorePage(props) {
   const { signOut, profile, data, toast } = props;
+  const { language, setLanguage, t } = useI18n();
   const isAdmin = profile.role === 'admin';
-  const tools = [
-    ...(isAdmin ? [['money', '/money', 'Money']] : []),
-    ...legacyAdminRoutes.filter(([key]) => (isAdmin
-      ? ['help', 'skill-levels', 'system-check', 'audit-logs', 'customers', 'venues', 'classes', 'packages', 'lessons', 'import', 'cleanup', 'reports', 'settings'].includes(key)
-      : ['help', 'skill-levels', 'system-check'].includes(key))),
-  ];
+  const helpTools = [['help', '/help', 'Help Guide'], ['skill-levels', '/skill-levels', 'Levels & Progress'], ['system-check', '/system-check', isAdmin ? 'Setup Check' : 'My Account Check']];
+  const recordTools = [['customers', '/customers', 'Customers / Families'], ['venues', '/venues', 'Venues'], ['classes', '/classes', 'Classes / Groups'], ['packages', '/packages', 'Packages'], ['lessons', '/lessons', 'Lesson History']];
+  const adminTools = [['money', '/money', 'Money'], ['audit-logs', '/audit-logs', 'Audit Logs'], ['import', '/import', 'CSV Import'], ['cleanup', '/data-cleanup', 'Data Cleanup'], ['reports', '/reports', 'Reports'], ['settings', '/settings', 'Settings']];
   return (
     <div data-testid="more-page" className="grid gap-5">
-      <Section title="More">
-        <p className="text-sm leading-6 text-slate-500">Advanced and occasional tools live here so the daily menu stays simple.</p>
-        <div className="mt-4 grid gap-2 lg:grid-cols-2 xl:grid-cols-3">
-          {tools.map(([key, href, label]) => (
-            <button key={key} onClick={() => go(href)} className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-sky-200 hover:bg-sky-50 sm:block sm:min-h-0 sm:p-4">
-              <p className="font-semibold text-slate-950 ty-wrap">{!isAdmin && key === 'system-check' ? 'My Account Check' : label}</p>
-              <p className="hidden text-sm text-slate-500 lg:mt-1 lg:block ty-wrap">{moreToolDescription(key, isAdmin)}</p>
-              <span className="text-slate-300 sm:hidden">›</span>
-            </button>
-          ))}
-          <button data-testid="sign-out-button" onClick={signOut} className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-lg border border-rose-100 bg-rose-50 p-3 text-left font-semibold text-rose-700 hover:bg-rose-100">
-            Sign out / 登出
-            <span className="text-rose-300">›</span>
+      <Section title={t('Account')}>
+        <div className="grid gap-3">
+          <div className="rounded-xl border border-sky-100 bg-sky-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">{t('Current user')}</p>
+            <p className="mt-1 font-semibold text-slate-950 ty-wrap">{profile.full_name || profile.email}</p>
+            <p className="mt-1 text-sm text-slate-600">{t('Role')}: {t(isAdmin ? 'Admin' : 'Coach')}</p>
+          </div>
+          <div className="flex min-w-0 flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="font-semibold text-slate-950">{t('Language')}</p>
+              <p className="text-sm text-slate-500">English / 中文</p>
+            </div>
+            <LanguageToggle language={language} setLanguage={setLanguage} />
+          </div>
+          <button data-testid="sign-out-button" onClick={signOut} className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-xl border border-rose-100 bg-rose-50 p-4 text-left font-semibold text-rose-700 hover:bg-rose-100">
+            <span>{t('Sign out')}</span>
+            <span className="shrink-0 text-rose-300">›</span>
           </button>
         </div>
       </Section>
-      {isAdmin ? <Section title="Admin Tools">
-        <p className="text-sm leading-6 text-slate-500">Use these before real operations or when checking sensitive changes.</p>
-        <div className="mt-4 grid gap-2 lg:flex lg:flex-wrap">
-          <Button onClick={() => go('/settings')}>Open Settings</Button>
-          <Button variant="ghost" onClick={() => go('/audit-logs')}>Audit Logs</Button>
-          <Button variant="ghost" onClick={() => exportAllDataBackup(data, profile, toast)}>Export All Data JSON</Button>
-        </div>
-      </Section> : null}
+      <MoreGroup title={t('Help & Setup')} tools={helpTools} isAdmin={isAdmin} t={t} />
+      {isAdmin ? <MoreGroup title={t('Admin Tools')} tools={adminTools} isAdmin={isAdmin} t={t} extra={<Button variant="ghost" onClick={() => exportAllDataBackup(data, profile, toast)}>Export All Data JSON</Button>} /> : null}
+      {isAdmin ? <MoreGroup title={t('Records')} tools={recordTools} isAdmin={isAdmin} t={t} /> : null}
     </div>
+  );
+}
+
+function MoreGroup({ title, tools, isAdmin, t, extra }) {
+  return (
+    <Section title={title}>
+      <div className="grid gap-2">
+        {tools.map(([key, href, label]) => (
+          <button key={key} onClick={() => go(href)} className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left hover:border-sky-200 hover:bg-sky-50">
+            <span className="min-w-0">
+              <span className="block font-semibold text-slate-950 ty-wrap">{t(label)}</span>
+              <span className="mt-1 hidden text-sm text-slate-500 lg:block ty-wrap">{moreToolDescription(key, isAdmin)}</span>
+            </span>
+            <span className="shrink-0 text-slate-300">›</span>
+          </button>
+        ))}
+        {extra ? <div className="pt-2">{extra}</div> : null}
+      </div>
+    </Section>
   );
 }
 
@@ -1635,12 +1692,18 @@ function SystemCheckPage({ session, profile, data, tableErrors = {} }) {
       {showDetails ? (
         <Section title="Advanced Details">
           <p className="mb-4 text-sm leading-6 text-slate-500 ty-wrap">These details are useful for setup and support. They include connection settings, role checks, private storage, table access, demo data, and security checks.</p>
-          <DataTable rows={rows} columns={[
-            { key: 'status', label: 'Status', render: (row) => <StatusBadge value={row.status}>{row.label}</StatusBadge> },
-            { key: 'check', label: 'Check' },
-            { key: 'detail', label: 'Result' },
-            { key: 'nextAction', label: 'Next action' },
-          ]} />
+          <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+            {rows.map((row) => (
+              <article key={row.id} className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <h3 className="font-semibold text-slate-950 ty-wrap">{row.check}</h3>
+                  <StatusBadge value={row.status}>{row.label}</StatusBadge>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate-600 ty-wrap">{row.detail}</p>
+                <p className="mt-2 text-sm font-medium leading-6 text-slate-700 ty-wrap">{row.nextAction}</p>
+              </article>
+            ))}
+          </div>
         </Section>
       ) : null}
       <Section title="Basic Data Counts">
@@ -3032,6 +3095,7 @@ function approvalImpactText(lesson) {
 }
 
 function PayrollPage({ profile, data, reload, toast }) {
+  const { t } = useI18n();
   const isAdmin = profile.role === 'admin';
   const coach = data.coaches.find((item) => item.profile_id === profile.id);
   const items = isAdmin ? data.payroll_items : data.payroll_items.filter((item) => item.coach_id === coach?.id);
@@ -3058,15 +3122,15 @@ function PayrollPage({ profile, data, reload, toast }) {
   };
   return (
     <div data-testid={isAdmin ? 'payroll-page' : 'coach-pay-page'} className="grid gap-5">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Card title={isAdmin ? 'Payable now' : 'Expected pay'} value={formatMoney(unpaidItems.reduce((sum, item) => sum + Number(item.pay_amount || 0), 0))} tone="amber" />
-        <Card title="Approved lessons" value={items.length} />
-        <Card title="Paid items" value={paidItems.length} tone="green" />
+      <div className="grid min-w-0 gap-3 sm:grid-cols-3">
+        <Card title={isAdmin ? 'Payable now' : t('Expected payroll')} value={formatMoney(unpaidItems.reduce((sum, item) => sum + Number(item.pay_amount || 0), 0))} tone="amber" />
+        <Card title={t('Approved lessons')} value={items.length} />
+        <Card title={t('Paid items')} value={paidItems.length} tone="green" />
       </div>
-      <Section title={isAdmin ? 'Generate Payroll' : 'My Expected Payroll'} action={isAdmin ? <div className="flex gap-2"><Input type="month" value={month} onChange={(event) => setMonth(event.target.value)} /><Button onClick={generate}>Generate</Button><Button variant="ghost" onClick={() => downloadCsv(`ty-payroll-${month}.csv`, items)}>Export CSV</Button></div> : null}>
+      <Section title={isAdmin ? 'Generate Payroll' : t('My Pay')} action={isAdmin ? <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]"><Input type="month" value={month} onChange={(event) => setMonth(event.target.value)} /><Button onClick={generate}>Generate</Button><Button variant="ghost" onClick={() => downloadCsv(`ty-payroll-${month}.csv`, items)}>Export CSV</Button></div> : null}>
         {!isAdmin ? <p className="mb-4 text-sm leading-6 text-slate-500">This shows approved lessons that count toward your pay. Payments marked paid will appear as paid here.</p> : null}
         <PayrollPeriodCards rows={periods} data={data} isAdmin={isAdmin} markPaid={markPaid} />
-        <DataTable className="hidden md:block" rows={periods} columns={[
+        <DataTable className="hidden xl:block" rows={periods} columns={[
           { key: 'coach', label: 'Coach', render: (row) => data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-' },
           { key: 'period_month', label: 'Month', render: (row) => formatDate(row.period_month).slice(0, 7) },
           { key: 'total_lessons', label: 'Lessons' },
@@ -3077,7 +3141,7 @@ function PayrollPage({ profile, data, reload, toast }) {
       </Section>
       <Section title="Payroll Items">
         <PayrollItemCards rows={items} data={data} />
-        <DataTable className="hidden md:block" rows={items} columns={[
+        <DataTable className="hidden xl:block" rows={items} columns={[
           { key: 'lesson', label: 'Lesson', render: (row) => data.lessons.find((item) => item.id === row.lesson_id)?.lesson_code || '-' },
           { key: 'coach', label: 'Coach', render: (row) => data.coaches.find((item) => item.id === row.coach_id)?.display_name || '-' },
           { key: 'pay_amount', label: 'Amount', render: (row) => formatMoney(row.pay_amount) },
@@ -3090,11 +3154,11 @@ function PayrollPage({ profile, data, reload, toast }) {
 }
 
 function PayrollPeriodCards({ rows, data, isAdmin, markPaid }) {
-  if (rows.length === 0) return <div className="md:hidden"><EmptyState title="No payroll yet" body="Approved payable lessons will appear here after payroll is generated." /></div>;
+  if (rows.length === 0) return <EmptyState title="No payroll yet" body="Approved payable lessons will appear here after payroll is generated." />;
   return (
-    <div className="grid gap-3 md:hidden">
+    <div className="grid min-w-0 gap-3 lg:grid-cols-2">
       {rows.map((row) => (
-        <article key={row.id} className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <article key={row.id} className="min-w-0 max-w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="font-semibold text-slate-950 ty-wrap">{formatDate(row.period_month).slice(0, 7)}</p>
@@ -3102,7 +3166,7 @@ function PayrollPeriodCards({ rows, data, isAdmin, markPaid }) {
             </div>
             <StatusBadge value={row.status}>{row.status}</StatusBadge>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+          <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
             <Info label="Lessons" value={row.total_lessons} />
             <Info label="Amount" value={formatMoney(row.total_amount)} />
           </div>
@@ -3114,11 +3178,11 @@ function PayrollPeriodCards({ rows, data, isAdmin, markPaid }) {
 }
 
 function PayrollItemCards({ rows, data }) {
-  if (rows.length === 0) return <div className="md:hidden"><EmptyState title="No payroll items yet" body="Approved payable lessons will show here." /></div>;
+  if (rows.length === 0) return <EmptyState title="No payroll items yet" body="Approved payable lessons will show here." />;
   return (
-    <div className="grid gap-3 md:hidden">
+    <div className="grid min-w-0 gap-3 lg:grid-cols-2">
       {rows.map((row) => (
-        <article key={row.id} className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <article key={row.id} className="min-w-0 max-w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="font-semibold text-slate-950 ty-wrap">{data.lessons.find((item) => item.id === row.lesson_id)?.lesson_code || 'Lesson'}</p>
@@ -3427,7 +3491,7 @@ function AuditLogPage({ data }) {
       <Section title="Recent Activity">
         {rows.length === 0 ? <EmptyState title="No audit logs found" body="Actions will appear here after Admin updates important records." /> : (
           <>
-            <div className="grid gap-3 xl:grid-cols-2">
+            <div className="grid min-w-0 gap-3 xl:grid-cols-2">
               {rows.map((row) => <AuditLogCard key={row.id} row={row} data={data} />)}
             </div>
             <DataTable className="hidden" rows={rows} columns={[
@@ -3446,6 +3510,7 @@ function AuditLogPage({ data }) {
 }
 
 function AuditLogCard({ row, data }) {
+  const summary = auditSummary(row);
   return (
     <article className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -3457,7 +3522,10 @@ function AuditLogCard({ row, data }) {
       </div>
       <p className="mt-3 text-sm text-slate-600 ty-wrap"><span className="font-semibold">Actor:</span> {actorName(row.actor_id, data)}</p>
       <p className="mt-1 text-sm text-slate-600 ty-wrap"><span className="font-semibold">Record:</span> {entityLabel(row, data)}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-500 ty-wrap">{auditSummary(row)}</p>
+      <details className="mt-3 rounded-lg bg-slate-50 p-3">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-800 ty-wrap">View details</summary>
+        <p className="mt-2 text-sm leading-6 text-slate-500 ty-wrap">{summary}</p>
+      </details>
     </article>
   );
 }
