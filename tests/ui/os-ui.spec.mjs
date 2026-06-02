@@ -80,8 +80,7 @@ test.describe('Admin UI quality', () => {
     await login(page, adminCreds, 'Admin');
     await openRoute(page, '/more');
     await expect(page.getByTestId('more-page')).toBeVisible();
-    const count = await page.getByTestId('sign-out-button').count();
-    expect(count).toBeGreaterThan(0);
+    await expect(page.getByTestId('more-page').getByTestId('sign-out-button')).toBeVisible();
   });
 });
 
@@ -142,8 +141,7 @@ test.describe('Coach UI quality', () => {
     await login(page, coachCreds, 'Coach');
     await openRoute(page, '/more');
     await expect(page.getByTestId('more-page')).toBeVisible();
-    const count = await page.getByTestId('sign-out-button').count();
-    expect(count).toBeGreaterThan(0);
+    await expect(page.getByTestId('more-page').getByTestId('sign-out-button')).toBeVisible();
     await expect(page.getByText('Expenses')).toHaveCount(0);
     await expect(page.getByText('Audit Logs')).toHaveCount(0);
   });
@@ -204,9 +202,9 @@ async function login(page, creds, role) {
 async function attemptLogin(page, creds, role) {
   if (!creds?.ready) return { ok: false, message: creds?.reason || `${role} QA credentials are missing.` };
   await page.goto('/login');
-  await page.getByLabel('Email').fill(creds.email);
-  await page.getByLabel('Password').fill(creds.password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByTestId('login-email').fill(creds.email);
+  await page.getByTestId('login-password').fill(creds.password);
+  await page.getByTestId('login-submit-button').click();
   await page.waitForFunction(() => window.location.pathname !== '/login' || document.body.textContent.includes('Login failed') || document.body.textContent.includes('missing or inactive') || document.body.textContent.includes('invalid') || document.body.textContent.includes('inactive'));
   const body = await page.locator('body').innerText();
   const prefix = `${role} QA login failed for ${creds.email}.`;

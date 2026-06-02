@@ -177,10 +177,10 @@ function LoginPage() {
           <LanguageToggle compact language={language} setLanguage={setLanguage} />
         </div>
         <form className="mt-6 grid gap-4" onSubmit={submit}>
-          <Field label={t('Email')}><Input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
-          <Field label={t('Password')}><Input type="password" required value={password} onChange={(event) => setPassword(event.target.value)} /></Field>
+          <Field label={t('Email')}><Input data-testid="login-email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
+          <Field label={t('Password')}><Input data-testid="login-password" type="password" required value={password} onChange={(event) => setPassword(event.target.value)} /></Field>
           {message ? <p className="rounded-lg bg-rose-50 p-3 text-sm font-medium leading-6 text-rose-700">{message}</p> : null}
-          <Button disabled={loading}>{loading ? t('Signing in...') : t('Sign in')}</Button>
+          <Button data-testid="login-submit-button" disabled={loading}>{loading ? t('Signing in...') : t('Sign in')}</Button>
         </form>
         <p className="mt-5 text-sm leading-6 text-slate-500">If login succeeds but the profile is missing, ask Admin to create or activate your staff profile in Supabase.</p>
       </div>
@@ -301,7 +301,7 @@ function LanguageToggle({ language, setLanguage, compact = false }) {
 }
 
 function OsShell({ session, profile, pathInfo, data, tableErrors, reload, toast, children }) {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const isAdmin = profile.role === 'admin';
   const nav = isAdmin ? adminNav : coachNav;
   const mobileNav = isAdmin
@@ -343,7 +343,7 @@ function OsShell({ session, profile, pathInfo, data, tableErrors, reload, toast,
             </div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" onClick={() => go('/dashboard')}>{t('Today')}</Button>
-              <Button data-testid="sign-out-button" variant="ghost" onClick={signOut}>{t('Sign out')}</Button>
+              <Button data-testid="sign-out-button" variant="ghost" onClick={signOut}>{language === 'zh' ? t('Sign out') : 'Sign out / 登出'}</Button>
             </div>
           </div>
         </header>
@@ -1432,7 +1432,7 @@ function MorePage(props) {
             <LanguageToggle language={language} setLanguage={setLanguage} />
           </div>
           <button data-testid="sign-out-button" onClick={signOut} className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-xl border border-rose-100 bg-rose-50 p-4 text-left font-semibold text-rose-700 hover:bg-rose-100">
-            <span>{t('Sign out')}</span>
+            <span>{language === 'zh' ? t('Sign out') : 'Sign out / 登出'}</span>
             <span className="shrink-0 text-rose-300">›</span>
           </button>
         </div>
