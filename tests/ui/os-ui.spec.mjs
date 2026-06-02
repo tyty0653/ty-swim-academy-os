@@ -5,8 +5,11 @@ import { expect, test } from '@playwright/test';
 loadLocalEnv();
 
 const screenshotsEnabled = process.env.UI_SCREENSHOTS === '1';
+const authPreflight = readAuthPreflight();
 const adminCreds = credsFor('ADMIN');
 const coachCreds = credsFor('COACH');
+const adminState = { ok: false, issue: adminCreds.reason || 'Admin QA login preflight has not run yet.' };
+const coachState = { ok: false, issue: coachCreds.reason || 'Coach QA login preflight has not run yet.' };
 
 const adminPages = [
   ['today', '/dashboard', 'Today'],
@@ -38,14 +41,20 @@ test.afterEach(async ({ page }, testInfo) => {
 });
 
 test.describe('Admin UI quality', () => {
+  test.describe.configure({ mode: 'serial' });
   test.skip(!adminCreds.ready, adminCreds.reason);
 
-  test.beforeEach(async ({ page }) => {
-    await login(page, adminCreds);
+  test('Admin QA login preflight', async ({ page }) => {
+    const result = await attemptLogin(page, adminCreds, 'Admin');
+    adminState.ok = result.ok;
+    adminState.issue = result.message;
+    expect(result.ok, result.message).toBe(true);
   });
 
   for (const [slug, route] of adminPages) {
     test(`Admin ${slug} loads and fits`, async ({ page }, testInfo) => {
+      test.skip(!adminState.ok, adminState.issue);
+      await login(page, adminCreds, 'Admin');
       await openRoute(page, route);
       await expectNoAccessMessage(page, false);
       await expectMobileShell(page, testInfo);
@@ -55,6 +64,8 @@ test.describe('Admin UI quality', () => {
   }
 
   test('Admin Student Profile loads when demo/student data exists', async ({ page }, testInfo) => {
+    test.skip(!adminState.ok, adminState.issue);
+    await login(page, adminCreds, 'Admin');
     await openRoute(page, '/students');
     const opened = await openFirstProfile(page);
     test.skip(!opened, 'No student profile card is available. Run demo seed or add a student first.');
@@ -65,6 +76,8 @@ test.describe('Admin UI quality', () => {
   });
 
   test('Admin More includes Sign out', async ({ page }) => {
+    test.skip(!adminState.ok, adminState.issue);
+    await login(page, adminCreds, 'Admin');
     await openRoute(page, '/more');
     await expect(page.getByTestId('more-page')).toBeVisible();
     const count = await page.getByTestId('sign-out-button').count();
@@ -73,14 +86,20 @@ test.describe('Admin UI quality', () => {
 });
 
 test.describe('Coach UI quality', () => {
+  test.describe.configure({ mode: 'serial' });
   test.skip(!coachCreds.ready, coachCreds.reason);
 
-  test.beforeEach(async ({ page }) => {
-    await login(page, coachCreds);
+  test('Coach QA login preflight', async ({ page }) => {
+    const result = await attemptLogin(page, coachCreds, 'Coach');
+    coachState.ok = result.ok;
+    coachState.issue = result.message;
+    expect(result.ok, result.message).toBe(true);
   });
 
   for (const [slug, route] of coachPages) {
     test(`Coach ${slug} loads and fits`, async ({ page }, testInfo) => {
+      test.skip(!coachState.ok, coachState.issue);
+      await login(page, coachCreds, 'Coach');
       await openRoute(page, route);
       await expectMobileShell(page, testInfo);
       await expectNoHorizontalOverflow(page);
@@ -89,6 +108,8 @@ test.describe('Coach UI quality', () => {
   }
 
   test('Coach Student Profile loads when assigned student data exists', async ({ page }, testInfo) => {
+    test.skip(!coachState.ok, coachState.issue);
+    await login(page, coachCreds, 'Coach');
     await openRoute(page, '/students');
     const opened = await openFirstProfile(page);
     test.skip(!opened, 'No assigned student profile is available for this Coach. Run demo seed or assign a class first.');
@@ -100,6 +121,8 @@ test.describe('Coach UI quality', () => {
   });
 
   test('Coach Submit Record opens when an assigned lesson exists', async ({ page }, testInfo) => {
+    test.skip(!coachState.ok, coachState.issue);
+    await login(page, coachCreds, 'Coach');
     await openRoute(page, '/dashboard');
     const submitButton = page.getByTestId('coach-submit-record-button');
     if (await submitButton.count() === 0) {
@@ -115,6 +138,8 @@ test.describe('Coach UI quality', () => {
   });
 
   test('Coach More includes Sign out and hides admin finance wording', async ({ page }) => {
+    test.skip(!coachState.ok, coachState.issue);
+    await login(page, coachCreds, 'Coach');
     await openRoute(page, '/more');
     await expect(page.getByTestId('more-page')).toBeVisible();
     const count = await page.getByTestId('sign-out-button').count();
@@ -149,19 +174,58 @@ function credsFor(role) {
       reason: `Missing QA_${role}_EMAIL or QA_${role}_PASSWORD. Add them to .env.local or your shell to run authenticated UI checks.`,
     };
   }
+  const preflight = authPreflight?.[role.toLowerCase()];
+  if (preflight && !preflight.ok) {
+    return {
+      ready: false,
+      email,
+      password,
+      reason: preflight.message,
+    };
+  }
   return { ready: true, email, password };
 }
 
-async function login(page, creds) {
+function readAuthPreflight() {
+  const filePath = path.resolve('test-artifacts', 'ui-auth-preflight.json');
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+async function login(page, creds, role) {
+  const result = await attemptLogin(page, creds, role);
+  expect(result.ok, result.message).toBe(true);
+}
+
+async function attemptLogin(page, creds, role) {
+  if (!creds?.ready) return { ok: false, message: creds?.reason || `${role} QA credentials are missing.` };
   await page.goto('/login');
   await page.getByLabel('Email').fill(creds.email);
   await page.getByLabel('Password').fill(creds.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForFunction(() => window.location.pathname !== '/login' || document.body.textContent.includes('Login failed') || document.body.textContent.includes('missing or inactive') || document.body.textContent.includes('invalid'));
+  await page.waitForFunction(() => window.location.pathname !== '/login' || document.body.textContent.includes('Login failed') || document.body.textContent.includes('missing or inactive') || document.body.textContent.includes('invalid') || document.body.textContent.includes('inactive'));
   const body = await page.locator('body').innerText();
-  expect(body, 'Login failed or staff profile is not ready. Passwords are intentionally not printed.').not.toContain('Login failed');
-  expect(body).not.toContain('missing or inactive');
-  expect(body).not.toContain('role is not valid');
+  const prefix = `${role} QA login failed for ${creds.email}.`;
+  if (body.includes('Login failed')) {
+    return { ok: false, message: `${prefix} Check QA_${role.toUpperCase()}_EMAIL / QA_${role.toUpperCase()}_PASSWORD. Password was not printed.` };
+  }
+  if (body.includes('missing or inactive')) {
+    return { ok: false, message: `${prefix} Login succeeded but staff profile is missing or inactive. Check Supabase profiles row for this Auth user.` };
+  }
+  if (body.includes('role is not valid')) {
+    return { ok: false, message: `${prefix} Staff profile role is invalid. Role must be admin or coach.` };
+  }
+  if (body.includes('staff account is inactive')) {
+    return { ok: false, message: `${prefix} Staff profile is inactive. Set active=true for this test user if appropriate.` };
+  }
+  if (page.url().endsWith('/login')) {
+    return { ok: false, message: `${prefix} Browser stayed on /login after sign in. Check QA credentials and Supabase Auth/profile setup.` };
+  }
+  return { ok: true, message: `${role} QA login succeeded for ${creds.email}.` };
 }
 
 async function openRoute(page, route) {

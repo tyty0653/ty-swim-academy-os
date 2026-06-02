@@ -102,6 +102,18 @@ Viewports checked:
 
 If `QA_ADMIN_EMAIL`, `QA_ADMIN_PASSWORD`, `QA_COACH_EMAIL`, or `QA_COACH_PASSWORD` are missing, the authenticated UI tests are skipped with a clear message. Add those values to `.env.local` or your shell to run the full check.
 
+The UI check now runs one Admin and one Coach Supabase login preflight before checking pages. If the Coach password is wrong, you should see a clear message such as `Coach QA login failed. Check QA_COACH_EMAIL / QA_COACH_PASSWORD.` instead of many unrelated Coach page failures. The output may show the QA email used, but it must never print the password.
+
+The preflight result is saved locally for troubleshooting:
+
+```text
+test-artifacts/ui-auth-preflight.json
+```
+
+This file is ignored by git.
+
+If a student profile or submit-record test is skipped, rerun the latest `supabase/demo-seed.sql` or make sure the Coach test account is assigned to at least one demo class, student, and lesson.
+
 When a UI check fails, Playwright saves a failure screenshot here:
 
 ```text

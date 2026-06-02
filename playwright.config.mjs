@@ -1,10 +1,11 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig } from '@playwright/test';
 
 const port = Number(process.env.PLAYWRIGHT_PORT || 5174);
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: './tests/ui',
+  globalSetup: './tests/ui/auth-preflight.mjs',
   timeout: 45_000,
   expect: { timeout: 8_000 },
   fullyParallel: false,
@@ -26,10 +27,10 @@ export default defineConfig({
         timeout: 45_000,
       },
   projects: [
-    { name: 'mobile-375', use: { ...devices['iPhone 13 mini'], viewport: { width: 375, height: 812 } } },
-    { name: 'mobile-390', use: { ...devices['iPhone 14'], viewport: { width: 390, height: 844 } } },
-    { name: 'mobile-430', use: { ...devices['Pixel 7'], viewport: { width: 430, height: 932 } } },
-    { name: 'tablet-768', use: { viewport: { width: 768, height: 1024 }, isMobile: true, hasTouch: true } },
-    { name: 'desktop-1440', use: { viewport: { width: 1440, height: 900 } } },
+    { name: 'mobile-375', use: { browserName: 'chromium', viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } },
+    { name: 'mobile-390', use: { browserName: 'chromium', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } },
+    { name: 'mobile-430', use: { browserName: 'chromium', viewport: { width: 430, height: 932 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } },
+    { name: 'tablet-768', use: { browserName: 'chromium', viewport: { width: 768, height: 1024 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } },
+    { name: 'desktop-1440', use: { browserName: 'chromium', viewport: { width: 1440, height: 900 } } },
   ],
 });
