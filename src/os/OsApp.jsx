@@ -454,6 +454,7 @@ function OsShell({ session, profile, pathInfo, data, dataLoading = false, tableE
 }
 
 function MobileBottomNav({ nav, pathInfo }) {
+  const { t } = useI18n();
   return (
     <nav aria-label="Mobile navigation" data-testid="mobile-bottom-nav" className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-2 pb-[calc(0.35rem+env(safe-area-inset-bottom))] pt-2 shadow-xl shadow-slate-300/40 backdrop-blur lg:hidden">
       <div className="mx-auto grid max-w-md gap-1" style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0, 1fr))` }}>
