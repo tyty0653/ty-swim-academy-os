@@ -10,6 +10,7 @@ const adminCreds = credsFor('ADMIN');
 const coachCreds = credsFor('COACH');
 const adminState = { ok: false, issue: adminCreds.reason || 'Admin QA login preflight has not run yet.' };
 const coachState = { ok: false, issue: coachCreds.reason || 'Coach QA login preflight has not run yet.' };
+const storageStateCache = new Map();
 
 const adminPages = [
   ['today', '/dashboard', 'Today'],
@@ -72,8 +73,8 @@ test.describe('Admin UI quality', () => {
   test.describe.configure({ mode: 'serial' });
   test.skip(!adminCreds.ready, adminCreds.reason);
 
-  test('Admin QA login preflight', async ({ page }) => {
-    const result = await attemptLogin(page, adminCreds, 'Admin');
+  test('Admin QA login preflight', async ({ page }, testInfo) => {
+    const result = await ensureRoleSession(page, adminCreds, 'Admin', testInfo);
     adminState.ok = result.ok;
     adminState.issue = result.message;
     expect(result.ok, result.message).toBe(true);
@@ -82,7 +83,7 @@ test.describe('Admin UI quality', () => {
   for (const [slug, route] of adminPages) {
     test(`Admin ${slug} loads and fits`, async ({ page }, testInfo) => {
       test.skip(!adminState.ok, adminState.issue);
-      await login(page, adminCreds, 'Admin');
+      await useRoleSession(page, adminCreds, 'Admin', testInfo);
       await openRoute(page, route);
       await expectNoAccessMessage(page, false);
       await expectMobileShell(page, testInfo);
@@ -93,7 +94,7 @@ test.describe('Admin UI quality', () => {
 
   test('Admin Student Profile loads when demo/student data exists', async ({ page }, testInfo) => {
     test.skip(!adminState.ok, adminState.issue);
-    await login(page, adminCreds, 'Admin');
+    await useRoleSession(page, adminCreds, 'Admin', testInfo);
     await openRoute(page, '/students');
     const opened = await openFirstProfile(page);
     test.skip(!opened, 'No student profile card is available. Run demo seed or add a student first.');
@@ -103,9 +104,9 @@ test.describe('Admin UI quality', () => {
     await capture(page, testInfo, 'admin-student-profile');
   });
 
-  test('Admin More includes Sign out', async ({ page }) => {
+  test('Admin More includes Sign out', async ({ page }, testInfo) => {
     test.skip(!adminState.ok, adminState.issue);
-    await login(page, adminCreds, 'Admin');
+    await useRoleSession(page, adminCreds, 'Admin', testInfo);
     await openRoute(page, '/more');
     await expect(page.getByTestId('more-page')).toBeVisible();
     await expect(page.getByTestId('account-section')).toBeVisible();
@@ -117,8 +118,8 @@ test.describe('Coach UI quality', () => {
   test.describe.configure({ mode: 'serial' });
   test.skip(!coachCreds.ready, coachCreds.reason);
 
-  test('Coach QA login preflight', async ({ page }) => {
-    const result = await attemptLogin(page, coachCreds, 'Coach');
+  test('Coach QA login preflight', async ({ page }, testInfo) => {
+    const result = await ensureRoleSession(page, coachCreds, 'Coach', testInfo);
     coachState.ok = result.ok;
     coachState.issue = result.message;
     expect(result.ok, result.message).toBe(true);
@@ -127,7 +128,7 @@ test.describe('Coach UI quality', () => {
   for (const [slug, route] of coachPages) {
     test(`Coach ${slug} loads and fits`, async ({ page }, testInfo) => {
       test.skip(!coachState.ok, coachState.issue);
-      await login(page, coachCreds, 'Coach');
+      await useRoleSession(page, coachCreds, 'Coach', testInfo);
       await openRoute(page, route);
       await expectMobileShell(page, testInfo);
       await expectNoHorizontalOverflow(page, testInfo);
@@ -137,7 +138,7 @@ test.describe('Coach UI quality', () => {
 
   test('Coach Student Profile loads when assigned student data exists', async ({ page }, testInfo) => {
     test.skip(!coachState.ok, coachState.issue);
-    await login(page, coachCreds, 'Coach');
+    await useRoleSession(page, coachCreds, 'Coach', testInfo);
     await openRoute(page, '/students');
     const opened = await openFirstProfile(page);
     test.skip(!opened, 'No assigned student profile is available for this Coach. Run demo seed or assign a class first.');
@@ -150,7 +151,7 @@ test.describe('Coach UI quality', () => {
 
   test('Coach Submit Record opens when an assigned lesson exists', async ({ page }, testInfo) => {
     test.skip(!coachState.ok, coachState.issue);
-    await login(page, coachCreds, 'Coach');
+    await useRoleSession(page, coachCreds, 'Coach', testInfo);
     await openRoute(page, '/dashboard');
     const submitButton = page.getByTestId('coach-submit-record-button');
     if (await submitButton.count() === 0) {
@@ -165,9 +166,9 @@ test.describe('Coach UI quality', () => {
     await capture(page, testInfo, 'coach-submit-record');
   });
 
-  test('Coach More includes Sign out and hides admin finance wording', async ({ page }) => {
+  test('Coach More includes Sign out and hides admin finance wording', async ({ page }, testInfo) => {
     test.skip(!coachState.ok, coachState.issue);
-    await login(page, coachCreds, 'Coach');
+    await useRoleSession(page, coachCreds, 'Coach', testInfo);
     await openRoute(page, '/more');
     await expect(page.getByTestId('more-page')).toBeVisible();
     await expect(page.getByTestId('account-section')).toBeVisible();
@@ -224,14 +225,45 @@ function readAuthPreflight() {
   }
 }
 
-async function login(page, creds, role) {
-  const result = await attemptLogin(page, creds, role);
-  expect(result.ok, result.message).toBe(true);
+async function ensureRoleSession(page, creds, role, testInfo) {
+  const statePath = storageStatePath(role, testInfo);
+  const cacheKey = `${testInfo.project.name}:${role.toLowerCase()}`;
+  const cached = storageStateCache.get(cacheKey);
+  if (cached?.ok && fs.existsSync(cached.path)) return { ok: true, message: `${role} QA session reused for ${creds.email}.` };
+
+  const result = await attemptLogin(page, creds, role, testInfo);
+  if (!result.ok) return result;
+  await page.context().storageState({ path: statePath });
+  storageStateCache.set(cacheKey, { ok: true, path: statePath });
+  return { ok: true, message: `${role} QA browser session is ready for ${creds.email}.` };
 }
 
-async function attemptLogin(page, creds, role) {
+async function useRoleSession(page, creds, role, testInfo) {
+  let result = await ensureRoleSession(page, creds, role, testInfo);
+  expect(result.ok, result.message).toBe(true);
+  await restoreStorageState(page, storageStatePath(role, testInfo));
+  await page.goto('/dashboard');
+  await page.waitForLoadState('domcontentloaded');
+  if (!(await isAuthenticatedPage(page))) {
+    storageStateCache.delete(`${testInfo.project.name}:${role.toLowerCase()}`);
+    if (fs.existsSync(storageStatePath(role, testInfo))) fs.rmSync(storageStatePath(role, testInfo), { force: true });
+    result = await ensureRoleSession(page, creds, role, testInfo);
+    expect(result.ok, `${result.message} Retried UI login once after saved session was rejected.`).toBe(true);
+    await restoreStorageState(page, storageStatePath(role, testInfo));
+    await page.goto('/dashboard');
+    await page.waitForLoadState('domcontentloaded');
+  }
+  expect(await isAuthenticatedPage(page), `${role} saved session was not accepted after one retry for ${creds.email}. Password was not printed.`).toBe(true);
+}
+
+async function attemptLogin(page, creds, role, testInfo) {
   if (!creds?.ready) return { ok: false, message: creds?.reason || `${role} QA credentials are missing.` };
+  await page.context().clearCookies();
   await page.goto('/login');
+  await page.evaluate(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
   await page.getByTestId('login-email').fill(creds.email);
   await page.getByTestId('login-password').fill(creds.password);
   await page.getByTestId('login-submit-button').click();
@@ -246,6 +278,7 @@ async function attemptLogin(page, creds, role) {
       { timeout: 16_000 },
     );
   } catch {
+    await captureLoginFailure(page, testInfo, `${role.toLowerCase()}-login-timeout`);
     const buttonText = await page.getByTestId('login-submit-button').innerText().catch(() => 'unknown');
     return {
       ok: false,
@@ -255,9 +288,11 @@ async function attemptLogin(page, creds, role) {
   const body = await page.locator('body').innerText();
   const prefix = `${role} QA login failed for ${creds.email}.`;
   if (body.includes('taking too long')) {
+    await captureLoginFailure(page, testInfo, `${role.toLowerCase()}-login-taking-too-long`);
     return { ok: false, message: `${prefix} The app reported that login is taking too long. Check Supabase Auth/profile connectivity and table loading warnings. Password was not printed.` };
   }
   if (body.includes('Login failed')) {
+    await captureLoginFailure(page, testInfo, `${role.toLowerCase()}-login-failed`);
     return { ok: false, message: `${prefix} Check QA_${role.toUpperCase()}_EMAIL / QA_${role.toUpperCase()}_PASSWORD. Password was not printed.` };
   }
   if (body.includes('missing or inactive')) {
@@ -273,6 +308,42 @@ async function attemptLogin(page, creds, role) {
     return { ok: false, message: `${prefix} Browser stayed on /login after sign in. Check QA credentials and Supabase Auth/profile setup.` };
   }
   return { ok: true, message: `${role} QA login succeeded for ${creds.email}.` };
+}
+
+function storageStatePath(role, testInfo) {
+  return path.join('test-artifacts', 'ui-auth-states', testInfo.project.name, `${role.toLowerCase()}.json`);
+}
+
+async function restoreStorageState(page, statePath) {
+  const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  await page.context().clearCookies();
+  await page.context().addCookies(state.cookies || []);
+  await page.goto('/login');
+  await page.evaluate((origins) => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    const current = origins.find((origin) => origin.origin === window.location.origin);
+    for (const item of current?.localStorage || []) window.localStorage.setItem(item.name, item.value);
+    for (const item of current?.sessionStorage || []) window.sessionStorage.setItem(item.name, item.value);
+  }, state.origins || []);
+}
+
+async function isAuthenticatedPage(page) {
+  await page.waitForLoadState('domcontentloaded');
+  if (page.url().endsWith('/login')) return false;
+  if (await page.getByTestId('login-submit-button').count()) return false;
+  if ((await page.locator('body').innerText()).includes('Login failed')) return false;
+  return true;
+}
+
+async function captureLoginFailure(page, testInfo, slug) {
+  if (!testInfo) return;
+  const directory = path.join('test-artifacts', 'ui-screenshots', 'failures', testInfo.project.name);
+  fs.mkdirSync(directory, { recursive: true });
+  await page.screenshot({
+    path: path.join(directory, `${safeFileName(slug)}.png`),
+    fullPage: true,
+  }).catch(() => {});
 }
 
 async function openRoute(page, route) {
