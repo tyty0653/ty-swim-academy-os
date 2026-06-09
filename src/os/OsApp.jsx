@@ -593,7 +593,6 @@ function AdminDashboard({ data }) {
   const { t } = useI18n();
   const now = todayISO();
   const lessonsToday = data.lessons.filter((lesson) => lesson.scheduled_date === now);
-  const weekLessons = data.lessons.filter((lesson) => lesson.scheduled_date >= now).slice(0, 12);
   const pending = data.lessons.filter((lesson) => ['completed_pending_review', 'cancelled_pending_review', 'needs_edit'].includes(lesson.status));
   const reschedules = data.lesson_change_logs.filter((log) => !log.admin_seen);
   const cancelled = data.lessons.filter((lesson) => lesson.status === 'cancelled_pending_review');
@@ -609,21 +608,23 @@ function AdminDashboard({ data }) {
   });
   const expiredWithLessons = data.packages.filter((pkg) => daysUntil(pkg.expiry_date) < 0 && Number(pkg.remaining_lessons) > 0);
   const replacement = data.lessons.filter((lesson) => lesson.need_replacement);
-  const cleanup = cleanupRows(data).length;
-  const primaryCards = [
-    ["Today's lessons", lessonsToday.length, 'Know what is happening today.', '/schedule', 'sky'],
-    ['Pending review', pending.length, 'Approve or request edits from coaches.', '/review', 'amber'],
-    ['Reschedule alerts', reschedules.length, 'Coach date/time changes to check.', '/review', 'rose'],
-    ['Renewals soon', oneRemaining.length + expiring.length, '1 lesson left or expiring in 7 days.', '/students', 'amber'],
-  ];
+  const cleanup = cleanupRows(data);
+  const renewalItems = [...oneRemaining, ...zeroRemaining, ...expiring, ...expiredWithLessons].filter((item, index, rows) => rows.findIndex((row) => row.id === item.id) === index);
+  const primaryAction = pending.length
+    ? ['Review Lessons', '/review', `${pending.length} ${t('lesson(s)')} ${t('Pending review')}`]
+    : reschedules.length
+      ? ['Check reschedules', '/review', `${reschedules.length} ${t('Reschedule alerts')}`]
+      : lessonsToday.length
+        ? ['Open Schedule', '/schedule', `${lessonsToday.length} ${t("Today's lessons")}`]
+        : ['Add Student', '/students', t('Start setup or add the next family.')];
   const nextActions = [
     ['Review coach submissions', pending.length, '/review'],
     ['Check reschedules', reschedules.length, '/review'],
     ['Handle cancelled lessons', cancelled.length, '/review'],
     ['Fix missing required photos', missingPhotos.length, '/review'],
-    ['Follow up renewal reminders', oneRemaining.length + zeroRemaining.length + expiring.length + expiredWithLessons.length, '/students'],
+    ['Follow up renewal reminders', renewalItems.length, '/students'],
     ['Plan replacement lessons', replacement.length, '/schedule'],
-    ['Clean missing data', cleanup, '/data-cleanup'],
+    ['Clean missing data', cleanup.length, '/data-cleanup'],
   ];
   const quickActions = [
     ['Add Family', '/students', 'primary'],
@@ -638,26 +639,113 @@ function AdminDashboard({ data }) {
   return (
     <div data-testid="admin-today-page" className="grid min-w-0 max-w-full gap-4 overflow-hidden md:gap-5">
       <OnboardingChecklist data={data} />
-      <Section title={t('Today')}>
-        <p className="mb-4 text-sm leading-6 text-slate-500 ty-wrap">{t('A simple daily view for lessons, coach submissions, schedule changes, and renewal follow-ups.')}</p>
-        <div className="mb-4 grid min-w-0 grid-cols-2 gap-2 md:grid-cols-3 xl:flex xl:flex-wrap">
-          {quickActions.map(([label, href, variant]) => (
-            <Button key={label} className="w-full xl:w-auto" variant={variant} onClick={() => go(href)}>{t(label)}</Button>
-          ))}
+      <section className="min-w-0 overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-white to-sky-50 p-4 shadow-sm">
+        <p className="text-sm font-semibold text-sky-700 ty-wrap">今日总览 / {t('Today')}</p>
+        <h1 className="mt-1 text-xl font-semibold text-slate-950 ty-wrap">{t('What needs attention today')}</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-500 ty-wrap">{primaryAction[2]}</p>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <button onClick={() => go('/review')} className="rounded-xl border border-amber-100 bg-white p-3 text-left">
+            <p className="text-xs font-semibold text-amber-700 ty-wrap">待审核</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">{pending.length}</p>
+          </button>
+          <button onClick={() => go('/schedule')} className="rounded-xl border border-sky-100 bg-white p-3 text-left">
+            <p className="text-xs font-semibold text-sky-700 ty-wrap">今日课程</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">{lessonsToday.length}</p>
+          </button>
         </div>
-        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {primaryCards.map(([title, value, note, href, tone]) => (
-            <button key={title} onClick={() => go(href)} className="min-w-0 max-w-full text-left">
-              <Card title={t(title)} value={value} note={t(note)} tone={tone} />
+        <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
+          <Button className="min-h-12 rounded-xl" onClick={() => go(primaryAction[1])}>{t(primaryAction[0])}</Button>
+          <details className="min-w-0 rounded-xl border border-slate-200 bg-white p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-700 ty-wrap">{t('More actions')}</summary>
+            <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3">
+              {quickActions.map(([label, href, variant]) => (
+                <Button key={label} className="w-full" variant={variant} onClick={() => go(href)}>{t(label)}</Button>
+              ))}
+            </div>
+          </details>
+        </div>
+      </section>
+      <NextActionList rows={nextActions} />
+      <AdminAttentionSection title="待审核 / Pending Review" rows={pending.slice(0, 5)} data={data} emptyTitle={t('No pending review')} emptyBody={t('Coach submissions will appear here when they need Admin approval.')} actionHref="/review" actionLabel="Review" />
+      <AdminAttentionSection title="今日课程 / Today Lessons" rows={lessonsToday.slice(0, 5)} data={data} emptyTitle={t('No lessons today')} emptyBody={t('Today is clear. Scheduled lessons will appear here.')} actionHref="/schedule" actionLabel="Schedule" />
+      <AdminPackageAlerts title="剩余不足 / Low Remaining" packages={oneRemaining.concat(zeroRemaining).slice(0, 5)} data={data} emptyTitle={t('No low remaining packages')} />
+      <AdminPackageAlerts title="即将到期 / Expiring Soon" packages={expiring.concat(expiredWithLessons).slice(0, 5)} data={data} emptyTitle={t('No expiring packages')} />
+      <AdminCleanupCards rows={cleanup.slice(0, 6)} />
+    </div>
+  );
+}
+
+function AdminAttentionSection({ title, rows, data, emptyTitle, emptyBody, actionHref, actionLabel }) {
+  const { t } = useI18n();
+  return (
+    <Section title={title} action={<Button variant="ghost" onClick={() => go(actionHref)}>{t(actionLabel)}</Button>}>
+      {rows.length === 0 ? <EmptyState title={emptyTitle} body={emptyBody} /> : (
+        <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+          {rows.map((lesson) => {
+            const cls = data.classes.find((item) => item.id === lesson.class_id);
+            const coach = data.coaches.find((item) => item.id === lesson.coach_id);
+            const venue = data.venues.find((item) => item.id === lesson.venue_id);
+            return (
+              <button key={lesson.id} onClick={() => go(`/lessons/${lesson.id}`)} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-sky-200 hover:bg-sky-50">
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-sky-700 ty-wrap">{formatDate(lesson.scheduled_date)} {lesson.start_time || ''}</p>
+                    <p className="mt-1 font-semibold text-slate-950 ty-wrap">{cls?.class_name || lesson.lesson_code}</p>
+                    <p className="mt-1 text-sm text-slate-500 ty-wrap">{classStudentNames(cls?.id, data)}</p>
+                    <p className="mt-1 text-sm text-slate-500 ty-wrap">{coach?.display_name || '-'} / {venue?.area || venue?.venue_name || '-'}</p>
+                  </div>
+                  <StatusBadge value={lesson.status} />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function AdminPackageAlerts({ title, packages, data, emptyTitle }) {
+  const { t } = useI18n();
+  return (
+    <Section title={title} action={<Button variant="ghost" onClick={() => go('/students')}>{t('Open Students')}</Button>}>
+      {packages.length === 0 ? <EmptyState title={emptyTitle} body={t('Packages needing follow-up will appear here.')} /> : (
+        <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+          {packages.map((pkg) => {
+            const customer = data.customers.find((item) => item.id === pkg.customer_id);
+            const cls = data.classes.find((item) => item.id === pkg.class_id);
+            return (
+              <button key={pkg.id} onClick={() => customer ? go(`/customers/${customer.id}`) : go('/students')} className="min-w-0 rounded-2xl border border-amber-100 bg-amber-50 p-4 text-left hover:border-amber-200">
+                <p className="font-semibold text-slate-950 ty-wrap">{customer?.display_name || cls?.class_name || pkg.package_code}</p>
+                <p className="mt-1 text-sm text-amber-800 ty-wrap">剩余 {pkg.remaining_lessons ?? 0} / {pkg.total_lessons ?? '-'} · {pkg.expiry_date ? `${t('Expiry')}: ${formatDate(pkg.expiry_date)}` : t('No expiry date')}</p>
+                <StatusBadge value={pkg.status}>{t(pkg.status || 'active')}</StatusBadge>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function AdminCleanupCards({ rows }) {
+  const { t } = useI18n();
+  return (
+    <Section title="资料不完整 / Missing Data" action={<Button variant="ghost" onClick={() => go('/data-cleanup')}>{t('Data Cleanup')}</Button>}>
+      {rows.length === 0 ? <EmptyState title={t('Nothing urgent right now')} body={t('Missing names, contact, venue, health, consent, and proof items will appear here.')} /> : (
+        <div className="grid min-w-0 gap-2">
+          {rows.map((row) => (
+            <button key={row.id} onClick={() => go(row.href)} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left hover:border-sky-200 hover:bg-sky-50">
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-slate-950 ty-wrap">{row.name}</span>
+                <span className="mt-1 block text-xs text-amber-700 ty-wrap">{t(row.issue)}</span>
+              </span>
+              <span className="shrink-0 text-slate-300">›</span>
             </button>
           ))}
         </div>
-      </Section>
-      <div className="grid min-w-0 max-w-full gap-4 overflow-hidden xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] xl:gap-5">
-        <LessonList title={t('Today and This Week')} rows={weekLessons} data={data} empty={t('No scheduled lessons in this view.')} />
-        <NextActionList rows={nextActions} />
-      </div>
-    </div>
+      )}
+    </Section>
   );
 }
 
@@ -846,8 +934,14 @@ function StudentsHub(props) {
   ];
   return (
     <div className="grid gap-5">
-      <Section title={t('Students')} action={<div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"><Button variant={mode === 'profiles' ? 'primary' : 'ghost'} onClick={() => setMode('profiles')}>{t('Student Profiles')}</Button><Button variant={mode === 'add' ? 'primary' : 'soft'} onClick={() => setMode('add')}>{t('Add Student / Family')}</Button></div>}>
-        <p className="text-sm leading-6 text-slate-500">{t('Use Student Profiles for daily view and follow-up. Use Add Student / Family when a new family joins, then fill the missing pieces step by step.')}</p>
+      <Section title="学生 / Students" action={<Button className="w-full sm:w-auto" onClick={() => setMode('add')}>{t('Add Student / Family')}</Button>}>
+        <div className="grid gap-3">
+          <p className="text-sm leading-6 text-slate-500 ty-wrap">{t('Search first, open a profile, or add a new family. Advanced records stay hidden until needed.')}</p>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            <Button variant={mode === 'profiles' ? 'primary' : 'ghost'} onClick={() => setMode('profiles')}>{t('Student Profiles')}</Button>
+            <Button variant={mode === 'add' ? 'primary' : 'soft'} onClick={() => setMode('add')}>{t('Add Student / Family')}</Button>
+          </div>
+        </div>
       </Section>
       {mode === 'add' ? <StudentSetupWizard data={data} reload={reload} toast={toast} profile={profile} onOpenAdvanced={(key) => { setActive(key); setAdvanced(true); }} /> : null}
       {mode === 'profiles' ? <StudentProfileDirectory data={data} profile={profile} onUpdateProgress={setProgressStudent} onAddStudent={() => setMode('add')} /> : null}
@@ -914,15 +1008,15 @@ function StudentProfileDirectory({ data, profile, onUpdateProgress, onAddStudent
     ['missing-consent', 'Missing consent'],
   ];
   return (
-    <Section title={isAdmin ? t('Student / Family Profiles') : t('My Students')} action={isAdmin ? <Button onClick={onAddStudent || (() => go('/students'))}>{t('Add Student / Family')}</Button> : null}>
-      <p className="text-sm leading-6 text-slate-500">{isAdmin ? t('Search families and open a clean profile with safety, lesson setup, package, progress, and recent lessons.') : t('Open a student profile for WhatsApp, map, safety notes, current level, progress, and lesson history.')}</p>
-      <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto]">
+    <Section title={isAdmin ? '学生档案 / Student Profiles' : t('My Students')} action={isAdmin ? <Button onClick={onAddStudent || (() => go('/students'))}>{t('Add Student / Family')}</Button> : null}>
+      <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
         <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Search student, parent, phone, class, coach, area')} />
         <Select value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)} className="lg:w-40">
           <option value="">{t('All levels')}</option>
           {[1, 2, 3, 4, 5, 6].map((level) => <option key={level} value={level}>{t('Level')} {level}</option>)}
         </Select>
       </div>
+      <p className="mt-3 text-sm leading-6 text-slate-500 ty-wrap">{isAdmin ? t('Open a profile to see family contact, safety, venue, class setup, package, progress, and recent lessons.') : t('Open a student profile for WhatsApp, map, safety notes, current level, progress, and lesson history.')}</p>
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
         {filterLabels.map(([key, label]) => <Button key={key} variant={filter === key ? 'primary' : 'ghost'} className="shrink-0" onClick={() => setFilter(key)}>{t(label)}</Button>)}
       </div>
@@ -944,7 +1038,7 @@ function StudentProfileCard({ item, isAdmin, onUpdateProgress }) {
   const map = venue?.google_maps_link;
   const lowPackage = Number(activePackage?.remaining_lessons || 0) <= 1;
   return (
-    <article data-testid="student-profile-card" className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <article data-testid="student-profile-card" className="min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-slate-950 ty-wrap">{student.display_name || t('Unnamed student')}</h3>
@@ -952,7 +1046,7 @@ function StudentProfileCard({ item, isAdmin, onUpdateProgress }) {
         </div>
         <StudentLevelBadge student={student} data={item.data} />
       </div>
-      {student.safety_alert ? <p className="mt-3 rounded-lg bg-rose-50 p-2 text-sm font-semibold text-rose-700 ty-wrap">{student.safety_alert}</p> : null}
+      {student.safety_alert ? <p className="mt-3 rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm font-semibold text-rose-700 ty-wrap">安全: {student.safety_alert}</p> : null}
       <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
         <Info label={t('Coach')} value={coach?.display_name || coach?.coach_code || t('Not set')} />
         <Info label={t('Class')} value={primaryClass?.class_name || primaryClass?.class_type || t('Not set')} />
@@ -964,7 +1058,7 @@ function StudentProfileCard({ item, isAdmin, onUpdateProgress }) {
         {missingItems.length > 4 ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">+{missingItems.length - 4} {t('more')}</span> : null}
       </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <Button data-testid="open-student-profile-button" onClick={() => go(`/students/${student.id}`)}>{t('Open Profile')}</Button>
+        <Button data-testid="open-student-profile-button" className="min-h-11 rounded-xl" onClick={() => go(`/students/${student.id}`)}>打开档案</Button>
         <Button variant="soft" onClick={() => onUpdateProgress(student)}>{t('Update Progress')}</Button>
         <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? t('WhatsApp') : t('No WhatsApp')}</a>
         <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${map ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={map || undefined} target="_blank" rel="noreferrer">{map ? t('Map') : t('No map')}</a>
@@ -1359,6 +1453,16 @@ function StudentProfilePage({ profile, pathInfo, data, reload, toast }) {
           <p className="mt-3 rounded-xl border border-sky-100 bg-white p-3 text-sm font-medium text-sky-800 ty-wrap"><span className="font-semibold">重点:</span> {currentFocus}</p>
         </div>
       </Section>
+      <Section title="家庭 / Family Contact">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Info label={t('Family')} value={customer?.display_name || t('Family not set')} />
+          <Info label={t('Parent')} value={customer?.parent_name || '-'} />
+          <Info label={t('WhatsApp')} value={customer?.whatsapp || t('No WhatsApp')} />
+          <Info label={t('Secondary contact')} value={customer?.secondary_contact || '-'} />
+          <Info label={t('Preferred language')} value={student.preferred_language || '-'} />
+          <Info label={t('Student status')} value={<StatusBadge value={student.status}>{t(student.status || 'active')}</StatusBadge>} />
+        </div>
+      </Section>
       <div className="grid gap-5 xl:grid-cols-2">
         <Section title="安全 / Safety">
           <div className="grid gap-3">
@@ -1369,16 +1473,22 @@ function StudentProfilePage({ profile, pathInfo, data, reload, toast }) {
             {student.photo_consent_note ? <Info label={t('Consent note')} value={student.photo_consent_note} /> : null}
           </div>
         </Section>
-        <Section title="地点 / Lesson Setup">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Info label={t('Coach')} value={coach?.display_name || coach?.coach_code || t('Not set')} />
-            <Info label={t('Class type')} value={primaryClass?.class_type || '-'} />
-            <Info label={t('Schedule mode')} value={primaryClass?.scheduling_mode === 'fixed_weekly' ? t('Fixed weekly') : primaryClass?.scheduling_mode === 'flexible' ? t('Flexible / Coach-arranged') : '-'} />
-            <Info label={t('Photo required')} value={primaryClass?.photo_required ? t('Yes') : t('No')} />
+        <Section title="地点 / Venue">
+          <div className="grid gap-3">
             <Info label={t('Venue')} value={venue?.venue_name || venue?.area || '-'} />
             <Info label={t('Address')} value={venue?.full_address || '-'} />
             <Info label={t('Access')} value={venue?.access_instruction || '-'} />
             <Info label={t('Parking / pool note')} value={[venue?.parking_note, venue?.pool_depth_note].filter(Boolean).join(' / ') || '-'} />
+          </div>
+        </Section>
+        <Section title="班级 / Class Setup">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Info label={t('Coach')} value={coach?.display_name || coach?.coach_code || t('Not set')} />
+            <Info label={t('Class')} value={primaryClass?.class_name || '-'} />
+            <Info label={t('Class type')} value={primaryClass?.class_type || '-'} />
+            <Info label={t('Schedule mode')} value={primaryClass?.scheduling_mode === 'fixed_weekly' ? t('Fixed weekly') : primaryClass?.scheduling_mode === 'flexible' ? t('Flexible / Coach-arranged') : '-'} />
+            <Info label={t('Photo required')} value={primaryClass?.photo_required ? t('Yes') : t('No')} />
+            <Info label={t('Duration')} value={primaryClass?.default_duration_minutes ? `${primaryClass.default_duration_minutes} min` : '-'} />
           </div>
         </Section>
         <Section title="配套 / Package">
@@ -1430,7 +1540,7 @@ function StudentProfilePage({ profile, pathInfo, data, reload, toast }) {
         )}
       </Section>
       {isAdmin ? (
-        <Section title={t('Admin-only Finance')}>
+        <Section title="财务 / Admin-only Finance">
           <p className="mb-3 text-sm leading-6 text-slate-500">{t('This section is hidden from coaches. It contains customer price and payment records only.')}</p>
           {payments.length === 0 ? <EmptyState title={t('No payment records')} body={t('Payment records can be added from Money > Payments or during package setup.')} /> : (
             <div className="grid gap-3 md:grid-cols-2">
@@ -1544,16 +1654,27 @@ function MorePage(props) {
   const { signOut, profile, data, toast } = props;
   const { language, setLanguage, t } = useI18n();
   const isAdmin = profile.role === 'admin';
-  const helpTools = [['help', '/help', 'Help Guide'], ['skill-levels', '/skill-levels', 'Levels & Progress'], ['system-check', '/system-check', isAdmin ? 'Setup Check' : 'My Account Check']];
+  const helpTools = isAdmin
+    ? [['help', '/help', 'Help Guide'], ['skill-levels', '/skill-levels', 'Levels & Progress']]
+    : [['help', '/help', 'Help Guide'], ['skill-levels', '/skill-levels', 'Levels & Progress'], ['system-check', '/system-check', 'My Account Check']];
   const recordTools = [['customers', '/customers', 'Customers / Families'], ['venues', '/venues', 'Venues'], ['classes', '/classes', 'Classes / Groups'], ['packages', '/packages', 'Packages'], ['lessons', '/lessons', 'Lesson History']];
-  const adminTools = [['money', '/money', 'Money'], ['audit-logs', '/audit-logs', 'Audit Logs'], ['import', '/import', 'CSV Import'], ['cleanup', '/data-cleanup', 'Data Cleanup'], ['reports', '/reports', 'Reports'], ['settings', '/settings', 'Settings']];
+  const adminTools = [
+    ['export', '', 'Export All Data', () => exportAllDataBackup(data, profile, toast)],
+    ['audit-logs', '/audit-logs', 'Audit Logs'],
+    ['system-check', '/system-check', 'Setup Check'],
+    ['import', '/import', 'CSV Import'],
+    ['cleanup', '/data-cleanup', 'Data Cleanup'],
+    ['reports', '/reports', 'Reports'],
+    ['settings', '/settings', 'Settings'],
+  ];
   return (
     <div data-testid="more-page" className="grid min-w-0 max-w-full gap-4 overflow-hidden md:gap-5">
-      <Section title={t('Account')} data-testid="account-section">
+      <Section title="账号 / Account" data-testid="account-section">
         <div className="grid gap-3">
           <div className="rounded-xl border border-sky-100 bg-sky-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">{t('Current user')}</p>
             <p className="mt-1 font-semibold text-slate-950 ty-wrap">{profile.full_name || profile.email}</p>
+            <p className="mt-1 text-sm text-slate-600 ty-wrap">{profile.email}</p>
             <p className="mt-1 text-sm text-slate-600">{t('Role')}: {t(isAdmin ? 'Admin' : 'Coach')}</p>
           </div>
           <div className="flex min-w-0 flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1569,9 +1690,22 @@ function MorePage(props) {
           </button>
         </div>
       </Section>
-      <MoreGroup testId="help-setup-section" title={t('Help & Setup')} tools={helpTools} isAdmin={isAdmin} t={t} />
-      {isAdmin ? <MoreGroup testId="admin-tools-section" title={t('Admin Tools')} tools={adminTools} isAdmin={isAdmin} t={t} extra={<Button variant="ghost" onClick={() => exportAllDataBackup(data, profile, toast)}>{t('Export All Data JSON')}</Button>} /> : null}
-      {isAdmin ? <MoreGroup testId="records-section" title={t('Records')} tools={recordTools} isAdmin={isAdmin} t={t} /> : null}
+      <MoreGroup testId="help-setup-section" title="帮助与设置 / Help & Setup" tools={helpTools} isAdmin={isAdmin} t={t} />
+      {isAdmin ? <MoreGroup testId="admin-tools-section" title="管理工具 / Admin Tools" tools={adminTools} isAdmin={isAdmin} t={t} /> : null}
+      {isAdmin ? <MoreGroup testId="records-section" title="记录 / Records" tools={recordTools} isAdmin={isAdmin} t={t} /> : null}
+      {isAdmin ? (
+        <Section title="系统 / System" data-testid="system-section">
+          <div className="grid gap-2">
+            <button onClick={() => go('/money')} className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left hover:border-sky-200 hover:bg-sky-50">
+              <span className="min-w-0">
+                <span className="block font-semibold text-slate-950 ty-wrap">{t('Money')}</span>
+                <span className="mt-1 hidden text-sm text-slate-500 lg:block ty-wrap">{t('Payments, payroll, expenses, and accounting summary.')}</span>
+              </span>
+              <span className="shrink-0 text-slate-300">›</span>
+            </button>
+          </div>
+        </Section>
+      ) : null}
     </div>
   );
 }
@@ -1580,8 +1714,8 @@ function MoreGroup({ title, tools, isAdmin, t, extra, testId }) {
   return (
     <Section title={title} data-testid={testId}>
       <div className="grid gap-2">
-        {tools.map(([key, href, label]) => (
-          <button key={key} onClick={() => go(href)} className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left hover:border-sky-200 hover:bg-sky-50">
+        {tools.map(([key, href, label, action]) => (
+          <button key={key} onClick={() => action ? action() : go(href)} className="flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left hover:border-sky-200 hover:bg-sky-50">
             <span className="min-w-0">
               <span className="block font-semibold text-slate-950 ty-wrap">{t(label)}</span>
               <span className="mt-1 hidden text-sm text-slate-500 lg:block ty-wrap">{t(moreToolDescription(key, isAdmin))}</span>
@@ -1598,6 +1732,7 @@ function MoreGroup({ title, tools, isAdmin, t, extra, testId }) {
 function moreToolDescription(key, isAdmin = true) {
   return {
     money: 'Payments, payroll, expenses, and accounting summary.',
+    export: 'Download a JSON backup of all Admin-accessible OS records.',
     help: 'Simple owner and coach guide for daily use.',
     'skill-levels': 'TY Swim Level 1-6 syllabus and student progress.',
     'system-check': isAdmin ? 'Check whether the OS is ready and see what to fix first.' : 'Check your coach account, assigned lessons, students, venues, and pay access.',
