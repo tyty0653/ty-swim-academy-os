@@ -667,19 +667,31 @@ function CoachDashboard({ profile, data }) {
   const ownLessons = data.lessons.filter((lesson) => lesson.coach_id === coach?.id);
   const today = ownLessons.filter((lesson) => lesson.scheduled_date === todayISO());
   const pending = ownLessons.filter((lesson) => ['scheduled', 'rescheduled', 'needs_edit'].includes(lesson.status));
-  const payroll = data.payroll_items.filter((item) => item.coach_id === coach?.id && item.status !== 'void');
   const todayDone = today.length > 0 && today.every((lesson) => ['completed_pending_review', 'cancelled_pending_review', 'approved', 'rejected', 'archived', 'void'].includes(lesson.status));
+  const upcomingLessons = today.length ? today : ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 5);
 
   return (
     <div data-testid="coach-today-page" className="grid min-w-0 max-w-full gap-4 overflow-hidden md:gap-5">
-      <div className="grid min-w-0 max-w-full grid-cols-2 gap-3 xl:grid-cols-4">
-        <Card title={t("Today's lessons")} value={today.length} />
-        <Card title={t('This week')} value={ownLessons.filter((lesson) => daysUntil(lesson.scheduled_date) >= 0 && daysUntil(lesson.scheduled_date) <= 7).length} />
-        <Card title={t('Pending records')} value={pending.length} tone="amber" />
-        <Card title={t('Expected payroll')} value={formatMoney(payroll.reduce((sum, item) => sum + Number(item.pay_amount || 0), 0))} tone="green" />
-      </div>
+      <section className="min-w-0 overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-white to-sky-50 p-4 shadow-sm">
+        <p className="text-sm font-semibold text-sky-700 ty-wrap">{t('Today')} / 今日课程</p>
+        <h1 className="mt-1 text-xl font-semibold text-slate-950 ty-wrap">{coach?.display_name || profile.full_name || t('Coach')}</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-500 ty-wrap">{today.length ? t('Check time, venue, safety, then submit after class.') : t('No lessons today. Your next assigned lesson is shown below if available.')}</p>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-sky-100 bg-white p-3">
+            <p className="text-xs font-semibold text-sky-700 ty-wrap">{t("Today's lessons")}</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">{today.length}</p>
+          </div>
+          <div className="rounded-xl border border-amber-100 bg-white p-3">
+            <p className="text-xs font-semibold text-amber-700 ty-wrap">{t('Pending records')}</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">{pending.length}</p>
+          </div>
+        </div>
+      </section>
       {todayDone ? <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700 ty-wrap">{t('Approved — no further action needed.', "All today's lesson records submitted.")}</div> : null}
-      <CoachTodayCards lessons={today.length ? today : ownLessons.filter((lesson) => lesson.scheduled_date >= todayISO()).slice(0, 5)} data={data} />
+      <CoachTodayCards lessons={upcomingLessons} data={data} />
+      <div className="text-center">
+        <Button variant="ghost" onClick={() => go('/system-check')}>{t('My Account Check')}</Button>
+      </div>
     </div>
   );
 }
@@ -687,7 +699,7 @@ function CoachDashboard({ profile, data }) {
 function CoachTodayCards({ lessons, data }) {
   const { t } = useI18n();
   return (
-    <Section title={t('Today')} action={<Button variant="ghost" onClick={() => go('/system-check')}>{t('My Account Check')}</Button>}>
+    <Section title="今日课程 / Today">
       {lessons.length === 0 ? (
         <EmptyState title={t('No lessons today')} body={t('Assigned lessons will appear here with contact, map, safety alerts, and a fast submit button.')} />
       ) : (
@@ -701,26 +713,30 @@ function CoachTodayCards({ lessons, data }) {
             const approved = lesson.status === 'approved';
             const photoRequired = Boolean(cls?.photo_required || lesson.photo_required);
             const focus = currentFocusForClass(cls, data);
+            const alerts = studentAlerts(cls, data);
             return (
-              <article key={lesson.id} data-testid="coach-today-lesson-card" className="min-w-0 max-w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <article key={lesson.id} data-testid="coach-today-lesson-card" className="min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-sky-700">{lesson.start_time || t('Time TBC')} - {lesson.end_time || ''}</p>
-                    <h3 className="mt-1 text-lg font-semibold text-slate-950 ty-wrap">{cls?.class_name || lesson.lesson_code}</h3>
-                    <p className="mt-1 text-sm text-slate-700 ty-wrap">{classStudentNames(cls?.id, data)}</p>
-                    <p className="mt-1 text-sm text-slate-500 ty-wrap">{venue?.full_address || venue?.area || venue?.venue_name || t('Venue not set')}</p>
-                    {focus ? <p className="mt-2 rounded-lg bg-sky-50 p-2 text-sm font-medium text-sky-800 ty-wrap">{t('Current focus')}: {focus}</p> : null}
+                    <p className="text-lg font-bold text-sky-700 ty-wrap">{lesson.start_time || t('Time TBC')}{lesson.end_time ? ` - ${lesson.end_time}` : ''}</p>
+                    <h3 className="mt-1 text-base font-semibold text-slate-950 ty-wrap">{cls?.class_name || lesson.lesson_code}</h3>
+                    <p className="mt-1 text-sm font-medium text-slate-700 ty-wrap">{classStudentNames(cls?.id, data)}</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-500 ty-wrap">{venue?.full_address || venue?.area || venue?.venue_name || t('Venue not set')}</p>
                   </div>
                   <div className="flex flex-wrap gap-2 sm:grid sm:justify-items-end">
                     <StatusBadge value={lesson.status} />
-                    {photoRequired ? <StatusBadge value="needs_edit">{t('Photo required today')}</StatusBadge> : null}
+                    {photoRequired ? <StatusBadge value="needs_edit">需照片</StatusBadge> : null}
                   </div>
                 </div>
-                {studentAlerts(cls, data) ? <p className="mt-3 rounded-lg bg-rose-50 p-3 text-sm font-medium text-rose-700 ty-wrap"><span className="font-semibold">{t('Safety alert')}:</span> {studentAlerts(cls, data)}</p> : null}
-                <div className="mt-4 grid min-w-0 gap-2 lg:grid-cols-3">
-                  <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? t('WhatsApp') : t('No WhatsApp')}</a>
-                  <a className={`inline-flex min-h-10 max-w-full items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold ty-wrap ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? t('Map') : t('No map')}</a>
-                  <Button data-testid={!approved ? 'coach-submit-record-button' : undefined} disabled={approved} onClick={() => go(`/lessons/${lesson.id}`)}>{approved ? t('Approved') : t('Submit Record')}</Button>
+                {alerts ? <p className="mt-3 rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm font-medium text-rose-700 ty-wrap"><span className="font-semibold">安全:</span> {alerts}</p> : null}
+                {focus ? <p className="mt-3 rounded-xl border border-sky-100 bg-sky-50 p-3 text-sm font-medium text-sky-800 ty-wrap"><span className="font-semibold">重点:</span> {focus}</p> : null}
+                {approved ? <p className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm font-semibold text-emerald-700 ty-wrap">无需操作 / No action needed</p> : null}
+                <div className="mt-4 grid min-w-0 gap-2">
+                  <div className="grid min-w-0 grid-cols-2 gap-2">
+                    <a className={`inline-flex min-h-11 max-w-full items-center justify-center rounded-xl border px-3 py-2 text-center text-sm font-semibold ty-wrap ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? t('WhatsApp') : t('No WhatsApp')}</a>
+                    <a className={`inline-flex min-h-11 max-w-full items-center justify-center rounded-xl border px-3 py-2 text-center text-sm font-semibold ty-wrap ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? '地图' : t('No map')}</a>
+                  </div>
+                  <Button data-testid={!approved ? 'coach-submit-record-button' : undefined} className="min-h-12 w-full rounded-xl text-base" disabled={approved} onClick={() => go(`/lessons/${lesson.id}`)}>{approved ? '无需操作' : '提交'}</Button>
                 </div>
               </article>
             );
@@ -1317,34 +1333,34 @@ function StudentProfilePage({ profile, pathInfo, data, reload, toast }) {
   const whatsapp = customer?.whatsapp;
   const mapsLink = venue?.google_maps_link;
   const renewalWarning = activePackage && (Number(activePackage.remaining_lessons || 0) <= 1 || daysUntil(activePackage.expiry_date) <= 14);
+  const profileSafety = [student.safety_alert, student.health_notes, student.special_needs].filter(Boolean).join(' / ');
+  const currentFocus = skillProfile.current_focus || student.learning_goal || '-';
   return (
     <div data-testid="student-profile-page" className="grid gap-5">
-      <Section title={student.display_name || t('Student Profile')} action={<Button variant="ghost" onClick={() => go('/students')}>{t('Back')}</Button>}>
-        <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
-          <div>
-            <p className="text-sm font-semibold text-sky-700">{customer?.display_name || t('Family not set')}</p>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-950">{student.display_name || t('Unnamed student')}</h1>
-            <p className="mt-2 text-sm leading-6 text-slate-500">{t('Parent')}: {customer?.parent_name || '-'}{customer?.whatsapp ? ` / WhatsApp: ${customer.whatsapp}` : ''}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <StudentLevelBadge student={student} data={data} />
-              <StatusBadge value={student.status}>{t(student.status || 'active')}</StatusBadge>
-              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${renewalWarning ? 'bg-amber-50 text-amber-700 ring-amber-100' : 'bg-emerald-50 text-emerald-700 ring-emerald-100'}`}>{activePackage ? `${activePackage.remaining_lessons} ${t('lessons left')}` : t('No package')}</span>
+      <Section title={t('Student Profile')} action={<Button variant="ghost" onClick={() => go('/students')}>{t('Back')}</Button>}>
+        <div className="rounded-2xl border border-sky-100 bg-gradient-to-br from-white to-sky-50 p-4">
+          <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-sky-700 ty-wrap">{customer?.display_name || t('Family not set')}</p>
+              <h1 className="mt-1 text-2xl font-semibold text-slate-950 ty-wrap">{student.display_name || t('Unnamed student')}</h1>
+              <p className="mt-2 text-sm leading-6 text-slate-500 ty-wrap">{t('Parent')}: {customer?.parent_name || '-'}{customer?.whatsapp ? ` / WhatsApp: ${customer.whatsapp}` : ''}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <StudentLevelBadge student={student} data={data} />
+                <StatusBadge value={student.status}>{t(student.status || 'active')}</StatusBadge>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${renewalWarning ? 'bg-amber-50 text-amber-700 ring-amber-100' : 'bg-emerald-50 text-emerald-700 ring-emerald-100'}`}>{activePackage ? `剩余 ${activePackage.remaining_lessons}` : t('No package')}</span>
+              </div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:min-w-60 lg:grid-cols-1">
+              <a className={`inline-flex min-h-11 items-center justify-center rounded-xl border px-3 py-2 text-sm font-semibold ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? t('WhatsApp') : t('No WhatsApp')}</a>
+              <a className={`inline-flex min-h-11 items-center justify-center rounded-xl border px-3 py-2 text-sm font-semibold ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? '地图' : t('No map')}</a>
             </div>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:min-w-60 lg:grid-cols-1">
-            <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${whatsapp ? 'border-sky-100 bg-sky-50 text-sky-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={whatsapp ? `https://wa.me/${String(whatsapp).replace(/\D/g, '')}` : undefined} target="_blank" rel="noreferrer">{whatsapp ? t('WhatsApp Parent') : t('No WhatsApp')}</a>
-            <a className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold ${mapsLink ? 'border-slate-200 bg-white text-slate-700' : 'pointer-events-none border-slate-200 bg-slate-50 text-slate-400'}`} href={mapsLink || undefined} target="_blank" rel="noreferrer">{mapsLink ? t('Open Map') : t('No map link')}</a>
-          </div>
+          {profileSafety ? <p className="mt-4 rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm font-medium text-rose-700 ty-wrap"><span className="font-semibold">安全:</span> {profileSafety}</p> : null}
+          <p className="mt-3 rounded-xl border border-sky-100 bg-white p-3 text-sm font-medium text-sky-800 ty-wrap"><span className="font-semibold">重点:</span> {currentFocus}</p>
         </div>
       </Section>
-      {missingItems.length ? (
-        <Section title={t('Missing Data')}>
-          <p className="mb-3 text-sm leading-6 text-slate-500">{t('These items make daily operations smoother. Fill them when available.')}</p>
-          <div className="flex flex-wrap gap-2">{missingItems.map((label) => <span key={label} className="rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-700">{t(label)}</span>)}</div>
-        </Section>
-      ) : null}
       <div className="grid gap-5 xl:grid-cols-2">
-        <Section title={t('Safety')}>
+        <Section title="安全 / Safety">
           <div className="grid gap-3">
             {student.safety_alert ? <div className="rounded-lg border border-rose-100 bg-rose-50 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-rose-700">{t('Safety alert')}</p><p className="mt-1 text-sm font-semibold leading-6 text-rose-800">{student.safety_alert}</p></div> : null}
             <Info label={t('Health notes')} value={student.health_notes || t('Not confirmed yet')} />
@@ -1353,7 +1369,7 @@ function StudentProfilePage({ profile, pathInfo, data, reload, toast }) {
             {student.photo_consent_note ? <Info label={t('Consent note')} value={student.photo_consent_note} /> : null}
           </div>
         </Section>
-        <Section title={t('Lesson Setup')}>
+        <Section title="地点 / Lesson Setup">
           <div className="grid gap-3 sm:grid-cols-2">
             <Info label={t('Coach')} value={coach?.display_name || coach?.coach_code || t('Not set')} />
             <Info label={t('Class type')} value={primaryClass?.class_type || '-'} />
@@ -1365,7 +1381,7 @@ function StudentProfilePage({ profile, pathInfo, data, reload, toast }) {
             <Info label={t('Parking / pool note')} value={[venue?.parking_note, venue?.pool_depth_note].filter(Boolean).join(' / ') || '-'} />
           </div>
         </Section>
-        <Section title={t('Package')}>
+        <Section title="配套 / Package">
           <div className="grid gap-3 sm:grid-cols-2">
             <Info label={t('Remaining')} value={activePackage ? `${activePackage.remaining_lessons} ${t('lessons')}` : t('No package')} />
             <Info label={t('Used')} value={activePackage ? `${activePackage.used_lessons || 0} / ${activePackage.total_lessons || 0}` : '-'} />
@@ -1374,7 +1390,7 @@ function StudentProfilePage({ profile, pathInfo, data, reload, toast }) {
           </div>
           {renewalWarning ? <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-700">{t('Renewal follow-up recommended.')}</p> : null}
         </Section>
-        <Section title={t('Progress')} action={<Button variant="soft" onClick={() => setProgressStudent(student)}>{t('Update Progress')}</Button>}>
+        <Section title="进度 / Progress" action={<Button variant="soft" onClick={() => setProgressStudent(student)}>更新进度</Button>}>
           <div className="grid gap-3 sm:grid-cols-2">
             <Info label={t('Current level')} value={`${t('Level')} ${skillProfile.current_level}`} />
             <Info label={t('Level status')} value={t(levelStatusLabels[skillProfile.level_status] || skillProfile.level_status)} />
@@ -1385,7 +1401,13 @@ function StudentProfilePage({ profile, pathInfo, data, reload, toast }) {
           </div>
         </Section>
       </div>
-      <Section title={t('Recent Lessons')}>
+      {isAdmin && missingItems.length ? (
+        <Section title={t('Missing Data')}>
+          <p className="mb-3 text-sm leading-6 text-slate-500">{t('These items make daily operations smoother. Fill them when available.')}</p>
+          <div className="flex flex-wrap gap-2">{missingItems.map((label) => <span key={label} className="rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-700">{t(label)}</span>)}</div>
+        </Section>
+      ) : null}
+      <Section title="最近课程 / Recent Lessons">
         {recentLessons.length === 0 ? <EmptyState title={t('No lesson history yet')} body={t('Scheduled and completed lessons will appear here after this student is linked to a class.')} /> : (
           <div className="grid gap-3">
             {recentLessons.slice(0, 5).map((lesson) => {
@@ -2811,82 +2833,110 @@ function LessonDetail({ profile, pathInfo, data, reload, toast }) {
 
 function CoachLessonSubmission({ lesson, profile, cls, customer, venue, data, form, setForm, participants, setParticipants, rescheduleReason, setRescheduleReason, coachLocked, saveLesson, submitReview, reload, toast }) {
   const photoRequired = Boolean(cls?.photo_required || lesson.photo_required);
-  const [showScheduleChange, setShowScheduleChange] = useState(false);
   const [outcome, setOutcome] = useState(lesson.status === 'cancelled_pending_review' ? 'cancelled' : 'completed');
   const submitted = ['completed_pending_review', 'cancelled_pending_review'].includes(lesson.status);
   const lessonStudents = participants.map((item) => data.students.find((student) => student.id === item.student_id)).filter(Boolean);
+  const alerts = studentAlerts(cls, data);
+  const focus = currentFocusForClass(cls, data);
+  const attendanceOptions = [
+    ['present', 'Present'],
+    ['absent', 'Absent'],
+    ['sick', 'Sick'],
+    ['late', 'Late'],
+  ];
+  const updateParticipant = (index, updates) => setParticipants(participants.map((row, rowIndex) => rowIndex === index ? { ...row, ...updates } : row));
   return (
-    <div className="grid gap-5">
-      <Section title={cls?.class_name || lesson.lesson_code} action={<Button variant="ghost" onClick={() => go('/schedule')}>Back</Button>}>
-        <div className="grid gap-3 md:grid-cols-3">
-          <Info label="Time" value={`${lesson.scheduled_date} ${lesson.start_time || ''} - ${lesson.end_time || ''}`} />
-          <Info label="Students" value={classStudentNames(cls?.id, data)} />
-          <Info label="Status" value={<StatusBadge value={lesson.status} />} />
-          <Info label="WhatsApp" value={customer?.whatsapp || '-'} />
-          <Info label="Venue" value={venue?.full_address || venue?.venue_name || '-'} />
-          <Info label="Photo" value={photoRequired ? <StatusBadge value="needs_edit">Required</StatusBadge> : 'Optional'} />
-        </div>
-        {studentAlerts(cls, data) ? <p className="mt-4 rounded-lg border border-rose-100 bg-rose-50 p-3 text-sm font-semibold text-rose-700">Safety alert: {studentAlerts(cls, data)}</p> : <p className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm font-medium text-emerald-700">No health/safety alerts recorded.</p>}
-      </Section>
-      <Section title={coachLocked ? 'Read-only Lesson Record' : 'Submit Lesson Record'}>
-        {coachLocked ? <p className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">{lesson.status === 'approved' ? 'Approved - no further action needed.' : 'This lesson is closed.'} This lesson is read-only.</p> : null}
-        {submitted && !coachLocked ? <p className="mb-4 rounded-lg bg-sky-50 p-3 text-sm font-semibold text-sky-700">Record submitted for Admin review.</p> : null}
-        {!coachLocked ? (
-          <div className="mb-4 grid gap-3 rounded-lg border border-sky-100 bg-sky-50 p-3 sm:grid-cols-[1fr_auto] sm:items-end">
-            <Field label="Lesson result">
-              <Select value={outcome} onChange={(event) => setOutcome(event.target.value)}>
-                <option value="completed">Lesson completed</option>
-                <option value="cancelled">Lesson cancelled</option>
-              </Select>
-            </Field>
-            <Button type="button" variant="ghost" onClick={() => setShowScheduleChange((value) => !value)}>{showScheduleChange ? 'Hide date/time change' : 'Change date/time'}</Button>
+    <div className="grid gap-4">
+      <Section title="提交记录 / Submit Record" action={<Button variant="ghost" onClick={() => go('/schedule')}>Back</Button>}>
+        <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-lg font-bold text-sky-700 ty-wrap">{form.scheduled_date || lesson.scheduled_date} {form.start_time || lesson.start_time || ''}{form.end_time || lesson.end_time ? ` - ${form.end_time || lesson.end_time || ''}` : ''}</p>
+              <h1 className="mt-1 text-base font-semibold text-slate-950 ty-wrap">{cls?.class_name || lesson.lesson_code}</h1>
+              <p className="mt-1 text-sm font-medium text-slate-700 ty-wrap">{classStudentNames(cls?.id, data)}</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500 ty-wrap">{venue?.full_address || venue?.venue_name || '-'}</p>
+            </div>
+            <div className="flex flex-wrap gap-2 sm:justify-end">
+              <StatusBadge value={lesson.status} />
+              <StatusBadge value={photoRequired ? 'needs_edit' : 'approved'}>{photoRequired ? '需照片' : '照片可选'}</StatusBadge>
+            </div>
           </div>
-        ) : null}
-        {showScheduleChange ? (
-          <div className="mb-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-4">
+          {alerts ? <p className="mt-3 rounded-xl border border-rose-100 bg-white p-3 text-sm font-medium text-rose-700 ty-wrap"><span className="font-semibold">安全:</span> {alerts}</p> : null}
+          {focus ? <p className="mt-3 rounded-xl border border-sky-100 bg-white p-3 text-sm font-medium text-sky-800 ty-wrap"><span className="font-semibold">重点:</span> {focus}</p> : null}
+        </div>
+        {coachLocked ? <p className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">无需操作 / Approved - no further action needed. This lesson is read-only.</p> : null}
+        {submitted && !coachLocked ? <p className="mt-4 rounded-xl bg-sky-50 p-3 text-sm font-semibold text-sky-700">Record submitted for Admin review.</p> : null}
+      </Section>
+
+      <Section title="结果 / Result">
+        {!coachLocked ? (
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              ['completed', '完成'],
+              ['cancelled', '取消'],
+            ].map(([value, label]) => (
+              <button key={value} type="button" onClick={() => setOutcome(value)} className={`min-h-12 rounded-xl border px-3 py-2 text-sm font-semibold ${outcome === value ? 'border-sky-600 bg-sky-600 text-white' : 'border-slate-200 bg-white text-slate-700'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : <p className="text-sm font-semibold text-slate-700">{lesson.status}</p>}
+      </Section>
+
+      <Section title="点名 / Attendance">
+        <div className="grid gap-3">
+          {participants.map((item, index) => {
+            const student = data.students.find((row) => row.id === item.student_id);
+            return (
+              <article key={item.student_id} className="rounded-2xl border border-slate-200 bg-white p-3">
+                <p className="font-semibold text-slate-950 ty-wrap">{student?.display_name}</p>
+                {student?.safety_alert || student?.health_notes || student?.special_needs ? <p className="mt-1 text-xs font-medium text-rose-600 ty-wrap">{student?.safety_alert || student?.health_notes || student?.special_needs}</p> : null}
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {attendanceOptions.map(([value, label]) => (
+                    <button key={value} type="button" disabled={coachLocked} onClick={() => updateParticipant(index, { attendance: value })} className={`min-h-11 rounded-xl border px-2 py-2 text-sm font-semibold disabled:opacity-60 ${item.attendance === value ? 'border-sky-600 bg-sky-600 text-white' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-3 grid gap-3">
+                  <Textarea disabled={coachLocked} className="min-h-20" placeholder="备注 / Short progress note" value={item.progress_note || ''} onChange={(event) => updateParticipant(index, { progress_note: event.target.value })} />
+                  <Textarea disabled={coachLocked} className="min-h-20" placeholder="重点 / Next focus" value={item.next_focus || ''} onChange={(event) => updateParticipant(index, { next_focus: event.target.value })} />
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </Section>
+
+      <Section title="照片 / Photo">
+        <LessonPhotos lesson={lesson} profile={profile} data={data} reload={reload} toast={toast} disabled={coachLocked} />
+      </Section>
+
+      <Section title="进度 / Progress">
+        <p className="mb-3 text-sm leading-6 text-slate-500 ty-wrap">Optional: update 1-2 current focus skills only. Full syllabus stays separate.</p>
+        <CoachQuickProgress students={lessonStudents} lesson={lesson} data={data} profile={profile} reload={reload} toast={toast} disabled={coachLocked} />
+        <div className="mt-3">
+          <Button variant="ghost" onClick={() => go('/skill-levels')}>View full syllabus</Button>
+        </div>
+      </Section>
+
+      <details className="rounded-xl border border-slate-200 bg-white p-4">
+        <summary className="cursor-pointer font-semibold text-slate-800 ty-wrap">更改时间 / Change date/time</summary>
+        <div className="mt-4 grid gap-3">
+          <div className="grid gap-3 md:grid-cols-4">
             <Field label="Lesson date"><Input disabled={coachLocked} type="date" value={form.scheduled_date || ''} onChange={(event) => setForm({ ...form, scheduled_date: event.target.value })} /></Field>
             <Field label="Start time"><Input disabled={coachLocked} type="time" value={form.start_time || ''} onChange={(event) => setForm({ ...form, start_time: event.target.value })} /></Field>
             <Field label="End time"><Input disabled={coachLocked} type="time" value={form.end_time || ''} onChange={(event) => setForm({ ...form, end_time: event.target.value })} /></Field>
             <Field label="Reschedule reason"><Input disabled={coachLocked} value={rescheduleReason} onChange={(event) => setRescheduleReason(event.target.value)} placeholder="Required if time changed" /></Field>
           </div>
-        ) : null}
-        <div className="grid gap-3">
-          {participants.map((item, index) => {
-            const student = data.students.find((row) => row.id === item.student_id);
-            return (
-              <div key={item.student_id} className="rounded-lg border border-slate-200 p-3">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-semibold text-slate-950 ty-wrap">{student?.display_name}</p>
-                    <p className="text-xs text-rose-600">{student?.safety_alert || student?.health_notes || student?.special_needs || ''}</p>
-                  </div>
-                  <Select disabled={coachLocked} value={item.attendance} onChange={(event) => setParticipants(participants.map((row, rowIndex) => rowIndex === index ? { ...row, attendance: event.target.value } : row))}>{['present', 'absent', 'sick', 'late', 'no_show', 'not_applicable'].map((value) => <option key={value}>{value}</option>)}</Select>
-                </div>
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <Textarea disabled={coachLocked} placeholder="Short progress note" value={item.progress_note || ''} onChange={(event) => setParticipants(participants.map((row, rowIndex) => rowIndex === index ? { ...row, progress_note: event.target.value } : row))} />
-                  <Textarea disabled={coachLocked} placeholder="Next focus" value={item.next_focus || ''} onChange={(event) => setParticipants(participants.map((row, rowIndex) => rowIndex === index ? { ...row, next_focus: event.target.value } : row))} />
-                </div>
-              </div>
-            );
-          })}
+          <Field label="备注 / Coach note"><Textarea disabled={coachLocked} value={form.coach_notes || ''} onChange={(event) => setForm({ ...form, coach_notes: event.target.value })} placeholder="Optional note for Admin" /></Field>
+          <Button variant="ghost" onClick={saveLesson} disabled={coachLocked}>Save changes</Button>
         </div>
-        <Field label="Coach note"><Textarea disabled={coachLocked} value={form.coach_notes || ''} onChange={(event) => setForm({ ...form, coach_notes: event.target.value })} placeholder="Optional note for Admin" /></Field>
-        <LessonPhotos lesson={lesson} profile={profile} data={data} reload={reload} toast={toast} disabled={coachLocked} />
-        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="font-semibold text-slate-950 ty-wrap">Update student progress</p>
-              <p className="mt-1 text-sm leading-6 text-slate-500">Optional. Quickly update 1-2 current focus skills. Full checklist stays in Levels & Progress.</p>
-            </div>
-            <Button variant="ghost" onClick={() => go('/skill-levels')}>View full syllabus</Button>
-          </div>
-          <CoachQuickProgress students={lessonStudents} lesson={lesson} data={data} profile={profile} reload={reload} toast={toast} disabled={coachLocked} />
-        </div>
-        <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] mt-4 flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white/95 p-3 shadow-lg shadow-slate-200/70 backdrop-blur lg:bottom-3">
-          <Button variant="ghost" onClick={saveLesson} disabled={coachLocked}>Save draft</Button>
-          <Button data-testid="coach-submit-record-button" className="min-h-12 flex-1 text-base sm:flex-none" onClick={() => submitReview(outcome === 'cancelled' ? 'cancelled_pending_review' : 'completed_pending_review')} disabled={coachLocked}>Submit Record</Button>
-        </div>
-      </Section>
+      </details>
+
+      <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 mt-1 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg shadow-slate-200/70 backdrop-blur lg:bottom-3">
+        <Button data-testid="coach-submit-record-button" className="min-h-12 w-full rounded-xl text-base" onClick={() => submitReview(outcome === 'cancelled' ? 'cancelled_pending_review' : 'completed_pending_review')} disabled={coachLocked}>提交</Button>
+      </div>
     </div>
   );
 }
@@ -2994,7 +3044,7 @@ function CoachQuickProgressCard({ student, lesson, data, profile, reload, toast,
       <div className="mt-3 grid gap-2">
         <Input disabled={disabled} value={focus} onChange={(event) => setFocus(event.target.value)} placeholder="Next focus" />
         <Textarea disabled={disabled} className="min-h-16" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional progress note" />
-        <Button disabled={disabled || saving} onClick={save}>{saving ? 'Saving...' : 'Save progress'}</Button>
+        <Button variant="soft" disabled={disabled || saving} onClick={save}>{saving ? 'Saving...' : 'Save progress'}</Button>
       </div>
     </article>
   );
@@ -3042,8 +3092,12 @@ function LessonPhotos({ lesson, profile, data, reload, toast, disabled = false, 
   };
   return (
     <div className="mt-4 rounded-lg border border-slate-200 p-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <Select disabled={disabled} value={type} onChange={(event) => setType(event.target.value)}>{photoTypes.map((item) => <option key={item}>{item}</option>)}</Select>
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+        {isAdmin ? (
+          <Select disabled={disabled} value={type} onChange={(event) => setType(event.target.value)}>{photoTypes.map((item) => <option key={item}>{item}</option>)}</Select>
+        ) : (
+          <div className="rounded-xl bg-sky-50 p-3 text-sm font-semibold text-sky-700 ty-wrap">照片 / Add lesson photo</div>
+        )}
         <Input disabled={disabled} type="file" accept="image/*" onChange={upload} />
       </div>
       <div className="mt-3 grid gap-2 md:grid-cols-3">
