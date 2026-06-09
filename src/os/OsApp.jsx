@@ -1604,10 +1604,10 @@ function MoneyPage(props) {
   const { t } = useI18n();
   const [active, setActive] = useState('summary');
   const tabs = [
-    ['summary', 'Summary'],
-    ['payments', 'Payments'],
-    ['payroll', 'Payroll'],
-    ['expenses', 'Expenses'],
+    ['summary', '导出 / Export'],
+    ['payments', '收款 / Payments'],
+    ['payroll', '教练工资 / Coach Pay'],
+    ['expenses', '支出 / Expenses'],
   ];
   const { data } = props;
   const month = todayISO().slice(0, 7);
@@ -1616,26 +1616,35 @@ function MoneyPage(props) {
   const salary = data.payroll_items.filter((row) => row.status !== 'void' && row.status !== 'paid').reduce((sum, row) => sum + Number(row.pay_amount || 0), 0);
   return (
     <div className="grid gap-5">
-      <Section title={t('Money')}>
-        <p className="text-sm leading-6 text-slate-500">{t('Admin-only monthly records. Payments are money received from customers, Payroll is coach salary to pay, Expenses are business costs, and Summary is the simple monthly view for records/accounting.')}</p>
-        <div className="mt-4 grid gap-3 md:grid-cols-4">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950 ty-wrap">{t('Summary')}</p><p className="mt-1 text-sm text-slate-500 ty-wrap">{t('Quick monthly picture.')}</p></div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950 ty-wrap">{t('Payments')}</p><p className="mt-1 text-sm text-slate-500 ty-wrap">{t('Money received from customers.')}</p></div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950 ty-wrap">{t('Payroll')}</p><p className="mt-1 text-sm text-slate-500 ty-wrap">{t('Coach salary to pay.')}</p></div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-semibold text-slate-950 ty-wrap">{t('Expenses')}</p><p className="mt-1 text-sm text-slate-500 ty-wrap">{t('Business costs and receipts.')}</p></div>
+      <section className="min-w-0 overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-white to-sky-50 p-4 shadow-sm">
+        <p className="text-sm font-semibold text-sky-700 ty-wrap">财务 / {t('Money')}</p>
+        <h1 className="mt-1 text-xl font-semibold text-slate-950 ty-wrap">{month} {t('business summary')}</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-600 ty-wrap">收款是客户付款，教练工资是待支付薪水，支出是业务成本。收入不是首页重点，但这里保留给 Admin 记录。</p>
+        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="rounded-xl border border-emerald-100 bg-white p-3">
+            <p className="text-xs font-semibold text-emerald-700 ty-wrap">收款</p>
+            <p className="mt-1 text-lg font-semibold text-slate-950 ty-wrap">{formatMoney(payments)}</p>
+          </div>
+          <div className="rounded-xl border border-amber-100 bg-white p-3">
+            <p className="text-xs font-semibold text-amber-700 ty-wrap">教练工资</p>
+            <p className="mt-1 text-lg font-semibold text-slate-950 ty-wrap">{formatMoney(salary)}</p>
+          </div>
+          <div className="rounded-xl border border-rose-100 bg-white p-3">
+            <p className="text-xs font-semibold text-rose-700 ty-wrap">支出</p>
+            <p className="mt-1 text-lg font-semibold text-slate-950 ty-wrap">{formatMoney(expenses)}</p>
+          </div>
+          <div className="rounded-xl border border-sky-100 bg-white p-3">
+            <p className="text-xs font-semibold text-sky-700 ty-wrap">预估净额</p>
+            <p className="mt-1 text-lg font-semibold text-slate-950 ty-wrap">{formatMoney(payments - expenses - salary)}</p>
+          </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           {tabs.map(([key, label]) => <Button key={key} variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{t(label)}</Button>)}
         </div>
-      </Section>
+      </section>
       {active === 'summary' ? (
-        <Section title={`${t('Accounting Summary')} ${month}`}>
-          <div className="grid gap-3 md:grid-cols-4">
-            <Card title={t('Payments collected')} value={formatMoney(payments)} tone="green" />
-            <Card title={t('Expenses')} value={formatMoney(expenses)} tone="rose" />
-            <Card title={t('Coach salary payable')} value={formatMoney(salary)} tone="amber" />
-            <Card title={t('Estimated net')} value={formatMoney(payments - expenses - salary)} />
-          </div>
+        <Section title={`导出 / ${t('Accounting Summary')} ${month}`}>
+          <p className="mb-4 text-sm leading-6 text-slate-500 ty-wrap">Download simple CSV exports for accounting records. Storage files are not included here.</p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button variant="ghost" onClick={() => downloadCsv(`ty-payments-${month}.csv`, data.package_financials)}>{t('Export payments')}</Button>
             <Button variant="ghost" onClick={() => downloadCsv(`ty-expenses-${month}.csv`, data.expenses)}>{t('Export expenses')}</Button>
@@ -1643,10 +1652,82 @@ function MoneyPage(props) {
           </div>
         </Section>
       ) : null}
-      {active === 'payments' ? <PaymentsPage {...props} /> : null}
+      {active === 'payments' ? (
+        <>
+          <MoneyPaymentCards rows={data.package_financials} data={data} />
+          <details className="rounded-2xl border border-slate-200 bg-white p-4">
+            <summary className="cursor-pointer font-semibold text-slate-950">Advanced payment records</summary>
+            <div className="mt-4"><PaymentsPage {...props} /></div>
+          </details>
+        </>
+      ) : null}
       {active === 'payroll' ? <PayrollPage {...props} /> : null}
-      {active === 'expenses' ? <ExpensesPage {...props} /> : null}
+      {active === 'expenses' ? (
+        <>
+          <MoneyExpenseCards rows={data.expenses} />
+          <details className="rounded-2xl border border-slate-200 bg-white p-4">
+            <summary className="cursor-pointer font-semibold text-slate-950">Advanced expense records</summary>
+            <div className="mt-4"><ExpensesPage {...props} /></div>
+          </details>
+        </>
+      ) : null}
     </div>
+  );
+}
+
+function MoneyPaymentCards({ rows, data }) {
+  const recent = [...rows].sort((a, b) => String(b.payment_date || '').localeCompare(String(a.payment_date || ''))).slice(0, 6);
+  if (recent.length === 0) return <Section title="收款 / Payments"><EmptyState title="No payments yet" body="Recent customer payments will appear here after Admin records them." /></Section>;
+  return (
+    <Section title="收款 / Payments">
+      <p className="mb-4 text-sm leading-6 text-slate-500 ty-wrap">Recent customer payments. Proof previews remain Admin-only.</p>
+      <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+        {recent.map((row) => {
+          const customer = data.customers.find((item) => item.id === row.customer_id);
+          const pkg = data.packages.find((item) => item.id === row.package_id);
+          return (
+            <article key={row.id} className="min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-950 ty-wrap">{customer?.display_name || customer?.customer_code || 'Customer'}</p>
+                  <p className="mt-1 text-sm text-slate-500 ty-wrap">{pkg?.package_code || 'Package'} · {row.payment_date || '-'}</p>
+                </div>
+                <StatusBadge value={row.payment_status}>{row.payment_status}</StatusBadge>
+              </div>
+              <p className="mt-3 text-xl font-semibold text-slate-950 ty-wrap">{formatMoney(row.amount)}</p>
+              <p className="mt-1 text-sm text-slate-500 ty-wrap">{row.payment_method || '-'}</p>
+              {row.proof_storage_path ? <div className="mt-3"><StoragePreview bucket="payment-proofs" path={row.proof_storage_path} /></div> : null}
+            </article>
+          );
+        })}
+      </div>
+    </Section>
+  );
+}
+
+function MoneyExpenseCards({ rows }) {
+  const recent = [...rows].sort((a, b) => String(b.expense_date || '').localeCompare(String(a.expense_date || ''))).slice(0, 6);
+  if (recent.length === 0) return <Section title="支出 / Expenses"><EmptyState title="No expenses yet" body="Recent business costs will appear here after Admin records them." /></Section>;
+  return (
+    <Section title="支出 / Expenses">
+      <p className="mb-4 text-sm leading-6 text-slate-500 ty-wrap">Recent business costs. Receipts remain Admin-only.</p>
+      <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+        {recent.map((row) => (
+          <article key={row.id} className="min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-slate-950 ty-wrap">{row.category || 'Expense'}</p>
+                <p className="mt-1 text-sm text-slate-500 ty-wrap">{row.vendor || 'No vendor'} · {row.expense_date || '-'}</p>
+              </div>
+              <StatusBadge value={row.category || 'other'}>{row.category || 'other'}</StatusBadge>
+            </div>
+            <p className="mt-3 text-xl font-semibold text-slate-950 ty-wrap">{formatMoney(row.amount)}</p>
+            <p className="mt-1 text-sm text-slate-500 ty-wrap">{row.payment_method || '-'}</p>
+            {row.receipt_storage_path ? <div className="mt-3"><StoragePreview bucket="expense-receipts" path={row.receipt_storage_path} /></div> : null}
+          </article>
+        ))}
+      </div>
+    </Section>
   );
 }
 
@@ -2597,19 +2678,49 @@ function LessonsPage({ profile, data, reload, toast }) {
   const flexibleClasses = data.classes.filter((cls) => cls.scheduling_mode === 'flexible' && (isAdmin || cls.assigned_coach_id === coach?.id));
   const fixedLessons = rows.filter((lesson) => lesson.scheduling_mode === 'fixed_weekly');
   const flexibleLessons = rows.filter((lesson) => lesson.scheduling_mode === 'flexible');
+  const todayLessons = rows.filter((lesson) => lesson.scheduled_date === todayISO());
+  const weekLessons = rows.filter((lesson) => daysUntil(lesson.scheduled_date) >= 0 && daysUntil(lesson.scheduled_date) <= 7);
+  const flexibleNeedingAppointment = flexibleClasses.filter((cls) => !flexibleLessons.some((lesson) => lesson.class_id === cls.id && ['scheduled', 'rescheduled'].includes(lesson.status)));
 
   return (
     <div className="grid gap-5">
-      <Section title={t('Schedule')} action={<div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">{activeMode === 'fixed_weekly' && isAdmin ? <Button onClick={() => setRecurring({})}>{t('Generate Upcoming Lessons')}</Button> : null}{activeMode === 'flexible' ? <Button onClick={() => setFlexible({})}>{t('Create Flexible Lesson')}</Button> : null}<Button variant="ghost" onClick={() => setShowFilters((value) => !value)}>{showFilters ? t('Hide advanced filters') : t('Advanced filters')}</Button></div>}>
+      <section className="min-w-0 overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-white to-sky-50 p-4 shadow-sm">
+        <p className="text-sm font-semibold text-sky-700 ty-wrap">课程安排 / {t('Schedule')}</p>
+        <h1 className="mt-1 text-xl font-semibold text-slate-950 ty-wrap">{activeMode === 'fixed_weekly' ? '固定每周' : '灵活安排'}</h1>
+        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="rounded-xl border border-sky-100 bg-white p-3">
+            <p className="text-xs font-semibold text-sky-700 ty-wrap">今日课程</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">{todayLessons.length}</p>
+          </div>
+          <div className="rounded-xl border border-sky-100 bg-white p-3">
+            <p className="text-xs font-semibold text-sky-700 ty-wrap">本周课程</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">{weekLessons.length}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <p className="text-xs font-semibold text-slate-600 ty-wrap">固定每周</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">{fixedSchedules.length}</p>
+          </div>
+          <div className="rounded-xl border border-amber-100 bg-white p-3">
+            <p className="text-xs font-semibold text-amber-700 ty-wrap">待安排</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">{flexibleNeedingAppointment.length}</p>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
+          {activeMode === 'fixed_weekly' && isAdmin ? <Button className="min-h-12 rounded-xl" onClick={() => setRecurring({})}>Generate / 生成</Button> : null}
+          {activeMode === 'flexible' ? <Button className="min-h-12 rounded-xl" onClick={() => setFlexible({})}>Schedule lesson / 安排课程</Button> : null}
+          <Button variant="ghost" onClick={() => setShowFilters((value) => !value)}>{showFilters ? t('Hide advanced filters') : t('Advanced filters')}</Button>
+        </div>
+      </section>
+      <Section title={t('Schedule')}>
         <p className="text-sm leading-6 text-slate-500 ty-wrap">{t('Choose one mode at a time. Fixed Weekly is for regular weekly classes. Flexible is for lessons arranged by coach and customer.')}</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <button className={`min-w-0 rounded-lg border p-4 text-left ${activeMode === 'fixed_weekly' ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50'}`} onClick={() => setActiveMode('fixed_weekly')}>
-            <p className="font-semibold text-slate-950 ty-wrap">{t('Fixed Weekly')}</p>
+          <button className={`min-w-0 rounded-2xl border p-4 text-left ${activeMode === 'fixed_weekly' ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50'}`} onClick={() => setActiveMode('fixed_weekly')}>
+            <p className="font-semibold text-slate-950 ty-wrap">固定每周 / {t('Fixed Weekly')}</p>
             <p className="mt-1 text-sm text-slate-600 ty-wrap">{t('Regular weekly classes. Rescheduling one lesson does not change the weekly pattern.')}</p>
             <p className="mt-2 text-xs font-semibold text-sky-700 ty-wrap">{fixedSchedules.length} {t('schedule(s)')}, {fixedLessons.length} {t('lesson(s)')}</p>
           </button>
-          <button className={`min-w-0 rounded-lg border p-4 text-left ${activeMode === 'flexible' ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50'}`} onClick={() => setActiveMode('flexible')}>
-            <p className="font-semibold text-slate-950 ty-wrap">{t('Flexible / Coach-arranged')}</p>
+          <button className={`min-w-0 rounded-2xl border p-4 text-left ${activeMode === 'flexible' ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50'}`} onClick={() => setActiveMode('flexible')}>
+            <p className="font-semibold text-slate-950 ty-wrap">灵活安排 / {t('Flexible / Coach-arranged')}</p>
             <p className="mt-1 text-sm text-slate-600 ty-wrap">{t('Appointment-style lessons arranged with the customer in WhatsApp.')}</p>
             <p className="mt-2 text-xs font-semibold text-sky-700 ty-wrap">{flexibleClasses.length} {t('class(es)')}, {flexibleLessons.length} {t('appointment(s)')}</p>
           </button>
@@ -2645,7 +2756,7 @@ function LessonsPage({ profile, data, reload, toast }) {
       ) : null}
       {activeMode === 'flexible' ? (
         <>
-          <Section title={t('Flexible Classes Needing Appointment')} action={<Button onClick={() => setFlexible({})}>{t('Create Flexible Lesson')}</Button>}>
+          <Section title={t('Flexible Classes Needing Appointment')}>
             <p className="mb-4 text-sm leading-6 text-slate-500">{t('Use this for classes where coach and customer arrange each lesson time directly. Coach-created or rescheduled appointments appear for Admin attention.')}</p>
             <FlexibleClassCardList rows={flexibleClasses} data={data} onCreate={() => setFlexible({})} />
             <DataTable className="hidden" rows={flexibleClasses} empty="No flexible classes." columns={[
@@ -2674,16 +2785,17 @@ function FixedScheduleCardList({ rows, data }) {
         const venue = data.venues.find((item) => item.id === row.venue_id);
         const nextLesson = data.lessons.filter((lesson) => lesson.recurring_schedule_id === row.id && lesson.scheduled_date >= todayISO()).sort((a, b) => String(a.scheduled_date).localeCompare(String(b.scheduled_date)))[0];
         return (
-          <article key={row.id} className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <article key={row.id} className="min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-sky-700">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][row.day_of_week] || '-'} · {row.start_time || ''} - {row.end_time || ''}</p>
                 <h3 className="mt-1 font-semibold text-slate-950 ty-wrap">{cls?.class_name || '-'}</h3>
+                <p className="mt-1 text-sm text-slate-600 ty-wrap">{classStudentNames(cls?.id, data)}</p>
                 <p className="mt-1 text-sm text-slate-500 ty-wrap">{coach?.display_name || '-'} · {venue?.venue_name || venue?.area || 'Venue not set'}</p>
               </div>
               <StatusBadge value={row.status}>{row.status}</StatusBadge>
             </div>
-            <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600 ty-wrap">Next lesson: {nextLesson?.scheduled_date || '-'}</p>
+            <p className="mt-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-600 ty-wrap">Next lesson / 下堂: {nextLesson?.scheduled_date || '-'}</p>
           </article>
         );
       })}
@@ -2696,11 +2808,12 @@ function FlexibleClassCardList({ rows, data, onCreate }) {
   return (
     <div className="grid gap-3 lg:grid-cols-2">
       {rows.map((row) => (
-        <article key={row.id} className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <article key={row.id} className="min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="font-semibold text-slate-950 ty-wrap">{row.class_name}</p>
           <p className="mt-1 text-sm text-slate-500 ty-wrap">{data.coaches.find((item) => item.id === row.assigned_coach_id)?.display_name || 'Coach not set'}</p>
           <p className="mt-1 text-sm text-slate-600 ty-wrap">{classStudentNames(row.id, data)}</p>
-          <Button className="mt-4 w-full" onClick={onCreate}>Create appointment</Button>
+          <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-800 ty-wrap">Coach/customer chooses the date and time. Admin can see new or changed appointments.</p>
+          <Button className="mt-4 min-h-12 w-full rounded-xl" onClick={onCreate}>Schedule lesson / 安排课程</Button>
         </article>
       ))}
     </div>
@@ -3323,15 +3436,37 @@ function ReviewPage({ data, reload, toast }) {
   };
   return (
     <div className="grid min-w-0 max-w-full gap-5 overflow-hidden">
+      <section className="min-w-0 overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-white to-sky-50 p-4 shadow-sm">
+        <p className="text-sm font-semibold text-sky-700 ty-wrap">审核中心 / {t('Review')}</p>
+        <h1 className="mt-1 text-xl font-semibold text-slate-950 ty-wrap">{groups.pending.length ? `${groups.pending.length} ${t('waiting for approval')}` : t('No review needed')}</h1>
+        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="rounded-xl border border-sky-100 bg-white p-3">
+            <p className="text-xs font-semibold text-sky-700 ty-wrap">待审核</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">{groups.pending.length}</p>
+          </div>
+          <div className="rounded-xl border border-amber-100 bg-white p-3">
+            <p className="text-xs font-semibold text-amber-700 ty-wrap">需要修改</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">{groups.needs_edit.length}</p>
+          </div>
+          <div className="rounded-xl border border-rose-100 bg-white p-3">
+            <p className="text-xs font-semibold text-rose-700 ty-wrap">缺照片</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">{groups.missing_photos.length}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <p className="text-xs font-semibold text-slate-600 ty-wrap">取消/改期</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">{groups.cancelled.length + groups.rescheduled.length}</p>
+          </div>
+        </div>
+      </section>
       <Section title={t('Review')}>
         <p className="text-sm leading-6 text-slate-500 ty-wrap">{t('Use this like an approval inbox. Each card shows what Admin needs before approving, requesting an edit, or rejecting.')}</p>
         <div className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible">
           {[
-            ['pending', 'Pending lesson records'],
-            ['rescheduled', 'Rescheduled lessons'],
-            ['cancelled', 'Cancelled lessons'],
-            ['needs_edit', 'Needs edit'],
-            ['missing_photos', 'Missing required photos'],
+            ['pending', '待审核 / Pending'],
+            ['needs_edit', '需要修改 / Needs Edit'],
+            ['missing_photos', '缺照片 / Missing Photo'],
+            ['cancelled', '已取消 / Cancelled'],
+            ['rescheduled', '已改期 / Rescheduled'],
           ].map(([key, label]) => <Button key={key} className="whitespace-nowrap" variant={active === key ? 'primary' : 'ghost'} onClick={() => setActive(key)}>{t(label)} ({groups[key].length})</Button>)}
         </div>
       </Section>
@@ -3342,10 +3477,11 @@ function ReviewPage({ data, reload, toast }) {
               const cls = data.classes.find((item) => item.id === lesson.class_id);
               const coach = data.coaches.find((item) => item.id === lesson.coach_id);
               const pkg = data.packages.find((item) => item.id === lesson.package_id);
+              const venue = data.venues.find((item) => item.id === lesson.venue_id);
               const photoCount = (data.lesson_photos || []).filter((photo) => photo.lesson_id === lesson.id).length;
               const photoRequired = cls?.photo_required && photoCount === 0;
               return (
-                <article key={lesson.id} className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <article key={lesson.id} className="min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-sky-700">{formatDate(lesson.scheduled_date)} {lesson.start_time || ''}</p>
@@ -3356,15 +3492,16 @@ function ReviewPage({ data, reload, toast }) {
                   </div>
                   <div className="mt-4 grid gap-2 text-sm text-slate-600">
                     <p className="ty-wrap"><span className="font-semibold text-slate-800">{t('Coach')}:</span> {coach?.display_name || '-'}</p>
+                    <p className="ty-wrap"><span className="font-semibold text-slate-800">{t('Venue')}:</span> {venue?.venue_name || venue?.area || '-'}</p>
                     <p className="ty-wrap"><span className="font-semibold text-slate-800">{t('Package')}:</span> {pkg?.package_code || t('No linked package')}{pkg ? `, ${pkg.remaining_lessons} ${t('lesson(s) left')}` : ''}</p>
                     <p className="ty-wrap"><span className="font-semibold text-slate-800">{t('Notes')}:</span> {lesson.coach_notes || t('No coach note')}</p>
                     <p className="ty-wrap"><span className="font-semibold text-slate-800">{t('Photos')}:</span> {photoRequired ? <StatusBadge value="needs_edit">{t('Missing required photo')}</StatusBadge> : `${photoCount} ${t('uploaded')}`}</p>
                   </div>
-                  <p className={`mt-4 rounded-lg p-3 text-sm font-medium ty-wrap ${lesson.status === 'cancelled_pending_review' ? 'bg-amber-50 text-amber-800' : 'bg-sky-50 text-sky-800'}`}>{approvalImpactText(lesson, t)}</p>
+                  <p className={`mt-4 rounded-xl p-3 text-sm font-medium ty-wrap ${lesson.status === 'cancelled_pending_review' ? 'bg-amber-50 text-amber-800' : 'bg-sky-50 text-sky-800'}`}><span className="font-semibold">影响 / Impact:</span> {approvalImpactText(lesson, t)}</p>
                   <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:flex xl:flex-wrap">
-                    <Button className="w-full xl:w-auto" onClick={() => approve(lesson)}>{t('Approve')}</Button>
-                    <Button className="w-full xl:w-auto" variant="soft" onClick={() => updateStatus(lesson, 'needs_edit')}>{t('Request edit')}</Button>
-                    <Button className="w-full xl:w-auto" variant="danger" onClick={() => updateStatus(lesson, 'rejected')}>{t('Reject')}</Button>
+                    <Button className="min-h-12 w-full rounded-xl xl:w-auto" onClick={() => approve(lesson)}>批准 / {t('Approve')}</Button>
+                    <Button className="min-h-12 w-full rounded-xl xl:w-auto" variant="soft" onClick={() => updateStatus(lesson, 'needs_edit')}>要求修改 / {t('Request edit')}</Button>
+                    <Button className="min-h-12 w-full rounded-xl xl:w-auto" variant="danger" onClick={() => updateStatus(lesson, 'rejected')}>拒绝 / {t('Reject')}</Button>
                     <Button className="w-full xl:w-auto" variant="ghost" onClick={() => go(`/lessons/${lesson.id}`)}>{t('Open')}</Button>
                   </div>
                 </article>
